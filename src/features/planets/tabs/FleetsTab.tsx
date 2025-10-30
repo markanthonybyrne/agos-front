@@ -1,32 +1,171 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Planet } from '@/types/api.types'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber } from '@/lib/formatters'
-import { Ship, Clock, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
+import { Ship, Clock, MapPin, AlertCircle, CheckCircle, Plus, Edit2, Move } from 'lucide-react'
+import { useGetFleetsQuery, useCancelFleetMutation } from '@/api/endpoints/fleetsApi'
+import { useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useMemo, useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { FleetBuilder } from '@/features/fleets/FleetBuilder'
 
 interface FleetsTabProps {
   planet: Planet
 }
 
 export function FleetsTab({ planet }: FleetsTabProps) {
-  // This would typically come from an API call to get fleets at this planet
-  // For now, we'll show a placeholder
-  const fleetsAtPlanet = [
-    {
-      id: 1,
-      ships: { fighters: 10, corvettes: 2 },
-      status: 'stationed' as const,
-      arrival_tick: null,
-    },
-    {
-      id: 2,
-      ships: { fighters: 5, frigates: 1 },
-      status: 'in_transit' as const,
-      arrival_tick: 1005,
-    },
-  ]
+  const { data: fleetsData, isLoading, error, refetch } = useGetFleetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+  const [selectedFleet, setSelectedFleet] = useState<any>(null)
+  const [cancelFleet] = useCancelFleetMutation()
+  
+  // Debug logging
+  console.log('FleetsTab mounted for planet:', planet.id, planet.name)
+  console.log('Planet ID type:', typeof planet.id, 'Value:', planet.id)
+  console.log('Fleets query state:', { isLoading, error, hasData: !!fleetsData })
+  console.log('Fleets data:', fleetsData)
+  console.log('Fleets array:', fleetsData?.fleets)
+  console.log('First fleet origin ID:', fleetsData?.fleets?.[0]?.origin?.id, 'Type:', typeof fleetsData?.fleets?.[0]?.origin?.id)
+  
+  // Ensure query runs when component mounts
+  useEffect(() => {
+    console.log('FleetsTab useEffect: Component mounted, forcing refetch')
+    refetch()
+  }, [refetch])
+  
+  // Parse planet coordinate to match against fleet coordinates
+  const planetCoord = useMemo(() => {
+    console.log('FleetsTab: Parsing planet coordinate', planet.coordinate)
+    if (!planet.coordinate) {
+      console.log('FleetsTab: No planet coordinate found')
+      return null
+    }
+    const coordStr = typeof planet.coordinate === 'string' 
+      ? planet.coordinate 
+      : (planet.coordinate as any)?.coordinate || String(planet.coordinate)
+    console.log('FleetsTab: Coordinate string:', coordStr)
+    const parts = String(coordStr).split(':')
+    console.log('FleetsTab: Coordinate parts:', parts)
+    if (parts.length === 4) {
+      const parsed = {
+        quadrant: parseInt(parts[0]),
+        sector: parseInt(parts[1]),
+        galaxy: parseInt(parts[2]),
+        planet: parseInt(parts[3]),
+      }
+      console.log('FleetsTab: Parsed coordinate:', parsed)
+      return parsed
+    }
+    console.log('FleetsTab: Invalid coordinate format, parts.length:', parts.length)
+    return null
+  }, [planet.coordinate])
+
+  // Filter fleets at this planet
+  const fleetsAtPlanet = useMemo(() => {
+    console.log('FleetsTab filter: Starting filter check', {
+      hasFleetsData: !!fleetsData?.fleets,
+      fleetsArrayLength: fleetsData?.fleets?.length,
+      hasPlanetCoord: !!planetCoord,
+      planetCoord,
+      planetId: planet.id
+    })
+    
+    // Even if planetCoord is null, we can still filter by planet ID
+    if (!fleetsData?.fleets) {
+      console.log('FleetsTab filter: No fleets data')
+      return []
+    }
+    
+    // Filter by planet ID if coordinate is not available
+    if (!planetCoord) {
+      console.log('FleetsTab filter: No planet coord, filtering by planet ID only', planet.id)
+      return fleetsData.fleets.filter((fleet: any) => {
+        const fleetOriginId = Number(fleet.origin?.id)
+        const planetIdNum = Number(planet.id)
+        if (fleetOriginId && planetIdNum && fleetOriginId === planetIdNum) {
+          console.log('FleetsTab filter: Match by origin ID (no coord)', fleet.id, fleetOriginId, planetIdNum)
+          return true
+        }
+        return false
+      })
+    }
+    
+    console.log('FleetsTab filter: Starting filter with coordinate', { 
+      totalFleets: fleetsData.fleets.length,
+      planetId: planet.id,
+      planetCoord 
+    })
+    
+    const filtered = fleetsData.fleets.filter((fleet: any) => {
+      // Option 1: Check if fleet's origin planet ID matches this planet ID
+      // Convert both to numbers for comparison
+      const fleetOriginId = Number(fleet.origin?.id)
+      const planetIdNum = Number(planet.id)
+      if (fleetOriginId && planetIdNum && fleetOriginId === planetIdNum) {
+        console.log('FleetsTab filter: Match by origin ID', fleet.id, fleetOriginId, planetIdNum)
+        return true
+      }
+      
+      // Option 2: Check if fleet's destination coordinate matches this planet coordinate
+      const destCoord = fleet.destination?.coordinate
+      if (destCoord) {
+        const destParts = String(destCoord).split(':')
+        if (destParts.length === 4) {
+          const destCoordObj = {
+            quadrant: parseInt(destParts[0]),
+            sector: parseInt(destParts[1]),
+            galaxy: parseInt(destParts[2]),
+            planet: parseInt(destParts[3]),
+          }
+          
+          if (destCoordObj.quadrant === planetCoord.quadrant &&
+              destCoordObj.sector === planetCoord.sector &&
+              destCoordObj.galaxy === planetCoord.galaxy &&
+              destCoordObj.planet === planetCoord.planet) {
+            console.log('FleetsTab filter: Match by destination coordinate', fleet.id, destCoord)
+            return true
+          }
+        }
+      }
+      
+      // Option 3: Check if fleet's origin coordinate matches this planet coordinate
+      const originCoord = fleet.origin?.coordinate
+      if (originCoord) {
+        const originParts = String(originCoord).split(':')
+        if (originParts.length === 4) {
+          const originCoordObj = {
+            quadrant: parseInt(originParts[0]),
+            sector: parseInt(originParts[1]),
+            galaxy: parseInt(originParts[2]),
+            planet: parseInt(originParts[3]),
+          }
+          
+          if (originCoordObj.quadrant === planetCoord.quadrant &&
+              originCoordObj.sector === planetCoord.sector &&
+              originCoordObj.galaxy === planetCoord.galaxy &&
+              originCoordObj.planet === planetCoord.planet) {
+            console.log('FleetsTab filter: Match by origin coordinate', fleet.id, originCoord)
+            return true
+          }
+        }
+      }
+      
+      return false
+    })
+    
+    console.log('FleetsTab filter: Filtered result', { 
+      filteredCount: filtered.length,
+      filteredIds: filtered.map((f: any) => f.id) 
+    })
+    
+    return filtered
+  }, [fleetsData?.fleets, planetCoord, planet.id])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -64,6 +203,27 @@ export function FleetsTab({ planet }: FleetsTabProps) {
       normalized[key] = typeof value === 'number' ? value : 0
     }
     return Object.values(normalized).reduce((total, count) => total + Number(count || 0), 0)
+  }
+
+  // Get ship definitions for displaying ship names
+  const { data: shipDefinitions } = useGetShipDefinitionsQuery()
+  
+  const getShipName = (definitionId: number) => {
+    const shipDef = shipDefinitions?.ships?.find(s => s.id === definitionId)
+    return shipDef?.name || `Ship #${definitionId}`
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    )
   }
 
   return (
@@ -125,43 +285,110 @@ export function FleetsTab({ planet }: FleetsTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {console.log('FleetsTab render check:', { 
+            fleetsAtPlanetLength: fleetsAtPlanet.length, 
+            fleetsAtPlanet,
+            isLoading,
+            hasFleetsData: !!fleetsData?.fleets
+          })}
           {fleetsAtPlanet.length > 0 ? (
             <div className="space-y-4">
-              {fleetsAtPlanet.map((fleet) => {
+              {fleetsAtPlanet.map((fleet: any) => {
                 const StatusIcon = getStatusIcon(fleet.status)
                 const totalShips = getTotalShips(fleet.ships)
+                const isInTransit = fleet.status === 'in_transit'
+                const isStationed = fleet.status === 'stationed'
                 
                 return (
-                  <div key={fleet.id} className="flex items-center justify-between p-4 bg-muted/10 rounded-lg">
+                  <div key={fleet.id} className="flex items-center justify-between p-4 bg-muted/10 rounded-lg border border-border/50">
                     <div className="flex items-center gap-4">
                       <StatusIcon className={`w-5 h-5 ${getStatusColor(fleet.status)}`} />
                       <div>
-                        <h4 className="font-semibold">Fleet #{fleet.id}</h4>
+                        <h4 className="font-semibold">
+                          {fleet.name || `Fleet #${fleet.id}`}
+                        </h4>
                         <p className="text-sm text-muted-foreground">
                           {totalShips} ship{totalShips !== 1 ? 's' : ''} • {fleet.status.replace('_', ' ')}
                         </p>
+                        {fleet.origin && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            From: {fleet.origin.name} ({fleet.origin.coordinate})
+                          </p>
+                        )}
+                        {fleet.order_type && (
+                          <p className="text-xs text-muted-foreground">
+                            Order: {fleet.order_type}
+                          </p>
+                        )}
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className="flex gap-2 text-sm">
-                          {Object.entries(fleet.ships).map(([shipType, count]) => (
-                            <Badge key={shipType} variant="outline">
-                              {count} {shipType}
-                            </Badge>
-                          ))}
+                        <div className="flex gap-2 text-sm flex-wrap justify-end">
+                          {Array.isArray(fleet.ships) && fleet.ships.map((ship: any, idx: number) => {
+                            const shipName = getShipName(ship.definition_id)
+                            return (
+                              <Badge key={idx} variant="outline">
+                                {ship.quantity} {shipName}
+                              </Badge>
+                            )
+                          })}
                         </div>
-                        {fleet.arrival_tick && (
+                        {isInTransit && fleet.arrival_tick && (
                           <p className="text-xs text-muted-foreground mt-1">
                             Arrives at tick {fleet.arrival_tick}
                           </p>
                         )}
+                        {isStationed && fleet.departure_tick && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Departed tick {fleet.departure_tick}
+                          </p>
+                        )}
+                        {fleet.auto_return_on_failure && (
+                          <p className="text-xs text-yellow-400 mt-1">
+                            Auto-return on failure
+                          </p>
+                        )}
                       </div>
                       
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
+                      <div className="flex gap-2">
+                        {isStationed && (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedFleet(fleet)
+                                // TODO: Open move fleet dialog
+                                toast.info('Move fleet functionality coming soon')
+                              }}
+                            >
+                              <Move className="w-4 h-4 mr-1" />
+                              Move
+                            </Button>
+                          </>
+                        )}
+                        {isInTransit && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={async () => {
+                              if (confirm('Are you sure you want to cancel this fleet?')) {
+                                try {
+                                  await cancelFleet(fleet.id).unwrap()
+                                  toast.success('Fleet cancelled successfully')
+                                } catch (error: any) {
+                                  toast.error(error?.data?.message || 'Failed to cancel fleet')
+                                }
+                              }
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -183,41 +410,36 @@ export function FleetsTab({ planet }: FleetsTabProps) {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="panel-glass border-purple/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Ship className="w-5 h-5 text-purple-400" />
-              Send Fleet
-            </CardTitle>
-            <CardDescription>
-              Deploy a fleet from this planet
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" disabled>
-              Fleet Builder (Coming Soon)
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="panel-glass border-orange/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-orange-400" />
-              Station Fleet
-            </CardTitle>
-            <CardDescription>
-              Station a fleet at this planet
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="w-full" disabled>
-              Station Fleet (Coming Soon)
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="panel-glass border-purple/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Ship className="w-5 h-5 text-purple-400" />
+            Build New Fleet
+          </CardTitle>
+          <CardDescription>
+            Create a new fleet from ships on this planet
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Dialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full">
+                <Plus className="w-4 h-4 mr-2" />
+                Build Fleet
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Build Fleet from {planet.name}</DialogTitle>
+                <DialogDescription>
+                  Select ships from this planet to create a new fleet
+                </DialogDescription>
+              </DialogHeader>
+              <FleetBuilder planetId={Number(planet.id)} onSuccess={() => setBuildDialogOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
     </div>
   )
 }

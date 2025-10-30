@@ -18,6 +18,13 @@ import {
   Trash2
 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  useChangePasswordMutation,
+  useDeleteAccountMutation,
+} from '@/api/endpoints/authApi'
+import { useAppDispatch } from '@/app/hooks'
+import { logout } from '@/app/slices/authSlice'
+import { useNavigate } from 'react-router-dom'
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
@@ -39,8 +46,11 @@ export function AccountSettings({ onLogout, user }: AccountSettingsProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const dispatch = useAppDispatch()
+  const navigate = useNavigate()
+  
+  const [changePassword, { isLoading: isChangingPassword }] = useChangePasswordMutation()
+  const [deleteAccount, { isLoading: isDeletingAccount }] = useDeleteAccountMutation()
 
   const {
     register,
@@ -52,16 +62,16 @@ export function AccountSettings({ onLogout, user }: AccountSettingsProps) {
   })
 
   const handlePasswordChange = async (data: PasswordData) => {
-    setIsChangingPassword(true)
     try {
-      // TODO: Implement API call to change password
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
+      await changePassword({
+        current_password: data.currentPassword,
+        new_password: data.newPassword,
+        new_password_confirmation: data.confirmPassword,
+      }).unwrap()
       toast.success('Password changed successfully!')
       reset()
-    } catch (error) {
-      toast.error('Failed to change password')
-    } finally {
-      setIsChangingPassword(false)
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to change password')
     }
   }
 
@@ -75,16 +85,13 @@ export function AccountSettings({ onLogout, user }: AccountSettingsProps) {
       return
     }
 
-    setIsDeletingAccount(true)
     try {
-      // TODO: Implement API call to delete account
-      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate API call
+      await deleteAccount().unwrap()
       toast.success('Account deleted successfully')
-      onLogout()
-    } catch (error) {
-      toast.error('Failed to delete account')
-    } finally {
-      setIsDeletingAccount(false)
+      dispatch(logout())
+      navigate('/login')
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to delete account')
     }
   }
 

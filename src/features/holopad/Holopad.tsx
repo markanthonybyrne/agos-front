@@ -10,6 +10,7 @@ import { formatCoordinate } from '@/lib/coordinates'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Avatar } from '@/components/common/Avatar'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -101,9 +102,22 @@ export function Holopad() {
       {/* Welcome Banner */}
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
-          <CardTitle className="text-3xl font-heading glow-cyan">
-            Welcome, Commander {empireData?.name}
-          </CardTitle>
+          <div className="flex items-center gap-4">
+            <Avatar
+              src={data?.user?.avatar_path}
+              name={empireData?.name}
+              size="xl"
+              className="border-2 border-cyan/50 shadow-lg shadow-cyan/20"
+            />
+            <div className="flex-1">
+              <CardTitle className="text-3xl font-heading glow-cyan">
+                Welcome, Commander {empireData?.name}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {data?.user?.username ? `@${data.user.username}` : 'Ready to command'}
+              </p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

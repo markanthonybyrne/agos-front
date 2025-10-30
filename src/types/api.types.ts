@@ -24,6 +24,7 @@ export interface User {
   api_token?: string
   role?: string
   token_expires_at?: string
+  avatar_path?: string
 }
 
 export interface TickTiming {
@@ -39,6 +40,7 @@ export interface Empire {
   alliance_id?: number
   homeworld_planet_id: number
   created_at: string
+  description?: string
   // Optional fields for rankings UI
   planets?: any[]
   fleets?: any[]
@@ -96,6 +98,7 @@ export interface Alliance {
   name: string
   tag: string
   description?: string
+  avatar_path?: string
   leader: {
     id: number
     name: string
@@ -624,5 +627,21 @@ export interface ConstructionQueueItem {
 export interface ConstructionQueueResponse {
   status: string
   construction_queue: ConstructionQueueItem[]
+}
+
+export interface UserPreferences {
+  notifications: {
+    email_notifications: boolean
+    push_notifications: boolean
+  }
+  events: {
+    construction_completed: boolean
+    research_completed: boolean
+    fleet_arrived: boolean
+    fleet_attacked: boolean
+    planet_colonized: boolean
+    alliance_messages: boolean
+    empire_attacked: boolean
+  }
 }
 

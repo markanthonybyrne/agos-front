@@ -88,5 +88,19 @@
     box-shadow: 0 0 0 1px hsl(var(--ring) / 0.4) inset, 0 0 30px hsl(var(--ring) / 0.1);
     transform: translateY(-1px);
   }
+
+  /* Fix dialog positioning - ensure it's centered */
+  [data-radix-portal] {
+    position: fixed;
+    z-index: 60;
+  }
+  
+  [data-radix-portal] > [data-radix-dialog-content] {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+  }
 }
 

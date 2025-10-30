@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
+import { useNavigate } from 'react-router-dom'
+import { useGetFleetsQuery, useCancelFleetMutation } from '@/api/endpoints/fleetsApi'
+import { useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -8,15 +10,24 @@ import { Ship, Plus, Clock, MapPin, AlertCircle, CheckCircle } from 'lucide-reac
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber } from '@/lib/formatters'
 import { FleetBuilder } from './FleetBuilder'
+import { toast } from 'sonner'
 
 type ViewType = 'list' | 'builder'
 
 export function FleetsPage() {
   const [activeView, setActiveView] = useState<ViewType>('list')
+  const navigate = useNavigate()
   const { data: fleets, isLoading, error } = useGetFleetsQuery()
+  const { data: shipDefinitions } = useGetShipDefinitionsQuery()
+  const [cancelFleet] = useCancelFleetMutation()
   
   // Debug logging
   console.log('Fleets API response:', fleets)
+
+  const getShipName = (definitionId: number) => {
+    const shipDef = shipDefinitions?.ships?.find(s => s.id === definitionId)
+    return shipDef?.name || `Ship #${definitionId}`
+  }
 
   if (isLoading) {
     return (
@@ -91,8 +102,16 @@ export function FleetsPage() {
     }
   }
 
-  const getTotalShips = (ships: Record<string, number>) => {
-    return Object.values(ships).reduce((total, count) => total + count, 0)
+  const getTotalShips = (ships: any) => {
+    if (Array.isArray(ships)) {
+      return ships.reduce((total: number, ship: any) => total + (ship.quantity || 0), 0)
+    }
+    // Handle Record with potentially undefined values
+    const normalized: Record<string, number> = {}
+    for (const [key, value] of Object.entries(ships || {})) {
+      normalized[key] = typeof value === 'number' ? value : 0
+    }
+    return Object.values(normalized).reduce((total, count) => total + Number(count || 0), 0)
   }
 
   const getFleetSummary = () => {
@@ -188,16 +207,18 @@ export function FleetsPage() {
         <CardContent>
           {fleetList.length > 0 ? (
             <div className="space-y-4">
-              {fleetList.map((fleet) => {
+              {fleetList.map((fleet: any) => {
                 const StatusIcon = getStatusIcon(fleet.status)
                 const totalShips = getTotalShips(fleet.ships)
                 
                 return (
-                  <div key={fleet.id} className="flex items-center justify-between p-4 bg-muted/10 rounded-lg">
+                  <div key={fleet.id} className="flex items-center justify-between p-4 bg-muted/10 rounded-lg border border-border/50">
                     <div className="flex items-center gap-4">
                       <StatusIcon className={`w-5 h-5 ${getStatusColor(fleet.status)}`} />
                       <div>
-                        <h4 className="font-semibold">Fleet #{fleet.id}</h4>
+                        <h4 className="font-semibold">
+                          {fleet.name || `Fleet #${fleet.id}`}
+                        </h4>
                         <p className="text-sm text-muted-foreground">
                           {totalShips} ship{totalShips !== 1 ? 's' : ''} • {fleet.status.replace('_', ' ')}
                         </p>
@@ -206,44 +227,72 @@ export function FleetsPage() {
                             {fleet.order_type}
                           </Badge>
                         )}
+                        {fleet.origin && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            From: {fleet.origin.name} ({fleet.origin.coordinate})
+                          </p>
+                        )}
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className="flex gap-2 text-sm mb-2">
-                          {Object.entries(fleet.ships).map(([shipType, count]) => (
-                            <Badge key={shipType} variant="outline">
-                              {String(count)} {shipType}
-                            </Badge>
-                          ))}
+                        <div className="flex gap-2 text-sm flex-wrap justify-end mb-2">
+                          {Array.isArray(fleet.ships) && fleet.ships.map((ship: any, idx: number) => {
+                            const shipName = getShipName(ship.definition_id)
+                            return (
+                              <Badge key={idx} variant="outline">
+                                {ship.quantity} {shipName}
+                              </Badge>
+                            )
+                          })}
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            From: {formatCoordinate(fleet.origin_coordinate)}
-                          </div>
-                          {fleet.destination_coordinate && (
+                          {fleet.destination && (
                             <div className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
-                              To: {formatCoordinate(fleet.destination_coordinate)}
+                              To: {formatCoordinate(fleet.destination.coordinate)}
                             </div>
                           )}
-                          {fleet.arrival_tick && (
+                          {fleet.arrival_tick && fleet.status === 'in_transit' && (
                             <div className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               Arrives: Tick {fleet.arrival_tick}
+                            </div>
+                          )}
+                          {fleet.departure_tick && fleet.status === 'stationed' && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              Departed: Tick {fleet.departure_tick}
                             </div>
                           )}
                         </div>
                       </div>
                       
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate(`/fleets/${fleet.id}`)}
+                        >
                           View
                         </Button>
                         {fleet.status === 'in_transit' && (
-                          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={async () => {
+                              if (confirm('Are you sure you want to cancel this fleet?')) {
+                                try {
+                                  await cancelFleet(fleet.id).unwrap()
+                                  toast.success('Fleet cancelled successfully')
+                                } catch (error: any) {
+                                  toast.error(error?.data?.message || 'Failed to cancel fleet')
+                                }
+                              }
+                            }}
+                          >
                             Cancel
                           </Button>
                         )}

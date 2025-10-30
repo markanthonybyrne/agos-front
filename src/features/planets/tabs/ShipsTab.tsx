@@ -55,8 +55,17 @@ export function ShipsTab({ planet }: ShipsTabProps) {
     },
   })
 
+  // Get ships from the API endpoint
   const ps: any = planetShips as any
-  const shipsList: Array<{ definition_id: number; quantity: number; definition?: any }> = ps?.ships || ps?.data?.ships || []
+  const shipsFromResponse: any[] = ps?.ships || ps?.data?.ships || []
+  
+  // Debug logging
+  console.log('Planet ships response:', planetShips)
+  console.log('Ships from response:', shipsFromResponse)
+  console.log('Ships list length:', shipsFromResponse.length)
+  
+  // Ships come from API with structure: { definition_id, quantity, definition: { name, class, attack_power } }
+  const shipsList: Array<{ definition_id: number; quantity: number; definition?: any }> = shipsFromResponse
 
   const handleBuildShips = async (data: BuildShipFormData) => {
     try {
@@ -72,11 +81,12 @@ export function ShipsTab({ planet }: ShipsTabProps) {
       // Log the ship definition to see what fields are available
       console.log('Ship definition for validation:', shipDef)
       
-            // Check if build_time exists, if not, use a default value
-            if (!shipDef.build_time_ticks || shipDef.build_time_ticks <= 0) {
-              console.warn('Ship definition missing build_time, using default value of 1')
-              // Don't return error, just log a warning
-            }
+      // Check if build_time_ticks exists and is valid - backend needs this
+      if (!shipDef.build_time_ticks || shipDef.build_time_ticks <= 0) {
+        toast.error(`Ship definition missing build_time_ticks. Cannot build ${shipDef.name}. Please contact support.`)
+        console.error('Ship definition missing build_time_ticks:', shipDef)
+        return
+      }
       
       const result = await buildShips({
         planetId: Number(planet.id),
@@ -106,21 +116,29 @@ export function ShipsTab({ planet }: ShipsTabProps) {
 
   const getTotalGunPower = () => {
     return shipsList.reduce((total, ship) => {
-      const def = definitions?.ships?.find(s => s.id === ship.definition_id)
-      return total + ((def?.gun_power || 0) * ship.quantity)
+      const defFromResponse = ship.definition || {}
+      const defFromDefs = definitions?.ships?.find(s => s.id === ship.definition_id)
+      const def = defFromDefs || defFromResponse
+      const attackPower = def?.attack_power || def?.gun_power || defFromResponse?.attack_power || 0
+      return total + (attackPower * ship.quantity)
     }, 0)
   }
 
   const getTotalArmour = () => {
     return shipsList.reduce((total, ship) => {
-      const def = definitions?.ships?.find(s => s.id === ship.definition_id)
-      return total + ((def?.armour || 0) * ship.quantity)
+      const defFromResponse = ship.definition || {}
+      const defFromDefs = definitions?.ships?.find(s => s.id === ship.definition_id)
+      const def = defFromDefs || defFromResponse
+      const defensePower = def?.defence_power || def?.armour || def?.armor || 0
+      return total + (defensePower * ship.quantity)
     }, 0)
   }
 
   const getTotalInitiative = () => {
     return shipsList.reduce((total, ship) => {
-      const def = definitions?.ships?.find(s => s.id === ship.definition_id)
+      const defFromResponse = ship.definition || {}
+      const defFromDefs = definitions?.ships?.find(s => s.id === ship.definition_id)
+      const def = defFromDefs || defFromResponse
       return total + ((def?.init || 0) * ship.quantity)
     }, 0)
   }
@@ -419,10 +437,16 @@ export function ShipsTab({ planet }: ShipsTabProps) {
       {shipsList.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {shipsList.map((ship) => {
+            // Use definition from API response if available, otherwise look up from definitions
+            const defFromResponse = ship.definition || {}
             const defFromDefs = definitions?.ships?.find(s => s.id === ship.definition_id)
-            const def = defFromDefs || ship.definition || {}
-            const displayName = def.name || `Ship #${ship.definition_id}`
-            const displayClass = def.class || '—'
+            const def = defFromDefs || defFromResponse || {}
+            
+            // Prefer name from definition, then from response, then fallback
+            const displayName = def.name || defFromResponse.name || `Ship #${ship.definition_id}`
+            const displayClass = def.class || defFromResponse.class || '—'
+            const attackPower = def.attack_power || def.gun_power || defFromResponse.attack_power || 0
+            const defensePower = def.defence_power || def.armour || def.armor || 0
 
             return (
               <Card key={ship.definition_id} className="panel-glass border-blue/20">
@@ -432,7 +456,7 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                     {displayName}
                   </CardTitle>
                   <CardDescription>
-                    {displayClass}{def.description ? ` • ${def.description}` : ''}
+                    {displayClass}{def.description || defFromResponse.description ? ` • ${def.description || defFromResponse.description}` : ''}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -447,27 +471,31 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                     <div className="flex justify-between text-sm">
                       <span>Attack Power:</span>
                       <span className="text-red-400">
-                        {(def.attack_power || def.gun_power || 0)} per ship ({(def.attack_power || def.gun_power || 0) * ship.quantity} total)
+                        {attackPower} per ship ({attackPower * ship.quantity} total)
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Defense Power:</span>
                       <span className="text-blue-400">
-                        {(def.defence_power || def.armor || def.armour || 0)} per ship ({(def.defence_power || def.armor || def.armour || 0) * ship.quantity} total)
+                        {defensePower} per ship ({defensePower * ship.quantity} total)
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Speed:</span>
-                      <span className="text-green-400">
-                        {def.speed || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Cargo Capacity:</span>
-                      <span className="text-yellow-400">
-                        {(def.cargo_capacity || 0)} per ship ({(def.cargo_capacity || 0) * ship.quantity} total)
-                      </span>
-                    </div>
+                    {(def.speed || 0) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>Speed:</span>
+                        <span className="text-green-400">
+                          {def.speed || 0}
+                        </span>
+                      </div>
+                    )}
+                    {(def.cargo_capacity || 0) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>Cargo Capacity:</span>
+                        <span className="text-yellow-400">
+                          {(def.cargo_capacity || 0)} per ship ({(def.cargo_capacity || 0) * ship.quantity} total)
+                        </span>
+                      </div>
+                    )}
                     {(def.energy_consumption || 0) > 0 && (
                       <div className="flex justify-between text-sm">
                         <span>Energy Consumption:</span>
@@ -533,7 +561,7 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                       <div className="space-y-1 text-xs text-muted-foreground">
                         <div className="flex justify-between">
                           <span>Cost:</span>
-                      <span>
+                          <span>
                             {formatResource(ship.tellerium_cost || 0)} T, {formatResource(ship.krypton_cost || 0)} K
                           </span>
                         </div>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useGetFacilityDefinitionsQuery, useGetPlanetFacilitiesQuery, useBuildFacilityMutation, useUpgradeFacilityMutation, useDestroyFacilityMutation } from '@/api/endpoints/facilitiesApi'
+import { useGetFacilityDefinitionsQuery, useGetPlanetFacilitiesQuery, useBuildFacilityMutation, useUpgradeFacilityMutation, useUpgradeFacilityBySlugMutation, useDestroyFacilityMutation } from '@/api/endpoints/facilitiesApi'
 import { usePrerequisites } from '@/hooks/usePrerequisites'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +47,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   }
   const [buildFacility, { isLoading: isBuilding }] = useBuildFacilityMutation()
   const [upgradeFacility, { isLoading: isUpgrading }] = useUpgradeFacilityMutation()
+  const [upgradeFacilityBySlug] = useUpgradeFacilityBySlugMutation()
   const [destroyFacility, { isLoading: isDestroying }] = useDestroyFacilityMutation()
 
   // Get all facility definitions for prerequisite checking
@@ -94,6 +95,11 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
         ? facilitiesFromPlanetArray
         : (facilitiesFromPlanetObj.length > 0 ? facilitiesFromPlanetObj : meFacilitiesList))
 
+  // Log facility IDs for debugging
+  console.log('Facilities from endpoint:', facilitiesFromEndpoint)
+  console.log('Final facilities list:', facilitiesList)
+  console.log('Facility IDs:', facilitiesList.map((f: any) => ({ id: f.id, slug: f.facility_slug || f.slug })))
+
   const handleBuildFacility = async (data: BuildFacilityFormData) => {
     try {
       const result = await buildFacility({
@@ -112,14 +118,49 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
     }
   }
 
-  const handleUpgradeFacility = async (facilityId: number) => {
-    try {
-      await upgradeFacility(facilityId).unwrap()
-      toast.success('Facility upgraded successfully!')
-      setUpgradeFacilityId(null)
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to upgrade facility')
+  const handleUpgradeFacility = async (facilityId: number, facilitySlug?: string) => {
+    // If we have a facility ID, use the ID-based endpoint
+    if (facilityId && !isNaN(facilityId) && facilityId > 0) {
+      const id = Number(facilityId)
+      console.log('Upgrading facility with ID:', id)
+      
+      try {
+        setUpgradeFacilityId(id)
+        await upgradeFacility(id).unwrap()
+        toast.success('Facility upgraded successfully!')
+        setUpgradeFacilityId(null)
+        return
+      } catch (error: any) {
+        console.error('Upgrade facility error:', error)
+        toast.error(error?.data?.message || 'Failed to upgrade facility')
+        setUpgradeFacilityId(null)
+        return
+      }
     }
+    
+    // Fallback: If no ID but we have a slug, use the slug-based endpoint
+    if (facilitySlug && planet.id) {
+      console.log('Upgrading facility by slug:', facilitySlug, 'on planet:', planet.id)
+      
+      try {
+        setUpgradeFacilityId(-1) // Use -1 as a marker for slug-based upgrade
+        await upgradeFacilityBySlug({
+          planetId: Number(planet.id),
+          facilitySlug: facilitySlug,
+        }).unwrap()
+        toast.success('Facility upgraded successfully!')
+        setUpgradeFacilityId(null)
+      } catch (error: any) {
+        console.error('Upgrade facility by slug error:', error)
+        toast.error(error?.data?.message || 'Failed to upgrade facility')
+        setUpgradeFacilityId(null)
+      }
+      return
+    }
+    
+    // No valid ID or slug
+    toast.error('Invalid facility ID. Please refresh the page and try again.')
+    console.error('Invalid facility ID:', facilityId, 'slug:', facilitySlug)
   }
 
   const handleDestroyFacility = async (facilityId: number) => {
@@ -367,7 +408,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
             const productionK = definition?.production_krypton || 0
             const energyUse = definition?.energy_consumption || 0
             const canAffordUpgrade = true
-
+            
             return (
               <Card key={`${(facility as any)?.id || slug}-${slug}`} className="panel-glass border-purple/20">
                 <CardHeader>
@@ -444,10 +485,14 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => handleUpgradeFacility(facility.id)}
-                      disabled={isUpgrading || upgradeFacilityId === facility.id || !canAffordUpgrade}
+                      onClick={() => {
+                        const facilityId = (facility as any)?.id
+                        const facilitySlug = slug || (facility as any)?.facility_slug || (facility as any)?.slug
+                        handleUpgradeFacility(facilityId || 0, facilitySlug)
+                      }}
+                      disabled={isUpgrading || upgradeFacilityId === (facility as any)?.id || upgradeFacilityId === -1 || !canAffordUpgrade}
                     >
-                      {isUpgrading && upgradeFacilityId === facility.id ? (
+                      {isUpgrading && upgradeFacilityId === (facility as any)?.id ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           Upgrading...

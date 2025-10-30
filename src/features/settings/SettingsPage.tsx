@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { useGetMeQuery, useUpdateProfileMutation, useLogoutMutation } from '@/api/endpoints/authApi'
+import { useGetAllianceDetailsQuery } from '@/api/endpoints/alliancesApi'
+import { formatNumber } from '@/lib/formatters'
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -31,6 +33,16 @@ export function SettingsPage() {
 
   const user = meData?.user
   const empire = meData?.empire
+
+  // Fetch alliance data if user is in an alliance
+  const { data: allianceData } = useGetAllianceDetailsQuery(
+    Number(empire?.alliance_id) || 0,
+    { skip: !empire?.alliance_id }
+  )
+
+  const allianceName = allianceData?.alliance?.name || 
+    (empire?.alliance as any)?.name || 
+    (empire?.alliance_id ? 'Loading...' : 'Independent')
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -130,6 +142,44 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Account Statistics */}
+      <Card className="panel-glass">
+        <CardHeader>
+          <CardTitle>Account Statistics</CardTitle>
+          <CardDescription>
+            Your account activity and statistics
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+              </div>
+              <div className="text-sm text-muted-foreground">Joined</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-400">
+                {empire?.planets_owned ?? empire?.planets?.length ?? 0}
+              </div>
+              <div className="text-sm text-muted-foreground">Planets</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-400">
+                {formatNumber(empire?.score || 0)}
+              </div>
+              <div className="text-sm text-muted-foreground">Score</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-400">
+                {allianceName}
+              </div>
+              <div className="text-sm text-muted-foreground">Alliance</div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

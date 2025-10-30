@@ -42,6 +42,21 @@ export const facilitiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Facility', 'Planet'],
     }),
+    upgradeFacilityBySlug: builder.mutation<
+      ApiResponse<{ facility: Facility }>,
+      { planetId: number; facilitySlug: string }
+    >({
+      query: ({ planetId, facilitySlug }) => ({
+        url: `/facilities/${facilitySlug}/upgrade`,
+        method: 'PUT',
+        body: { planet_id: Number(planetId) },
+      }),
+      invalidatesTags: (result, error, { planetId }) => [
+        { type: 'Facility', id: planetId },
+        'Facility',
+        'Planet',
+      ],
+    }),
     destroyFacility: builder.mutation<
       ApiResponse<{ message: string }>,
       number
@@ -74,6 +89,7 @@ export const {
   useGetPlanetFacilitiesQuery,
   useBuildFacilityMutation,
   useUpgradeFacilityMutation,
+  useUpgradeFacilityBySlugMutation,
   useDestroyFacilityMutation,
   useCancelFacilityConstructionMutation,
 } = facilitiesApi

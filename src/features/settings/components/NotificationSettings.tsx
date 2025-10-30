@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Bell, 
   Mail, 
@@ -14,15 +13,21 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  useGetPreferencesQuery,
+  useUpdatePreferencesMutation,
+} from '@/api/endpoints/authApi'
 
 interface NotificationSettingsProps {}
 
 export function NotificationSettings({}: NotificationSettingsProps) {
+  const { data: preferencesData, isLoading: isLoadingPreferences } = useGetPreferencesQuery()
+  const [updatePreferences, { isLoading: isSaving }] = useUpdatePreferencesMutation()
+
   const [settings, setSettings] = useState({
     // General Notifications
-    emailNotifications: true,
-    pushNotifications: false,
-    soundEnabled: true,
+    emailNotifications: false,
+    pushNotifications: true,
     
     // Game Events
     constructionCompleted: true,
@@ -30,20 +35,26 @@ export function NotificationSettings({}: NotificationSettingsProps) {
     fleetArrived: true,
     fleetAttacked: true,
     planetColonized: true,
-    allianceMessage: true,
+    allianceMessage: false,
     empireAttacked: true,
-    
-    // Frequency Settings
-    notificationFrequency: 'immediate', // immediate, hourly, daily
-    digestFrequency: 'daily', // daily, weekly, never
-    
-    // Channel Preferences
-    emailChannel: true,
-    inGameChannel: true,
-    webhookChannel: false,
   })
 
-  const [isSaving, setIsSaving] = useState(false)
+  // Load preferences from API when available
+  useEffect(() => {
+    if (preferencesData) {
+      setSettings({
+        emailNotifications: preferencesData.notifications.email_notifications ?? false,
+        pushNotifications: preferencesData.notifications.push_notifications ?? true,
+        constructionCompleted: preferencesData.events.construction_completed ?? true,
+        researchCompleted: preferencesData.events.research_completed ?? true,
+        fleetArrived: preferencesData.events.fleet_arrived ?? true,
+        fleetAttacked: preferencesData.events.fleet_attacked ?? true,
+        planetColonized: preferencesData.events.planet_colonized ?? true,
+        allianceMessage: preferencesData.events.alliance_messages ?? false,
+        empireAttacked: preferencesData.events.empire_attacked ?? true,
+      })
+    }
+  }, [preferencesData])
 
   const handleSettingChange = (key: string, value: boolean | string) => {
     setSettings(prev => ({
@@ -53,37 +64,55 @@ export function NotificationSettings({}: NotificationSettingsProps) {
   }
 
   const handleSave = async () => {
-    setIsSaving(true)
     try {
-      // TODO: Implement API call to save notification settings
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
+      await updatePreferences({
+        notifications: {
+          email_notifications: settings.emailNotifications,
+          push_notifications: settings.pushNotifications,
+        },
+        events: {
+          construction_completed: settings.constructionCompleted,
+          research_completed: settings.researchCompleted,
+          fleet_arrived: settings.fleetArrived,
+          fleet_attacked: settings.fleetAttacked,
+          planet_colonized: settings.planetColonized,
+          alliance_messages: settings.allianceMessage,
+          empire_attacked: settings.empireAttacked,
+        },
+      }).unwrap()
       toast.success('Notification settings saved!')
-    } catch (error) {
-      toast.error('Failed to save notification settings')
-    } finally {
-      setIsSaving(false)
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to save notification settings')
     }
   }
 
   const handleReset = () => {
     setSettings({
-      emailNotifications: true,
-      pushNotifications: false,
-      soundEnabled: true,
+      emailNotifications: false,
+      pushNotifications: true,
       constructionCompleted: true,
       researchCompleted: true,
       fleetArrived: true,
       fleetAttacked: true,
       planetColonized: true,
-      allianceMessage: true,
+      allianceMessage: false,
       empireAttacked: true,
-      notificationFrequency: 'immediate',
-      digestFrequency: 'daily',
-      emailChannel: true,
-      inGameChannel: true,
-      webhookChannel: false,
     })
     toast.success('Settings reset to defaults')
+  }
+
+  if (isLoadingPreferences) {
+    return (
+      <Card className="panel-glass">
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-muted rounded w-1/4"></div>
+            <div className="h-10 bg-muted rounded"></div>
+            <div className="h-10 bg-muted rounded"></div>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -126,20 +155,6 @@ export function NotificationSettings({}: NotificationSettingsProps) {
                 id="push-notifications"
                 checked={settings.pushNotifications}
                 onCheckedChange={(checked) => handleSettingChange('pushNotifications', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="sound-enabled">Sound Effects</Label>
-                <p className="text-sm text-muted-foreground">
-                  Play sounds for notifications
-                </p>
-              </div>
-              <Switch
-                id="sound-enabled"
-                checked={settings.soundEnabled}
-                onCheckedChange={(checked) => handleSettingChange('soundEnabled', checked)}
               />
             </div>
           </div>
@@ -256,116 +271,6 @@ export function NotificationSettings({}: NotificationSettingsProps) {
                 onCheckedChange={(checked) => handleSettingChange('empireAttacked', checked)}
               />
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Frequency Settings */}
-      <Card className="panel-glass">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="w-5 h-5 text-green-400" />
-            Frequency Settings
-          </CardTitle>
-          <CardDescription>
-            Control how often you receive notifications
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="notification-frequency">Notification Frequency</Label>
-            <Select
-              value={settings.notificationFrequency}
-              onValueChange={(value) => handleSettingChange('notificationFrequency', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="immediate">Immediate</SelectItem>
-                <SelectItem value="hourly">Hourly Digest</SelectItem>
-                <SelectItem value="daily">Daily Digest</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              How often to receive individual notifications
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="digest-frequency">Digest Frequency</Label>
-            <Select
-              value={settings.digestFrequency}
-              onValueChange={(value) => handleSettingChange('digestFrequency', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Daily Summary</SelectItem>
-                <SelectItem value="weekly">Weekly Summary</SelectItem>
-                <SelectItem value="never">Never</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              How often to receive summary digests
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Channel Preferences */}
-      <Card className="panel-glass">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-purple-400" />
-            Channel Preferences
-          </CardTitle>
-          <CardDescription>
-            Choose which channels to receive notifications through
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="email-channel">Email Channel</Label>
-              <p className="text-sm text-muted-foreground">
-                Receive notifications via email
-              </p>
-            </div>
-            <Switch
-              id="email-channel"
-              checked={settings.emailChannel}
-              onCheckedChange={(checked) => handleSettingChange('emailChannel', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="in-game-channel">In-Game Channel</Label>
-              <p className="text-sm text-muted-foreground">
-                Show notifications in the game interface
-              </p>
-            </div>
-            <Switch
-              id="in-game-channel"
-              checked={settings.inGameChannel}
-              onCheckedChange={(checked) => handleSettingChange('inGameChannel', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="webhook-channel">Webhook Channel</Label>
-              <p className="text-sm text-muted-foreground">
-                Send notifications to external webhooks
-              </p>
-            </div>
-            <Switch
-              id="webhook-channel"
-              checked={settings.webhookChannel}
-              onCheckedChange={(checked) => handleSettingChange('webhookChannel', checked)}
-            />
           </div>
         </CardContent>
       </Card>

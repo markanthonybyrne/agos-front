@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useGetAllianceDetailsQuery } from '@/api/endpoints/alliancesApi'
+import { useGetAllianceDetailsQuery, useUploadAllianceAvatarMutation, useDeleteAllianceAvatarMutation } from '@/api/endpoints/alliancesApi'
 import { formatNumber, formatDateTime } from '@/lib/formatters'
 import { 
   Users, 
@@ -19,10 +19,15 @@ import {
   Settings,
   UserPlus,
   UserMinus,
-  X
+  X,
+  Upload,
+  Trash2
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AllianceChat } from './AllianceChat'
+import { Avatar } from '@/components/common/Avatar'
+import { toast } from 'sonner'
+import { useGetMeQuery } from '@/api/endpoints/authApi'
 
 interface AllianceDetailsProps {
   allianceId: number
@@ -32,13 +37,24 @@ interface AllianceDetailsProps {
 
 export function AllianceDetails({ allianceId, isMyAlliance, onClose }: AllianceDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'chat'>('overview')
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Ensure allianceId is always a number
   const numericAllianceId = Number(allianceId)
   console.log('AllianceDetails - allianceId:', allianceId, 'type:', typeof allianceId, 'numeric:', numericAllianceId)
   
-  const { data: allianceData, isLoading, error } = useGetAllianceDetailsQuery(numericAllianceId)
+  const { data: allianceData, isLoading, error, refetch: refetchAlliance } = useGetAllianceDetailsQuery(numericAllianceId)
+  const { data: meData } = useGetMeQuery()
+  const [uploadAllianceAvatar, { isLoading: isUploadingAvatar }] = useUploadAllianceAvatarMutation()
+  const [deleteAllianceAvatar, { isLoading: isDeletingAvatar }] = useDeleteAllianceAvatarMutation()
+  
   const alliance = allianceData?.alliance
+  
+  // Check if user is leader or officer
+  const currentUserEmpireId = meData?.empire?.id
+  const userRole = alliance?.members?.find(m => m.empire_id === currentUserEmpireId)?.role
+  const canManageAvatar = userRole === 'leader' || userRole === 'officer'
 
   const getRoleIcon = (role: string) => {
     switch (role.toLowerCase()) {
@@ -63,6 +79,57 @@ export function AllianceDetails({ allianceId, isMyAlliance, onClose }: AllianceD
         return 'bg-green-500/20 text-green-400 border-green-500/30'
       default:
         return 'bg-muted/20 text-muted-foreground border-border'
+    }
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file size (4MB max for alliance)
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error('Avatar file must be less than 4MB')
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    // Show preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    // Upload avatar
+    try {
+      const formData = new FormData()
+      formData.append('avatar', file)
+      await uploadAllianceAvatar({ allianceId: numericAllianceId, formData }).unwrap()
+      toast.success('Avatar uploaded successfully!')
+      refetchAlliance()
+      setAvatarPreview(null)
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to upload avatar')
+      setAvatarPreview(null)
+    }
+  }
+
+  const handleDeleteAvatar = async () => {
+    if (!window.confirm('Are you sure you want to delete the alliance avatar?')) {
+      return
+    }
+
+    try {
+      await deleteAllianceAvatar(numericAllianceId).unwrap()
+      toast.success('Avatar deleted successfully!')
+      refetchAlliance()
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to delete avatar')
     }
   }
 
@@ -92,21 +159,93 @@ export function AllianceDetails({ allianceId, isMyAlliance, onClose }: AllianceD
       {/* Alliance Header */}
       <Card className="panel-glass border-primary/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Crown className="w-5 h-5 text-yellow-400" />
-            {alliance?.name}
-            <Badge variant="outline" className="text-xs">
-              {alliance?.tag}
-            </Badge>
-            {isMyAlliance && (
-              <Badge variant="outline" className="text-xs bg-primary/20 text-primary border-primary/30">
-                My Alliance
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {alliance?.description || 'No description available'}
-          </CardDescription>
+          <div className="flex items-start gap-4">
+            <div className="relative">
+              <Avatar
+                src={avatarPreview ? null : alliance?.avatar_path}
+                name={alliance?.name}
+                size="lg"
+                className="border-2 border-primary/30"
+              />
+              {avatarPreview && (
+                <div className="absolute inset-0 rounded-full border-2 border-primary">
+                  <img
+                    src={avatarPreview}
+                    alt="Avatar preview"
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarPreview(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center hover:bg-destructive/90"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+              {canManageAvatar && (
+                <div className="mt-2 flex flex-col gap-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    disabled={isUploadingAvatar}
+                    className="hidden"
+                    id="alliance-avatar-upload"
+                  />
+                  <label htmlFor="alliance-avatar-upload" className="cursor-pointer">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploadingAvatar}
+                      className="w-full text-xs"
+                      asChild
+                    >
+                      <span>
+                        <Upload className="w-3 h-3 mr-1" />
+                        {isUploadingAvatar ? 'Uploading...' : 'Upload'}
+                      </span>
+                    </Button>
+                  </label>
+                  {alliance?.avatar_path && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isDeletingAvatar}
+                      onClick={handleDeleteAvatar}
+                      className="w-full text-xs text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      {isDeletingAvatar ? 'Deleting...' : 'Delete'}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-400" />
+                {alliance?.name}
+                <Badge variant="outline" className="text-xs">
+                  {alliance?.tag}
+                </Badge>
+                {isMyAlliance && (
+                  <Badge variant="outline" className="text-xs bg-primary/20 text-primary border-primary/30">
+                    My Alliance
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription className="mt-1">
+                {alliance?.description || 'No description available'}
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

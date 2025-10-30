@@ -166,16 +166,16 @@ export function PlanetDetail() {
               className="w-10 h-10 rounded object-cover"
             />
           )}
-          <div>
-            <h1 className="text-3xl font-heading glow-cyan">{planet.name}</h1>
-            <p className="text-muted-foreground">
-              {formatCoordinate(planet.coordinate)} • {planet.state}
+        <div>
+          <h1 className="text-3xl font-heading glow-cyan">{planet.name}</h1>
+          <p className="text-muted-foreground">
+            {formatCoordinate(planet.coordinate)} • {planet.state}
               {planet?.type?.name && (
                 <>
                   {' '}• <span className="capitalize">{planet.type.name}</span>
                 </>
               )}
-            </p>
+          </p>
           </div>
         </div>
       </div>

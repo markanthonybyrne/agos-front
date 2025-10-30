@@ -9,6 +9,15 @@ import { toast } from 'sonner'
 import { NotificationCenter } from '@/features/notifications/NotificationCenter'
 import { setNotificationCenterOpen } from '@/app/slices/notificationSlice'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
+import { Avatar } from '@/components/common/Avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export function Header() {
   const empire = useAppSelector((state) => state.auth.empire)
@@ -88,18 +97,36 @@ export function Header() {
                 )}
               </Button>
               
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleSettings}
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-              
-              <Button variant="ghost" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 px-2">
+                    <Avatar
+                      src={meData?.user?.avatar_path}
+                      name={meData?.user?.username || empire.name}
+                      size="sm"
+                    />
+                    <span className="text-sm hidden sm:inline-block">{meData?.user?.username || empire.name}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{meData?.user?.username || 'User'}</p>
+                      <p className="text-xs text-muted-foreground">{empire.name}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSettings}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>

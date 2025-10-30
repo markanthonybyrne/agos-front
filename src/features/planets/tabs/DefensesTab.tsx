@@ -412,25 +412,25 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                   <div className="space-y-2">
                     {definition && (
                       <>
-                        <div className="flex justify-between text-sm">
-                          <span>Total Attack Power:</span>
-                          <span className="text-red-400">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Attack Power:</span>
+                      <span className="text-red-400">
                             {(definition.attack_power ?? 0) * defence.quantity}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Total Defense Power:</span>
-                          <span className="text-blue-400">
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Total Defense Power:</span>
+                      <span className="text-blue-400">
                             {(definition.defence_power ?? 0) * defence.quantity}
-                          </span>
-                        </div>
+                      </span>
+                    </div>
                         {(definition.energy_consumption ?? 0) > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span>Energy Consumption:</span>
-                            <span className="text-yellow-400">
+                      <div className="flex justify-between text-sm">
+                        <span>Energy Consumption:</span>
+                        <span className="text-yellow-400">
                               {(definition.energy_consumption ?? 0) * defence.quantity}/tick
-                            </span>
-                          </div>
+                        </span>
+                      </div>
                         )}
                       </>
                     )}

@@ -9,6 +9,7 @@ import { Holopad } from '@/features/holopad/Holopad'
 import { PlanetsList } from '@/features/planets/PlanetsList'
 import { PlanetDetail } from '@/features/planets/PlanetDetail'
 import { FleetsPage } from '@/features/fleets/FleetsPage'
+import { FleetDetail } from '@/features/fleets/FleetDetail'
 import { UniverseMap } from '@/features/map/UniverseMap'
 import { MessagingPage } from '@/features/messaging/MessagingPage'
 import { SignalsPage } from '@/features/signals/SignalsPage'
@@ -34,6 +35,7 @@ function App() {
                           <Route path="/planets" element={<PlanetsList />} />
                           <Route path="/planets/:id" element={<PlanetDetail />} />
                           <Route path="/fleets" element={<FleetsPage />} />
+                          <Route path="/fleets/:id" element={<FleetDetail />} />
                           <Route path="/signals" element={<SignalsPage />} />
                           <Route path="/alliances" element={<AlliancesPage />} />
                           <Route path="/mail" element={<MessagingPage />} />

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { useCreateFleetMutation } from '@/api/endpoints/fleetsApi'
+import { useGetPlanetShipsQuery, useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,25 +25,53 @@ const fleetSchema = z.object({
 
 type FleetFormData = z.infer<typeof fleetSchema>
 
-const shipTypes = [
-  { id: 'fighters', name: 'Fighters', cost: { tellerium: 1000, krypton: 500 }, description: 'Fast, agile ships for hit-and-run attacks' },
-  { id: 'corvettes', name: 'Corvettes', cost: { tellerium: 5000, krypton: 2500 }, description: 'Medium ships with balanced offense and defense' },
-  { id: 'frigates', name: 'Frigates', cost: { tellerium: 15000, krypton: 7500 }, description: 'Heavy ships with strong armor and weapons' },
-  { id: 'destroyers', name: 'Destroyers', cost: { tellerium: 50000, krypton: 25000 }, description: 'Capital ships with devastating firepower' },
-]
+interface FleetBuilderProps {
+  planetId?: number
+  onSuccess?: () => void
+}
 
-export function FleetBuilder() {
+export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
   const [ships, setShips] = useState<Record<string, number>>({})
   const [createFleet, { isLoading }] = useCreateFleetMutation()
   const { data: planetsData } = useGetPlanetsQuery()
+  const { data: planetShipsData } = useGetPlanetShipsQuery(planetId || 0, { skip: !planetId })
+  const { data: shipDefinitions } = useGetShipDefinitionsQuery()
+  
+  // Get ships available on the planet if planetId is provided
+  const availableShips = useMemo(() => {
+    if (!planetId || !planetShipsData) return []
+    
+    const ps: any = planetShipsData as any
+    const shipsFromResponse: any[] = ps?.ships || ps?.data?.ships || []
+    
+    // Map to ship definitions with quantities
+    return shipsFromResponse.map((ship: any) => {
+      const shipDef = shipDefinitions?.ships?.find(s => s.id === ship.definition_id)
+      return {
+        definition_id: ship.definition_id,
+        slug: shipDef?.slug || `ship_${ship.definition_id}`,
+        name: shipDef?.name || ship.definition?.name || `Ship #${ship.definition_id}`,
+        quantity: ship.quantity || 0,
+        description: shipDef?.description || ship.definition?.description || '',
+      }
+    }).filter(ship => ship.quantity > 0) // Only show ships that are available
+  }, [planetId, planetShipsData, shipDefinitions])
 
   const form = useForm<FleetFormData>({
     resolver: zodResolver(fleetSchema),
     defaultValues: {
+      origin_planet_id: planetId || undefined,
       order_type: 'attack',
       auto_return_on_failure: false,
     },
   })
+  
+  // Set origin planet if planetId is provided
+  useEffect(() => {
+    if (planetId) {
+      form.setValue('origin_planet_id', planetId)
+    }
+  }, [planetId, form])
 
   const watchedOrigin = form.watch('origin_planet_id')
   const watchedDestination = form.watch('destination_coordinate')
@@ -55,11 +84,14 @@ export function FleetBuilder() {
   const travelTime = originPlanet && destinationCoord ? 
     calculateDistance(originPlanet.coordinate, destinationCoord) : 0
 
-  const totalCost = Object.entries(ships).reduce((total, [shipType, count]) => {
-    const shipDef = shipTypes.find(s => s.id === shipType)
+  const totalCost = Object.entries(ships).reduce((total, [shipSlug, count]) => {
+    // Find ship definition by slug
+    const shipDef = shipDefinitions?.ships?.find(s => s.slug === shipSlug)
     if (shipDef) {
-      total.tellerium += shipDef.cost.tellerium * count
-      total.krypton += shipDef.cost.krypton * count
+      const telleriumCost = (shipDef as any).tellerium_cost || (shipDef as any).cost_tellerium || 0
+      const kryptonCost = (shipDef as any).krypton_cost || (shipDef as any).cost_krypton || 0
+      total.tellerium += telleriumCost * count
+      total.krypton += kryptonCost * count
     }
     return total
   }, { tellerium: 0, krypton: 0 })
@@ -90,12 +122,20 @@ export function FleetBuilder() {
 
     try {
       // Convert ships Record to FleetShip[] format
+      // ships is keyed by ship slug, we need to convert to definition_id format
       const fleetShips = Object.entries(ships)
         .filter(([_, count]) => count > 0)
-        .map(([shipType, count]) => ({
-          ship_type: shipType,
-          quantity: count,
-        }))
+        .map(([shipSlug, count]) => {
+          // Find ship definition by slug to get definition_id
+          const shipDef = shipDefinitions?.ships?.find(s => s.slug === shipSlug)
+          if (!shipDef) {
+            throw new Error(`Ship definition not found for slug: ${shipSlug}`)
+          }
+          return {
+            definition_id: shipDef.id,
+            quantity: count,
+          }
+        })
 
       // Parse destination coordinate
       const coordParts = data.destination_coordinate.split(':').map(Number)
@@ -117,6 +157,7 @@ export function FleetBuilder() {
       toast.success('Fleet created successfully!')
       setShips({})
       form.reset()
+      onSuccess?.()
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to create fleet')
     }
@@ -138,27 +179,29 @@ export function FleetBuilder() {
         <CardContent className="space-y-6">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Origin Planet */}
-            <div className="space-y-2">
-              <Label htmlFor="origin_planet">Origin Planet</Label>
-              <select
-                id="origin_planet"
-                {...form.register('origin_planet_id', { valueAsNumber: true })}
-                className="w-full p-2 bg-background border border-input rounded-md"
-              >
-                <option value="">Select a planet</option>
-                {planets?.map((planet: any) => (
-                  <option key={planet.id} value={planet.id}>
-                    {planet.name} ({formatCoordinate(planet.coordinate)}) - 
-                    T: {formatResource(planet.tellerium_balance)} K: {formatResource(planet.krypton_balance)}
-                  </option>
-                ))}
-              </select>
-              {form.formState.errors.origin_planet_id && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.origin_planet_id.message}
-                </p>
-              )}
-            </div>
+            {!planetId && (
+              <div className="space-y-2">
+                <Label htmlFor="origin_planet">Origin Planet</Label>
+                <select
+                  id="origin_planet"
+                  {...form.register('origin_planet_id', { valueAsNumber: true })}
+                  className="w-full p-2 bg-background border border-input rounded-md"
+                >
+                  <option value="">Select a planet</option>
+                  {planets?.map((planet: any) => (
+                    <option key={planet.id} value={planet.id}>
+                      {planet.name} ({formatCoordinate(planet.coordinate)}) - 
+                      T: {formatResource(planet.tellerium_balance)} K: {formatResource(planet.krypton_balance)}
+                    </option>
+                  ))}
+                </select>
+                {form.formState.errors.origin_planet_id && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.origin_planet_id.message}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Destination */}
             <div className="space-y-2">
@@ -193,41 +236,115 @@ export function FleetBuilder() {
             {/* Ship Selection */}
             <div className="space-y-4">
               <h4 className="font-semibold">Ship Selection</h4>
-              {shipTypes.map(shipType => (
-                <div key={shipType.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h5 className="font-medium">{shipType.name}</h5>
-                      <Badge variant="outline">
-                        {formatResource(shipType.cost.tellerium)}T / {formatResource(shipType.cost.krypton)}K
-                      </Badge>
+              {planetId ? (
+                // Show only ships available on this planet
+                availableShips.length > 0 ? (
+                  availableShips.map((ship: any) => {
+                    const shipDef = shipDefinitions?.ships?.find(s => s.id === ship.definition_id)
+                    const telleriumCost = (shipDef as any)?.tellerium_cost || (shipDef as any)?.cost_tellerium || 0
+                    const kryptonCost = (shipDef as any)?.krypton_cost || (shipDef as any)?.cost_krypton || 0
+                    const maxAvailable = ship.quantity
+                    const selected = ships[ship.slug] || 0
+                    
+                    return (
+                      <div key={ship.definition_id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h5 className="font-medium">{ship.name}</h5>
+                            {(telleriumCost > 0 || kryptonCost > 0) && (
+                              <Badge variant="outline">
+                                {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
+                              </Badge>
+                            )}
+                            <Badge variant="secondary">
+                              Available: {maxAvailable}
+                            </Badge>
+                          </div>
+                          {ship.description && (
+                            <p className="text-sm text-muted-foreground">{ship.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateShipCount(ship.slug, Math.max(0, selected - 1))}
+                            disabled={selected === 0}
+                          >
+                            -
+                          </Button>
+                          <span className="w-8 text-center font-mono">
+                            {selected}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateShipCount(ship.slug, Math.min(maxAvailable, selected + 1))}
+                            disabled={selected >= maxAvailable}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No ships available on this planet. Build ships first.
+                  </p>
+                )
+              ) : (
+                // Show all ship definitions (for main fleet builder)
+                shipDefinitions?.ships?.map((shipDef: any) => {
+                  const telleriumCost = shipDef.tellerium_cost || shipDef.cost_tellerium || 0
+                  const kryptonCost = shipDef.krypton_cost || shipDef.cost_krypton || 0
+                  const slug = shipDef.slug || `ship_${shipDef.id}`
+                  
+                  return (
+                    <div key={shipDef.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h5 className="font-medium">{shipDef.name}</h5>
+                          {(telleriumCost > 0 || kryptonCost > 0) && (
+                            <Badge variant="outline">
+                              {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
+                            </Badge>
+                          )}
+                        </div>
+                        {shipDef.description && (
+                          <p className="text-sm text-muted-foreground">{shipDef.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateShipCount(slug, (ships[slug] || 0) - 1)}
+                          disabled={!ships[slug]}
+                        >
+                          -
+                        </Button>
+                        <span className="w-8 text-center font-mono">
+                          {ships[slug] || 0}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateShipCount(slug, (ships[slug] || 0) + 1)}
+                        >
+                          +
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">{shipType.description}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateShipCount(shipType.id, (ships[shipType.id] || 0) - 1)}
-                      disabled={!ships[shipType.id]}
-                    >
-                      -
-                    </Button>
-                    <span className="w-8 text-center font-mono">
-                      {ships[shipType.id] || 0}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateShipCount(shipType.id, (ships[shipType.id] || 0) + 1)}
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                  )
+                }) || (
+                  <p className="text-muted-foreground text-sm">Loading ship definitions...</p>
+                )
+              )}
             </div>
 
             {/* Submit Button */}

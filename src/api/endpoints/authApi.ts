@@ -94,9 +94,237 @@ export const authApi = apiSlice.injectEndpoints({
       },
       invalidatesTags: ['Empire'],
     }),
+    changePassword: builder.mutation<
+      { message: string },
+      { current_password: string; new_password: string; new_password_confirmation: string }
+    >({
+      query: (data) => ({
+        url: '/auth/change-password',
+        method: 'POST',
+        body: data,
+      }),
+      transformResponse: (response: { status: string; message?: string; data?: { message: string } }) => {
+        if (response.status === 'ok' && response.message) {
+          return { message: response.message }
+        }
+        if (response.status === 'ok' && response.data?.message) {
+          return { message: response.data.message }
+        }
+        return { message: 'Password changed successfully' }
+      },
+    }),
+    uploadAvatar: builder.mutation<
+      { avatar_url: string },
+      FormData
+    >({
+      query: (formData) => ({
+        url: '/me/avatar',
+        method: 'POST',
+        body: formData,
+      }),
+      transformResponse: (response: { status: string; data?: { avatar_url: string }; avatar_url?: string }) => {
+        if (response.status === 'ok' && response.data?.avatar_url) {
+          return { avatar_url: response.data.avatar_url }
+        }
+        if (response.status === 'ok' && response.avatar_url) {
+          return { avatar_url: response.avatar_url }
+        }
+        return response as unknown as { avatar_url: string }
+      },
+      invalidatesTags: ['Empire'],
+    }),
+    deleteAvatar: builder.mutation<
+      { message: string },
+      void
+    >({
+      query: () => ({
+        url: '/me/avatar',
+        method: 'DELETE',
+      }),
+      transformResponse: (response: { status: string; message?: string; data?: { message: string } }) => {
+        if (response.status === 'ok' && response.message) {
+          return { message: response.message }
+        }
+        if (response.status === 'ok' && response.data?.message) {
+          return { message: response.data.message }
+        }
+        return { message: 'Avatar deleted successfully' }
+      },
+      invalidatesTags: ['Empire'],
+    }),
+    getPreferences: builder.query<
+      {
+        notifications: {
+          email_notifications: boolean
+          push_notifications: boolean
+        }
+        events: {
+          construction_completed: boolean
+          research_completed: boolean
+          fleet_arrived: boolean
+          fleet_attacked: boolean
+          planet_colonized: boolean
+          alliance_messages: boolean
+          empire_attacked: boolean
+        }
+      },
+      void
+    >({
+      query: () => '/me/preferences',
+      transformResponse: (response: {
+        status: string
+        data?: {
+          notifications: { email_notifications: boolean; push_notifications: boolean }
+          events: {
+            construction_completed: boolean
+            research_completed: boolean
+            fleet_arrived: boolean
+            fleet_attacked: boolean
+            planet_colonized: boolean
+            alliance_messages: boolean
+            empire_attacked: boolean
+          }
+        }
+      }) => {
+        if (response.status === 'ok' && response.data) {
+          return response.data
+        }
+        return response as unknown as {
+          notifications: { email_notifications: boolean; push_notifications: boolean }
+          events: {
+            construction_completed: boolean
+            research_completed: boolean
+            fleet_arrived: boolean
+            fleet_attacked: boolean
+            planet_colonized: boolean
+            alliance_messages: boolean
+            empire_attacked: boolean
+          }
+        }
+      },
+    }),
+    updatePreferences: builder.mutation<
+      {
+        notifications: {
+          email_notifications: boolean
+          push_notifications: boolean
+        }
+        events: {
+          construction_completed: boolean
+          research_completed: boolean
+          fleet_arrived: boolean
+          fleet_attacked: boolean
+          planet_colonized: boolean
+          alliance_messages: boolean
+          empire_attacked: boolean
+        }
+      },
+      {
+        notifications?: {
+          email_notifications?: boolean
+          push_notifications?: boolean
+        }
+        events?: {
+          construction_completed?: boolean
+          research_completed?: boolean
+          fleet_arrived?: boolean
+          fleet_attacked?: boolean
+          planet_colonized?: boolean
+          alliance_messages?: boolean
+          empire_attacked?: boolean
+        }
+      }
+    >({
+      query: (data) => ({
+        url: '/me/preferences',
+        method: 'PATCH',
+        body: data,
+      }),
+      transformResponse: (response: {
+        status: string
+        data?: {
+          notifications: { email_notifications: boolean; push_notifications: boolean }
+          events: {
+            construction_completed: boolean
+            research_completed: boolean
+            fleet_arrived: boolean
+            fleet_attacked: boolean
+            planet_colonized: boolean
+            alliance_messages: boolean
+            empire_attacked: boolean
+          }
+        }
+      }) => {
+        if (response.status === 'ok' && response.data) {
+          return response.data
+        }
+        return response as unknown as {
+          notifications: { email_notifications: boolean; push_notifications: boolean }
+          events: {
+            construction_completed: boolean
+            research_completed: boolean
+            fleet_arrived: boolean
+            fleet_attacked: boolean
+            planet_colonized: boolean
+            alliance_messages: boolean
+            empire_attacked: boolean
+          }
+        }
+      },
+    }),
+    deleteAccount: builder.mutation<
+      { message: string },
+      void
+    >({
+      query: () => ({
+        url: '/auth/account',
+        method: 'DELETE',
+      }),
+      transformResponse: (response: { status: string; message?: string; data?: { message: string } }) => {
+        if (response.status === 'ok' && response.message) {
+          return { message: response.message }
+        }
+        if (response.status === 'ok' && response.data?.message) {
+          return { message: response.data.message }
+        }
+        return { message: 'Account deleted successfully' }
+      },
+    }),
+    updateEmpireDescription: builder.mutation<
+      { empire: Empire },
+      { description: string }
+    >({
+      query: (data) => ({
+        url: '/empires/my/description',
+        method: 'PATCH',
+        body: data,
+      }),
+      transformResponse: (response: { status: string; data?: { empire: Empire }; empire?: Empire }) => {
+        if (response.status === 'ok' && response.data?.empire) {
+          return { empire: response.data.empire }
+        }
+        if (response.status === 'ok' && response.empire) {
+          return { empire: response.empire }
+        }
+        return response as unknown as { empire: Empire }
+      },
+      invalidatesTags: ['Empire'],
+    }),
   }),
 })
 
-export const { useRegisterMutation, useLoginMutation, useLogoutMutation, useGetMeQuery, useUpdateProfileMutation } =
-  authApi
+export const {
+  useRegisterMutation,
+  useLoginMutation,
+  useLogoutMutation,
+  useGetMeQuery,
+  useUpdateProfileMutation,
+  useChangePasswordMutation,
+  useUploadAvatarMutation,
+  useDeleteAvatarMutation,
+  useGetPreferencesQuery,
+  useUpdatePreferencesMutation,
+  useDeleteAccountMutation,
+  useUpdateEmpireDescriptionMutation,
+} = authApi
 
