@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 15% 9%; /* #17191D */
+    --foreground: 210 40% 98%;
+
+    --card: 220 15% 11%; /* #1C2024 */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 15% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 195 100% 50%; /* #19EAFD */
+    --primary-foreground: 220 15% 9%;
+
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 220 15% 20%;
+    --muted-foreground: 210 40% 65%;
+
+    --accent: 220 15% 15%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 23%; /* #3A3A3D */
+    --input: 220 15% 23%;
+    --ring: 195 100% 50%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .glow-cyan {
+    text-shadow: 0 0 10px theme('colors.space.cyan'), 0 0 20px theme('colors.space.cyan');
+  }
+  
+  .glow-blue {
+    text-shadow: 0 0 10px theme('colors.space.blue'), 0 0 20px theme('colors.space.blue');
+  }
+  
+  .panel-glass {
+    @apply backdrop-blur-sm border border-border/50 relative overflow-hidden;
+    background: linear-gradient(180deg, hsl(var(--card) / 0.75) 0%, hsl(var(--card) / 0.6) 100%);
+  }
+
+  /* Premium subtle gradient accents */
+  .surface-gradient {
+    background: radial-gradient(1200px 600px at -10% -10%, hsl(var(--primary) / 0.08), transparent 60%),
+                radial-gradient(800px 400px at 110% -20%, hsl(var(--ring) / 0.06), transparent 55%),
+                linear-gradient(180deg, hsl(var(--card) / 0.7), hsl(var(--card) / 0.6));
+  }
+
+  /* Subtle edge vignette for depth */
+  .vignette:before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 120% at 50% 0%, transparent 0%, transparent 60%, rgba(0,0,0,0.15) 100%);
+  }
+
+  /* Card glow on hover */
+  .card-glow {
+    transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+  }
+  .card-glow:hover {
+    box-shadow: 0 0 0 1px hsl(var(--ring) / 0.4) inset, 0 0 30px hsl(var(--ring) / 0.1);
+    transform: translateY(-1px);
+  }
+}
+
