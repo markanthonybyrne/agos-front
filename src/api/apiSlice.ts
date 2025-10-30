@@ -14,7 +14,7 @@ export const apiSlice = createApi({
       return headers
     },
   }),
-        tagTypes: ['Empire', 'Planet', 'Fleet', 'Signal', 'Alliance', 'Universe', 'Defence', 'Facility', 'Research', 'Ship', 'Mail', 'Resource', 'Buildable', 'ConstructionQueue'],
+        tagTypes: ['Empire', 'Planet', 'Fleet', 'Signal', 'Alliance', 'Universe', 'Defence', 'Facility', 'Research', 'Ship', 'Mail', 'Resource', 'Buildable', 'ConstructionQueue', 'Fund'],
   endpoints: () => ({}),
 })
 

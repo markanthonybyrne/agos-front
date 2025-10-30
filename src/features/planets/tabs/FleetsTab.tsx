@@ -73,7 +73,8 @@ export function FleetsTab({ planet }: FleetsTabProps) {
       fleetsArrayLength: fleetsData?.fleets?.length,
       hasPlanetCoord: !!planetCoord,
       planetCoord,
-      planetId: planet.id
+      planetId: planet.id,
+      planetCoordinate: planet.coordinate
     })
     
     // Even if planetCoord is null, we can still filter by planet ID
@@ -82,16 +83,43 @@ export function FleetsTab({ planet }: FleetsTabProps) {
       return []
     }
     
+    console.log('FleetsTab filter: All fleets:', fleetsData.fleets.map((f: any) => ({
+      id: f.id,
+      status: f.status,
+      destination: f.destination,
+      destination_coordinate: f.destination_coordinate,
+      origin: f.origin
+    })))
+    
     // Filter by planet ID if coordinate is not available
     if (!planetCoord) {
       console.log('FleetsTab filter: No planet coord, filtering by planet ID only', planet.id)
       return fleetsData.fleets.filter((fleet: any) => {
         const fleetOriginId = Number(fleet.origin?.id)
+        const fleetDestinationId = Number(fleet.destination?.id)
         const planetIdNum = Number(planet.id)
+        
+        console.log('FleetsTab filter: Checking fleet (no coord)', {
+          fleetId: fleet.id,
+          fleetOriginId,
+          fleetDestinationId,
+          planetIdNum,
+          matchesOrigin: fleetOriginId === planetIdNum,
+          matchesDest: fleetDestinationId === planetIdNum
+        })
+        
+        // Check origin ID
         if (fleetOriginId && planetIdNum && fleetOriginId === planetIdNum) {
           console.log('FleetsTab filter: Match by origin ID (no coord)', fleet.id, fleetOriginId, planetIdNum)
           return true
         }
+        
+        // Check destination ID (important for stationed fleets)
+        if (fleetDestinationId && planetIdNum && fleetDestinationId === planetIdNum) {
+          console.log('FleetsTab filter: Match by destination ID (no coord)', fleet.id, fleetDestinationId, planetIdNum)
+          return true
+        }
+        
         return false
       })
     }
@@ -103,59 +131,131 @@ export function FleetsTab({ planet }: FleetsTabProps) {
     })
     
     const filtered = fleetsData.fleets.filter((fleet: any) => {
-      // Option 1: Check if fleet's origin planet ID matches this planet ID
-      // Convert both to numbers for comparison
-      const fleetOriginId = Number(fleet.origin?.id)
+      // Debug each fleet
+      console.log('FleetsTab filter: Checking fleet', {
+        fleetId: fleet.id,
+        fleetStatus: fleet.status,
+        origin: fleet.origin,
+        destination: fleet.destination,
+        origin_coordinate: fleet.origin_coordinate,
+        destination_coordinate: fleet.destination_coordinate,
+        planetId: planet.id,
+        planetCoord
+      })
+      
       const planetIdNum = Number(planet.id)
+      
+      // Option 1: Check if fleet's origin planet ID matches this planet ID
+      const fleetOriginId = Number(fleet.origin?.id)
       if (fleetOriginId && planetIdNum && fleetOriginId === planetIdNum) {
         console.log('FleetsTab filter: Match by origin ID', fleet.id, fleetOriginId, planetIdNum)
         return true
       }
       
-      // Option 2: Check if fleet's destination coordinate matches this planet coordinate
-      const destCoord = fleet.destination?.coordinate
-      if (destCoord) {
-        const destParts = String(destCoord).split(':')
+      // Option 2: Check if fleet's destination planet ID matches this planet ID
+      // This is important for stationed fleets - they are at the destination
+      const fleetDestinationId = Number(fleet.destination?.id)
+      if (fleetDestinationId && planetIdNum && fleetDestinationId === planetIdNum) {
+        console.log('FleetsTab filter: Match by destination ID', fleet.id, fleetDestinationId, planetIdNum)
+        return true
+      }
+      
+      // Option 3: Check if fleet's destination coordinate matches this planet coordinate
+      // Handle both nested object (destination.coordinate) and direct object (destination_coordinate)
+      let destCoordObj = null
+      
+      // Check destination.coordinate string (most common format)
+      if (fleet.destination?.coordinate) {
+        const destParts = String(fleet.destination.coordinate).split(':')
         if (destParts.length === 4) {
-          const destCoordObj = {
+          destCoordObj = {
             quadrant: parseInt(destParts[0]),
             sector: parseInt(destParts[1]),
             galaxy: parseInt(destParts[2]),
             planet: parseInt(destParts[3]),
           }
-          
-          if (destCoordObj.quadrant === planetCoord.quadrant &&
-              destCoordObj.sector === planetCoord.sector &&
-              destCoordObj.galaxy === planetCoord.galaxy &&
-              destCoordObj.planet === planetCoord.planet) {
-            console.log('FleetsTab filter: Match by destination coordinate', fleet.id, destCoord)
-            return true
+        }
+      }
+      // Check destination_coordinate object directly (FleetDetails type)
+      else if (fleet.destination_coordinate && typeof fleet.destination_coordinate === 'object') {
+        destCoordObj = fleet.destination_coordinate
+      }
+      // Check destination_coordinate string
+      else if (fleet.destination_coordinate && typeof fleet.destination_coordinate === 'string') {
+        const destParts = String(fleet.destination_coordinate).split(':')
+        if (destParts.length === 4) {
+          destCoordObj = {
+            quadrant: parseInt(destParts[0]),
+            sector: parseInt(destParts[1]),
+            galaxy: parseInt(destParts[2]),
+            planet: parseInt(destParts[3]),
           }
         }
       }
       
-      // Option 3: Check if fleet's origin coordinate matches this planet coordinate
-      const originCoord = fleet.origin?.coordinate
-      if (originCoord) {
-        const originParts = String(originCoord).split(':')
+      if (destCoordObj && planetCoord) {
+        console.log('FleetsTab filter: Comparing destination coordinate', {
+          fleetId: fleet.id,
+          destCoordObj,
+          planetCoord,
+          matches: destCoordObj.quadrant === planetCoord.quadrant &&
+                   destCoordObj.sector === planetCoord.sector &&
+                   destCoordObj.galaxy === planetCoord.galaxy &&
+                   destCoordObj.planet === planetCoord.planet
+        })
+        if (destCoordObj.quadrant === planetCoord.quadrant &&
+            destCoordObj.sector === planetCoord.sector &&
+            destCoordObj.galaxy === planetCoord.galaxy &&
+            destCoordObj.planet === planetCoord.planet) {
+          console.log('FleetsTab filter: Match by destination coordinate', fleet.id, destCoordObj, fleet.status)
+          return true
+        }
+      }
+      
+      // Option 4: Check if fleet's origin coordinate matches this planet coordinate
+      // Handle both nested object (origin.coordinate) and direct object (origin_coordinate)
+      let originCoordObj = null
+      
+      // Check origin.coordinate string
+      if (fleet.origin?.coordinate) {
+        const originParts = String(fleet.origin.coordinate).split(':')
         if (originParts.length === 4) {
-          const originCoordObj = {
+          originCoordObj = {
             quadrant: parseInt(originParts[0]),
             sector: parseInt(originParts[1]),
             galaxy: parseInt(originParts[2]),
             planet: parseInt(originParts[3]),
           }
-          
-          if (originCoordObj.quadrant === planetCoord.quadrant &&
-              originCoordObj.sector === planetCoord.sector &&
-              originCoordObj.galaxy === planetCoord.galaxy &&
-              originCoordObj.planet === planetCoord.planet) {
-            console.log('FleetsTab filter: Match by origin coordinate', fleet.id, originCoord)
-            return true
+        }
+      }
+      // Check origin_coordinate object directly (FleetDetails type)
+      else if (fleet.origin_coordinate && typeof fleet.origin_coordinate === 'object') {
+        originCoordObj = fleet.origin_coordinate
+      }
+      // Check origin_coordinate string
+      else if (fleet.origin_coordinate && typeof fleet.origin_coordinate === 'string') {
+        const originParts = String(fleet.origin_coordinate).split(':')
+        if (originParts.length === 4) {
+          originCoordObj = {
+            quadrant: parseInt(originParts[0]),
+            sector: parseInt(originParts[1]),
+            galaxy: parseInt(originParts[2]),
+            planet: parseInt(originParts[3]),
           }
         }
       }
       
+      if (originCoordObj && planetCoord) {
+        if (originCoordObj.quadrant === planetCoord.quadrant &&
+            originCoordObj.sector === planetCoord.sector &&
+            originCoordObj.galaxy === planetCoord.galaxy &&
+            originCoordObj.planet === planetCoord.planet) {
+          console.log('FleetsTab filter: Match by origin coordinate', fleet.id, originCoordObj)
+          return true
+        }
+      }
+      
+      console.log('FleetsTab filter: No match for fleet', fleet.id)
       return false
     })
     

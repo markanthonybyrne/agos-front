@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { useGetResearchDefinitionsQuery, useGetMyResearchQuery, useStartResearchMutation } from '@/api/endpoints/researchApi'
-import { usePrerequisites } from '@/hooks/usePrerequisites'
+import { useGetResearchDefinitionsQuery, useGetMyResearchQuery, useStartResearchMutation, useGetPlanetAvailableResearchQuery } from '@/api/endpoints/researchApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Planet } from '@/types/api.types'
-import { formatNumber } from '@/lib/formatters'
+import { formatResource } from '@/lib/formatters'
 import { toast } from 'sonner'
-import { FlaskConical, CheckCircle, Lock, Loader2, AlertCircle } from 'lucide-react'
+import { FlaskConical, CheckCircle, Lock, Loader2, AlertCircle, Building2, Zap } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ResearchTabProps {
@@ -21,15 +20,15 @@ export function ResearchTab({ planet }: ResearchTabProps) {
 
   const { data: definitions, isLoading: isLoadingDefinitions } = useGetResearchDefinitionsQuery()
   const { data: researchProgress, isLoading: isLoadingProgress } = useGetMyResearchQuery()
+  const { data: planetResearchData, isLoading: isLoadingPlanetResearch } = useGetPlanetAvailableResearchQuery(Number(planet.id))
   const [startResearch, { isLoading: isStarting }] = useStartResearchMutation()
-
-  // Get all research definitions for prerequisite checking
-  const allResearchDefinitions = definitions?.research || []
-  const { canBuildItem } = usePrerequisites(Number(planet.id), allResearchDefinitions as unknown as any[])
 
   const handleStartResearch = async (researchSlug: string) => {
     try {
-      await startResearch({ research_slug: researchSlug }).unwrap()
+      await startResearch({ 
+        planet_id: Number(planet.id),
+        research_slug: researchSlug 
+      }).unwrap()
       toast.success('Research started successfully!')
       setStartResearchDialogOpen(false)
       setSelectedResearchSlug(null)
@@ -46,17 +45,11 @@ export function ResearchTab({ planet }: ResearchTabProps) {
     return researchProgress?.completed_research?.includes(slug) || false
   }
 
-  const canResearch = (slug: string) => {
-    const research = researchProgress?.available_research?.find(r => r.slug === slug)
-    return research?.can_research || false
+  const formatFacilityName = (slug: string) => {
+    return slug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
 
-  const getResearchCost = (slug: string) => {
-    const def = getResearchDefinition(slug)
-    return def?.cost_research_points || 0
-  }
-
-  if (isLoadingDefinitions || isLoadingProgress) {
+  if (isLoadingDefinitions || isLoadingProgress || isLoadingPlanetResearch) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-32" />
@@ -69,27 +62,36 @@ export function ResearchTab({ planet }: ResearchTabProps) {
     )
   }
 
-  const researchPoints = researchProgress?.research_points || 0
   const completedResearch = researchProgress?.completed_research || []
-  const allAvailableResearch = researchProgress?.available_research || []
-  const availableResearch = allAvailableResearch.filter(research => canBuildItem(research.slug))
+  const availableResearch = planetResearchData?.research || []
 
   return (
     <div className="space-y-6">
-      {/* Research Points */}
-      <Card className="panel-glass border-purple/20">
+      {/* Planet Resources */}
+      <Card className="panel-glass border-cyan/20">
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Research Points</p>
-              <p className="text-3xl font-mono glow-purple">
-                {formatNumber(researchPoints)}
-              </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-cyan-400" />
+                <span className="font-semibold">Tellerium</span>
+              </div>
+              <span className="text-2xl font-mono glow-cyan">
+                {formatResource(planet.tellerium_balance)}
+              </span>
             </div>
-            <FlaskConical className="w-12 h-12 text-purple-400" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-blue-400" />
+                <span className="font-semibold">Krypton</span>
+              </div>
+              <span className="text-2xl font-mono glow-blue">
+                {formatResource(planet.krypton_balance)}
+              </span>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            Research points are generated by research facilities and can be used to unlock new technologies.
+          <p className="text-sm text-muted-foreground mt-4">
+            Research requires resources to purchase. Ensure you have enough tellerium and krypton before starting research.
           </p>
         </CardContent>
       </Card>
@@ -153,25 +155,21 @@ export function ResearchTab({ planet }: ResearchTabProps) {
               Available Research ({availableResearch.length})
             </CardTitle>
             <CardDescription>
-              Technologies you can research
+              Technologies you can research at this planet
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {availableResearch.map((research) => {
-                const definition = getResearchDefinition(research.slug)
-                if (!definition) return null
-
-                const canAfford = researchPoints >= research.cost
-                const prerequisitesMet = definition.prerequisites.every(prereq =>
-                  completedResearch.includes(prereq)
-                )
+                const canAffordTellerium = planet.tellerium_balance >= research.cost_tellerium
+                const canAffordKrypton = planet.krypton_balance >= research.cost_krypton
+                const canAfford = canAffordTellerium && canAffordKrypton
 
                 return (
                   <Card
                     key={research.slug}
                     className={`panel-glass ${
-                      research.can_research && canAfford && prerequisitesMet
+                      research.can_research && canAfford && !research.completed
                         ? 'border-cyan/20'
                         : 'border-muted/20 opacity-60'
                     }`}
@@ -180,35 +178,69 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <FlaskConical className="w-5 h-5 text-cyan-400" />
                         {research.name}
+                        {research.completed && (
+                          <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30 ml-auto">
+                            Completed
+                          </Badge>
+                        )}
                       </CardTitle>
                       <CardDescription>
-                        {definition.description}
+                        {research.description}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Cost</span>
-                        <Badge variant="outline" className={canAfford ? 'text-purple-400' : 'text-destructive'}>
-                          {formatNumber(research.cost)} RP
-                        </Badge>
+                      {/* Resource Costs */}
+                      <div className="p-3 bg-muted/20 rounded-lg">
+                        <p className="text-sm font-medium mb-2">Resource Cost:</p>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-cyan-400" />
+                              <span className="text-sm">Tellerium</span>
+                            </div>
+                            <Badge variant="outline" className={canAffordTellerium ? 'text-cyan-400' : 'text-destructive'}>
+                              {formatResource(research.cost_tellerium)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-blue-400" />
+                              <span className="text-sm">Krypton</span>
+                            </div>
+                            <Badge variant="outline" className={canAffordKrypton ? 'text-blue-400' : 'text-destructive'}>
+                              {formatResource(research.cost_krypton)}
+                            </Badge>
+                          </div>
+                          {research.build_time_ticks > 0 && (
+                            <div className="flex items-center justify-between pt-2 border-t border-muted/30">
+                              <span className="text-sm text-muted-foreground">Research Time</span>
+                              <span className="text-sm font-mono">
+                                {research.build_time_ticks} ticks
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {definition.prerequisites.length > 0 && (
-                        <div className="p-3 bg-muted/20 rounded-lg">
-                          <p className="text-sm font-medium mb-2">Prerequisites:</p>
+                      {/* Facility Prerequisites */}
+                      {research.prerequisite_facilities && research.prerequisite_facilities.length > 0 && (
+                        <div className="p-3 bg-blue/10 rounded-lg border border-blue/20">
+                          <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-blue-400" />
+                            Required Facilities (on this planet):
+                          </p>
                           <div className="space-y-1">
-                            {definition.prerequisites.map((prereq) => {
-                              const isCompleted = completedResearch.includes(prereq)
-                              const prereqDef = getResearchDefinition(prereq)
+                            {research.prerequisite_facilities.map((facilitySlug) => {
+                              const hasFacility = planet.facilities && planet.facilities[facilitySlug] > 0
                               return (
-                                <div key={prereq} className="flex items-center gap-2 text-sm">
-                                  {isCompleted ? (
+                                <div key={facilitySlug} className="flex items-center gap-2 text-sm">
+                                  {hasFacility ? (
                                     <CheckCircle className="w-4 h-4 text-green-400" />
                                   ) : (
                                     <Lock className="w-4 h-4 text-muted-foreground" />
                                   )}
-                                  <span className={isCompleted ? 'text-green-400' : 'text-muted-foreground'}>
-                                    {prereqDef?.name || prereq}
+                                  <span className={hasFacility ? 'text-green-400' : 'text-muted-foreground'}>
+                                    {formatFacilityName(facilitySlug)}
                                   </span>
                                 </div>
                               )
@@ -217,11 +249,60 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                         </div>
                       )}
 
-                      {Object.keys(definition.effects).length > 0 && (
+                      {/* Research Prerequisites */}
+                      {research.prerequisite_research && research.prerequisite_research.length > 0 && (
+                        <div className="p-3 bg-muted/20 rounded-lg">
+                          <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <FlaskConical className="w-4 h-4 text-purple-400" />
+                            Required Research (empire-wide):
+                          </p>
+                          <div className="space-y-1">
+                            {research.prerequisite_research.map((researchSlug) => {
+                              const isCompleted = completedResearch.includes(researchSlug)
+                              const prereqDef = getResearchDefinition(researchSlug)
+                              return (
+                                <div key={researchSlug} className="flex items-center gap-2 text-sm">
+                                  {isCompleted ? (
+                                    <CheckCircle className="w-4 h-4 text-green-400" />
+                                  ) : (
+                                    <Lock className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                  <span className={isCompleted ? 'text-green-400' : 'text-muted-foreground'}>
+                                    {prereqDef?.name || researchSlug}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Missing Prerequisites Summary */}
+                      {research.missing_prerequisites && research.missing_prerequisites.length > 0 && (
+                        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                          <p className="text-sm font-medium text-destructive mb-2">Missing Prerequisites:</p>
+                          <div className="space-y-1">
+                            {research.missing_prerequisites.map((missing) => {
+                              const isFacility = research.prerequisite_facilities?.includes(missing)
+                              const isResearch = research.prerequisite_research?.includes(missing)
+                              return (
+                                <div key={missing} className="flex items-center gap-2 text-sm text-destructive">
+                                  <AlertCircle className="w-4 h-4" />
+                                  <span>
+                                    {isFacility ? formatFacilityName(missing) : getResearchDefinition(missing)?.name || missing}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {research.effects && Object.keys(research.effects).length > 0 && (
                         <div className="p-3 bg-cyan/10 rounded-lg">
                           <p className="text-sm font-medium text-cyan-400 mb-1">Effects:</p>
                           <div className="space-y-1 text-sm">
-                            {Object.entries(definition.effects).map(([key, value]) => (
+                            {Object.entries(research.effects).map(([key, value]) => (
                               <div key={key} className="flex justify-between">
                                 <span>{key.replace(/_/g, ' ')}:</span>
                                 <span className="text-green-400">
@@ -233,86 +314,116 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                         </div>
                       )}
 
-                      {(!research.can_research || !canAfford || !prerequisitesMet) && (
+                      {(!research.can_research || !canAfford || research.completed) && (
                         <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                           <AlertCircle className="w-4 h-4 text-destructive" />
                           <span className="text-sm text-destructive">
-                            {!prerequisitesMet
-                              ? 'Prerequisites not met'
-                              : !canAfford
-                              ? 'Insufficient research points'
-                              : 'Cannot research'}
+                            {research.completed
+                              ? 'Already completed'
+                              : !canAffordTellerium
+                              ? 'Insufficient tellerium'
+                              : !canAffordKrypton
+                              ? 'Insufficient krypton'
+                              : 'Prerequisites not met'}
                           </span>
                         </div>
                       )}
 
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            className="w-full"
-                            disabled={!research.can_research || !canAfford || !prerequisitesMet}
-                            onClick={() => setSelectedResearchSlug(research.slug)}
-                          >
-                            <FlaskConical className="w-4 h-4 mr-2" />
-                            Start Research
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="panel-glass border-purple/20">
-                          <DialogHeader>
-                            <DialogTitle>Start Research</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to start researching {research.name}?
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="p-4 bg-muted/20 rounded-lg">
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span>Research Points Cost:</span>
-                                  <span className="font-mono text-purple-400">
-                                    {formatNumber(research.cost)} RP
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Current Research Points:</span>
-                                  <span className={`font-mono ${
-                                    researchPoints >= research.cost ? 'text-green-400' : 'text-destructive'
-                                  }`}>
-                                    {formatNumber(researchPoints)} RP
-                                  </span>
+                      {!research.completed && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              className="w-full"
+                              disabled={!research.can_research || !canAfford}
+                              onClick={() => setSelectedResearchSlug(research.slug)}
+                            >
+                              <FlaskConical className="w-4 h-4 mr-2" />
+                              Start Research
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="panel-glass border-purple/20">
+                            <DialogHeader>
+                              <DialogTitle>Start Research</DialogTitle>
+                              <DialogDescription>
+                                Are you sure you want to start researching {research.name}?
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="p-4 bg-muted/20 rounded-lg">
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span>Tellerium Cost:</span>
+                                    <span className={`font-mono ${
+                                      canAffordTellerium ? 'text-cyan-400' : 'text-destructive'
+                                    }`}>
+                                      {formatResource(research.cost_tellerium)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Available Tellerium:</span>
+                                    <span className={`font-mono ${
+                                      canAffordTellerium ? 'text-green-400' : 'text-destructive'
+                                    }`}>
+                                      {formatResource(planet.tellerium_balance)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Krypton Cost:</span>
+                                    <span className={`font-mono ${
+                                      canAffordKrypton ? 'text-blue-400' : 'text-destructive'
+                                    }`}>
+                                      {formatResource(research.cost_krypton)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Available Krypton:</span>
+                                    <span className={`font-mono ${
+                                      canAffordKrypton ? 'text-green-400' : 'text-destructive'
+                                    }`}>
+                                      {formatResource(planet.krypton_balance)}
+                                    </span>
+                                  </div>
+                                  {research.build_time_ticks > 0 && (
+                                    <div className="flex justify-between pt-2 border-t border-muted/30">
+                                      <span>Research Time:</span>
+                                      <span className="font-mono">
+                                        {research.build_time_ticks} ticks
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
+                              <DialogFooter>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setStartResearchDialogOpen(false)
+                                    setSelectedResearchSlug(null)
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  onClick={() => handleStartResearch(research.slug)}
+                                  disabled={isStarting || !canAfford}
+                                >
+                                  {isStarting ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Starting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FlaskConical className="w-4 h-4 mr-2" />
+                                      Start Research
+                                    </>
+                                  )}
+                                </Button>
+                              </DialogFooter>
                             </div>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setStartResearchDialogOpen(false)
-                                  setSelectedResearchSlug(null)
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                onClick={() => handleStartResearch(research.slug)}
-                                disabled={isStarting || !canAfford || !prerequisitesMet}
-                              >
-                                {isStarting ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Starting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <FlaskConical className="w-4 h-4 mr-2" />
-                                    Start Research
-                                  </>
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                     </CardContent>
                   </Card>
                 )

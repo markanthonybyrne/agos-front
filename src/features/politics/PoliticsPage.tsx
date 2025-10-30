@@ -18,6 +18,7 @@ import {
   Globe,
   AlertCircle,
   Search,
+  Coins,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
@@ -33,8 +34,8 @@ import { GroupsManagement } from './components/GroupsManagement'
 import { GlobalOptions } from './components/GlobalOptions'
 import { JoinRequestManagement } from './components/JoinRequestManagement'
 import { MyJoinRequests } from './components/MyJoinRequests'
+import { AllianceFund } from './components/AllianceFund'
 import { LeaveAlliance } from './components/LeaveAlliance'
-import { JoinRequestForm } from './components/JoinRequestForm'
 import { useAuth } from '@/hooks/useAuth'
 
 export function PoliticsPage() {
@@ -180,12 +181,13 @@ export function PoliticsPage() {
       ) : (
         // In Alliance - Show member management features
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="chat">Chat</TabsTrigger>
             <TabsTrigger value="status">Status</TabsTrigger>
             <TabsTrigger value="groups">Groups</TabsTrigger>
+            <TabsTrigger value="fund">Fund</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -207,6 +209,10 @@ export function PoliticsPage() {
 
           <TabsContent value="groups">
             <GroupsManagement allianceId={allianceId!} />
+          </TabsContent>
+
+          <TabsContent value="fund">
+            <AllianceFund allianceId={allianceId!} />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

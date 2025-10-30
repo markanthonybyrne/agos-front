@@ -320,6 +320,32 @@ export interface AllianceGlobalOptions {
   motd?: string | null
 }
 
+// Alliance Fund Types
+export interface AllianceFundBalance {
+  tellerium: number
+  krypton: number
+}
+
+export interface WithdrawFundsRequest {
+  tellerium: number
+  krypton: number
+}
+
+export interface TransferFundsRequest {
+  planet_id: number
+  tellerium: number
+  krypton: number
+}
+
+export interface FundTransferResponse {
+  transfer: {
+    planet_id: number
+    tellerium: number
+    krypton: number
+  }
+  fund_balance: AllianceFundBalance
+}
+
 export interface UniverseMap {
   quadrants: Array<{
     id: number
@@ -486,6 +512,22 @@ export interface ResearchProgress {
   }>
   // Optional for UI compatibility
   research?: any[]
+}
+
+// Planet-specific research item with detailed prerequisite information
+export interface PlanetResearchItem {
+  slug: string
+  name: string
+  description: string
+  cost_tellerium: number
+  cost_krypton: number
+  build_time_ticks: number
+  can_research: boolean
+  completed: boolean // Whether already completed (empire-wide)
+  missing_prerequisites: string[] // Combined list of missing items
+  prerequisite_facilities: string[] // Required facilities (checked on planet)
+  prerequisite_research: string[] // Required research (checked empire-wide)
+  effects?: Record<string, number>
 }
 
 // Ship Types
@@ -774,6 +816,7 @@ export interface TransferResourcesRequest {
 }
 
 export interface StartResearchRequest {
+  planet_id: number
   research_slug: string
 }
 

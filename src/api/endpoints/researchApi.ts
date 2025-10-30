@@ -4,6 +4,7 @@ import {
   ResearchDefinition,
   ResearchProgress,
   StartResearchRequest,
+  PlanetResearchItem,
 } from '@/types/api.types'
 
 export const researchApi = apiSlice.injectEndpoints({
@@ -16,16 +17,27 @@ export const researchApi = apiSlice.injectEndpoints({
       query: () => '/research/my',
       providesTags: ['Research'],
     }),
+    getPlanetAvailableResearch: builder.query<{ research: PlanetResearchItem[] }, number>({
+      query: (planetId) => `/planets/${planetId}/research/available`,
+      providesTags: (result, error, planetId) => [
+        { type: 'Research', id: planetId },
+        'Planet',
+      ],
+    }),
     startResearch: builder.mutation<
       ApiResponse<{ research: ResearchDefinition }>,
       StartResearchRequest
     >({
       query: (data) => ({
-        url: '/research/start',
+        url: `/planets/${data.planet_id}/research/start`,
         method: 'POST',
-        body: data,
+        body: { research_slug: data.research_slug },
       }),
-      invalidatesTags: ['Research'],
+      invalidatesTags: (result, error, { planet_id }) => [
+        'Research',
+        'Planet',
+        { type: 'Research', id: planet_id },
+      ],
     }),
     cancelResearch: builder.mutation<
       ApiResponse<{ message: string; refund: { tellerium: number; krypton: number } }>,
@@ -47,6 +59,7 @@ export const researchApi = apiSlice.injectEndpoints({
 export const {
   useGetResearchDefinitionsQuery,
   useGetMyResearchQuery,
+  useGetPlanetAvailableResearchQuery,
   useStartResearchMutation,
   useCancelResearchMutation,
 } = researchApi

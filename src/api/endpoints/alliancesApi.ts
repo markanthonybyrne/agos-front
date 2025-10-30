@@ -19,6 +19,10 @@ import {
   AllianceGlobalOptions,
   AllianceChatMessage,
   SendAllianceChatRequest,
+  AllianceFundBalance,
+  WithdrawFundsRequest,
+  TransferFundsRequest,
+  FundTransferResponse,
 } from '@/types/api.types'
 
 export const alliancesApi = apiSlice.injectEndpoints({
@@ -60,7 +64,12 @@ export const alliancesApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: { tellerium, krypton },
       }),
-      invalidatesTags: (_result, _error, { allianceId }) => [{ type: 'Alliance', id: Number(allianceId) }, 'Alliance', 'Empire'],
+      invalidatesTags: (_result, _error, { allianceId }) => [
+        { type: 'Alliance', id: Number(allianceId) },
+        'Alliance',
+        'Empire',
+        { type: 'Fund', id: Number(allianceId) },
+      ],
     }),
     uploadAllianceAvatar: builder.mutation<
       { avatar_url: string },
@@ -308,6 +317,81 @@ export const alliancesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { allianceId }) => [{ type: 'Alliance', id: Number(allianceId) }],
     }),
+    // Fund Management
+    getAllianceFund: builder.query<
+      { fund_balance: AllianceFundBalance },
+      number
+    >({
+      query: (allianceId) => `/alliances/${Number(allianceId)}/fund`,
+      transformResponse: (response: any) => {
+        console.log('getAllianceFund: Raw API response:', response)
+        // Handle ApiResponse wrapper: { status: 'ok', data: { fund_balance: {...} } }
+        if (response.status === 'ok' && response.data) {
+          console.log('getAllianceFund: Using data from ApiResponse wrapper:', response.data)
+          // Check if data has 'fund' or 'fund_balance'
+          if (response.data.fund) {
+            return { fund_balance: response.data.fund }
+          }
+          return response.data
+        }
+        // Handle response with 'fund' property: { fund: { tellerium: X, krypton: Y } }
+        if (response.fund) {
+          console.log('getAllianceFund: Using fund property:', response.fund)
+          return { fund_balance: response.fund }
+        }
+        // Handle direct response: { fund_balance: {...} }
+        if (response.fund_balance) {
+          console.log('getAllianceFund: Using fund_balance property:', response.fund_balance)
+          return response
+        }
+        // Handle direct response: { tellerium: X, krypton: Y }
+        if (response.tellerium !== undefined && response.krypton !== undefined) {
+          console.log('getAllianceFund: Wrapping direct response:', response)
+          return { fund_balance: response }
+        }
+        console.log('getAllianceFund: Unknown format, returning as-is:', response)
+        return response
+      },
+      providesTags: (_result, _error, allianceId) => [
+        { type: 'Alliance', id: Number(allianceId) },
+        'Alliance',
+        { type: 'Fund', id: Number(allianceId) },
+      ],
+    }),
+    withdrawAllianceFunds: builder.mutation<
+      ApiResponse<{ fund_balance: AllianceFundBalance }>,
+      { allianceId: number; data: WithdrawFundsRequest }
+    >({
+      query: ({ allianceId, data }) => ({
+        url: `/alliances/${Number(allianceId)}/fund/withdraw`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { allianceId }) => [
+        { type: 'Alliance', id: Number(allianceId) },
+        'Alliance',
+        'Planet',
+        'Empire',
+        { type: 'Fund', id: Number(allianceId) },
+      ],
+    }),
+    transferAllianceFunds: builder.mutation<
+      ApiResponse<FundTransferResponse>,
+      { allianceId: number; data: TransferFundsRequest }
+    >({
+      query: ({ allianceId, data }) => ({
+        url: `/alliances/${Number(allianceId)}/fund/transfer`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { allianceId }) => [
+        { type: 'Alliance', id: Number(allianceId) },
+        'Alliance',
+        'Planet',
+        'Empire',
+        { type: 'Fund', id: Number(allianceId) },
+      ],
+    }),
   }),
 })
 
@@ -350,5 +434,9 @@ export const {
   // Chat
   useGetAllianceChatMessagesQuery,
   useSendAllianceChatMessageMutation,
+  // Fund Management
+  useGetAllianceFundQuery,
+  useWithdrawAllianceFundsMutation,
+  useTransferAllianceFundsMutation,
 } = alliancesApi
 
