@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { useGetMailQuery, useSendMailMutation, useReplyMailMutation, useDeleteMailMutation, useGetMailDetailsQuery } from '@/api/endpoints/mailApi'
+import { useGetMailQuery, useSendMailMutation, useReplyMailMutation, useDeleteMailMutation, useGetMailDetailsQuery, useMarkMailAsReadMutation } from '@/api/endpoints/mailApi'
 import { useGetEmpiresQuery } from '@/api/endpoints/empiresApi'
 import { formatDate } from '@/lib/formatters'
 import { 
@@ -56,6 +56,7 @@ export function MessagingPage() {
   const [sendMail, { isLoading: isSending }] = useSendMailMutation()
   const [replyMail, { isLoading: isReplying }] = useReplyMailMutation()
   const [deleteMail, { isLoading: isDeleting }] = useDeleteMailMutation()
+  const [markMailAsRead] = useMarkMailAsReadMutation()
   
   // Fetch mail details when a message is selected
   const { data: mailDetails } = useGetMailDetailsQuery(selectedMail || 0, {
@@ -139,14 +140,30 @@ export function MessagingPage() {
     setSelectedMail(null)
   }
 
-  const handleSelectMail = (mailId: number) => {
+  // Mark mail as read when viewing details
+  useEffect(() => {
+    if (selectedMail && activeTab === 'inbox') {
+      const mail = currentData?.data.find(m => m.id === selectedMail)
+      if (mail && !mail.is_read) {
+        markMailAsRead(selectedMail).catch((error: any) => {
+          console.error('Failed to mark mail as read:', error)
+        })
+      }
+    }
+  }, [selectedMail, activeTab, currentData?.data, markMailAsRead])
+
+  const handleSelectMail = async (mailId: number) => {
     setSelectedMail(mailId)
     // Mark as read if it's an inbox message and unread
     if (activeTab === 'inbox') {
       const mail = currentData?.data.find(m => m.id === mailId)
       if (mail && !mail.is_read) {
-        // The mail will be marked as read when we fetch the details
-        // This is handled by the backend when we call getMailDetails
+        try {
+          await markMailAsRead(mailId).unwrap()
+        } catch (error: any) {
+          console.error('Failed to mark mail as read:', error)
+          // Don't show error toast as this is a background operation
+        }
       }
     }
   }

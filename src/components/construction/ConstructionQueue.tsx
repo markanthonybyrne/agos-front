@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,8 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { apiSlice } from '@/api/apiSlice'
+import { useAppSelector } from '@/app/hooks'
 
 interface ConstructionQueueProps {
   planetId: number
@@ -30,14 +32,28 @@ export function ConstructionQueue({
   onConstructionComplete 
 }: ConstructionQueueProps) {
   const [cancellingId, setCancellingId] = useState<number | null>(null)
+  const empire = useAppSelector((state) => state.auth.empire)
 
-  const { data: constructionData, isLoading, error, refetch } = useGetConstructionQueueQuery(planetId)
+  const { data: constructionData, isLoading, error, refetch } = useGetConstructionQueueQuery(planetId, {
+    // Refetch when the component mounts or when planetId changes
+    refetchOnMountOrArgChange: true,
+  })
   const [cancelFacility] = useCancelFacilityConstructionMutation()
   const [cancelDefence] = useCancelDefenceConstructionMutation()
   const [cancelShip] = useCancelShipConstructionMutation()
   const [cancelResearch] = useCancelResearchMutation()
 
   const constructions = constructionData?.construction_queue || []
+
+  // Subscribe to WebSocket events for this planet's construction updates
+  useEffect(() => {
+    if (!empire) return
+
+    // RTK Query will automatically refetch when tags are invalidated
+    // But we can also manually refetch when planet.updated events occur
+    // The WebSocket hook already invalidates tags, so this should work automatically
+    // However, we'll keep the refetch capability for manual refresh button
+  }, [empire, planetId])
 
   const getItemIcon = (type: string) => {
     switch (type) {

@@ -189,17 +189,21 @@ export const authApi = apiSlice.injectEndpoints({
         if (response.status === 'ok' && response.data) {
           return response.data
         }
-        return response as unknown as {
-          notifications: { email_notifications: boolean; push_notifications: boolean }
+        // Return default structure if response is malformed
+        return {
+          notifications: {
+            email_notifications: false,
+            push_notifications: true,
+          },
           events: {
-            construction_completed: boolean
-            research_completed: boolean
-            fleet_arrived: boolean
-            fleet_attacked: boolean
-            planet_colonized: boolean
-            alliance_messages: boolean
-            empire_attacked: boolean
-          }
+            construction_completed: true,
+            research_completed: true,
+            fleet_arrived: true,
+            fleet_attacked: true,
+            planet_colonized: true,
+            alliance_messages: false,
+            empire_attacked: true,
+          },
         }
       },
     }),

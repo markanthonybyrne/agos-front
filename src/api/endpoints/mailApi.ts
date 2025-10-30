@@ -55,6 +55,17 @@ export const mailApi = apiSlice.injectEndpoints({
         { type: 'Mail', id: 'LIST' },
       ],
     }),
+    markMailAsRead: builder.mutation<ApiResponse<{ mail: { id: number; is_read: boolean } }>, number>({
+      query: (id) => ({
+        url: `/mail/${id}/read`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: [
+        { type: 'Mail', id: 'inbox' },
+        { type: 'Mail', id: 'LIST' },
+        (result, error, id) => [{ type: 'Mail', id }],
+      ],
+    }),
   }),
 })
 
@@ -64,4 +75,5 @@ export const {
   useSendMailMutation,
   useReplyMailMutation,
   useDeleteMailMutation,
+  useMarkMailAsReadMutation,
 } = mailApi

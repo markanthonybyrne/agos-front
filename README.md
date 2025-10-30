@@ -26,12 +26,25 @@ A modern React-based frontend for EmpireQuest - A Game Of Space MMORPG.
 npm install
 ```
 
-2. Create a `.env` file in the root directory:
+2. Create a `.env` file (or `.env.local`) in the root directory:
+
+**For local development:**
 ```env
-VITE_API_URL=http://localhost:8080/api/v1
-VITE_WS_URL=ws://localhost:8080
-VITE_WS_KEY=empirequest-key
+VITE_API_URL=http://127.0.0.1:8000/api/v1
+VITE_WS_URL=ws://127.0.0.1:8080
+VITE_WS_KEY=o714i1l2lrdflpgv7mwg
 ```
+
+**For staging (using Pusher):**
+```env
+VITE_API_URL=https://api.agameof.space/api/v1/
+VITE_PUSHER_KEY=33d7245f0190d9d32296
+VITE_PUSHER_CLUSTER=eu
+VITE_USE_PUSHER=true
+```
+(WebSocket will use Pusher service for staging)
+
+**Note:** Create `.env.staging` file for staging configuration, or use `npm run dev:staging` / `npm run build:staging` commands.
 
 3. Start the development server:
 ```bash
@@ -70,10 +83,46 @@ The app will be available at `http://localhost:3000`
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
+- `npm run dev` - Start development server (uses `.env.local` if present)
+- `npm run dev:staging` - Start development server with staging config (uses `.env.staging`)
 - `npm run build` - Build for production
+- `npm run build:staging` - Build for staging environment
 - `npm run preview` - Preview production build
+- `npm run preview:staging` - Preview staging build
 - `npm run lint` - Run ESLint
+
+## Deployment
+
+### Staging Deployment
+
+Deploy to staging server using the deployment script:
+
+```bash
+./deploy-staging.sh
+```
+
+This script will:
+1. Check for `.env.staging` configuration file
+2. Build the frontend with staging configuration (`npm run build:staging`)
+3. Deploy the `dist/` folder to `/var/www/agos-app/current/dist` on the staging server
+4. Use rsync for efficient file transfer
+
+**Requirements:**
+- SSH access to `159.65.16.122` as `root`
+- SSH key configured for passwordless login (recommended)
+- `.env.staging` file with staging configuration
+
+**Manual deployment:**
+
+If you prefer to deploy manually:
+
+```bash
+# Build for staging
+npm run build:staging
+
+# Deploy using rsync
+rsync -avz --delete dist/ root@159.65.16.122:/var/www/agos-app/current/dist/
+```
 - `npm run test` - Run unit tests
 - `npm run test:ui` - Run tests with UI
 - `npm run test:coverage` - Generate test coverage

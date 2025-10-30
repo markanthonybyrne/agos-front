@@ -41,7 +41,7 @@ export function NotificationSettings({}: NotificationSettingsProps) {
 
   // Load preferences from API when available
   useEffect(() => {
-    if (preferencesData) {
+    if (preferencesData?.notifications && preferencesData?.events) {
       setSettings({
         emailNotifications: preferencesData.notifications.email_notifications ?? false,
         pushNotifications: preferencesData.notifications.push_notifications ?? true,

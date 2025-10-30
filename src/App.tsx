@@ -5,6 +5,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthGuard } from '@/components/common/AuthGuard'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
+import { PlayerManual } from '@/features/manual/PlayerManual'
 import { Holopad } from '@/features/holopad/Holopad'
 import { PlanetsList } from '@/features/planets/PlanetsList'
 import { PlanetDetail } from '@/features/planets/PlanetDetail'
@@ -24,6 +25,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/manual" element={<PlayerManual />} />
         <Route
           path="/*"
           element={

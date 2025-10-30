@@ -1,8 +1,9 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
+import { useEffect } from 'react'
 import { useRegisterMutation } from '@/api/endpoints/authApi'
-import { useAppDispatch } from '@/app/hooks'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setCredentials } from '@/app/slices/authSlice'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,10 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const [register, { isLoading }] = useRegisterMutation()
+  
+  // Check if user is already authenticated
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
+  const token = useAppSelector((state) => state.auth.token)
 
   const backgroundUrl = new URL('../../../assets/images/background.jpg', import.meta.url).href
 
@@ -34,6 +39,18 @@ export function RegisterPage() {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   })
+
+  // Redirect to holopad if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      navigate('/holopad', { replace: true })
+    }
+  }, [isAuthenticated, token, navigate])
+
+  // Early return to prevent rendering if already authenticated
+  if (isAuthenticated && token) {
+    return null
+  }
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
@@ -49,11 +66,16 @@ export function RegisterPage() {
       } else {
         toast.error('Registration failed - invalid response')
       }
-    } catch (error: any) {
-      if (error?.data?.status === 'error') {
-        toast.error(error.data.message || 'Registration failed')
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'data' in error) {
+        const apiError = error as { data?: { status?: string; message?: string } }
+        if (apiError.data?.status === 'error') {
+          toast.error(apiError.data.message || 'Registration failed')
+        } else {
+          toast.error(apiError.data?.message || 'Registration failed')
+        }
       } else {
-        toast.error(error?.data?.message || 'Registration failed')
+        toast.error('Registration failed')
       }
     }
   }
@@ -65,7 +87,7 @@ export function RegisterPage() {
     >
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-3xl font-heading glow-cyan">Join EmpireQuest</CardTitle>
+          <CardTitle className="text-3xl font-heading glow-cyan">Join agameof.space</CardTitle>
           <CardDescription>Create your empire and conquer the galaxy</CardDescription>
         </CardHeader>
         <CardContent>
@@ -120,13 +142,21 @@ export function RegisterPage() {
               {isLoading ? 'Creating Empire...' : 'Register'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 space-y-2 text-center text-sm">
             <button
               onClick={() => navigate('/login')}
               className="text-primary hover:underline"
             >
               Already have an account? Login
             </button>
+            <div>
+              <button
+                onClick={() => navigate('/manual')}
+                className="text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Read Player Manual
+              </button>
+            </div>
           </div>
         </CardContent>
       </Card>
