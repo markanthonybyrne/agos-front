@@ -34,18 +34,25 @@ export function useWebSocket() {
     // Subscribe to private empire channel
     const privateChannel = echo.private(`empire.${empire.id}`)
 
-    // Handle tick processed event
-    privateChannel.listen('.tick.processed', (data: any) => {
-      dispatch(setTick({ tick: data.tick_number, nextTickETA: data.next_tick_eta }))
-      dispatch(setTickProcessing(false))
-      toast.success(`Tick ${data.tick_number} processed!`)
-      
-      // Invalidate all relevant caches
-      dispatch(apiSlice.util.invalidateTags(['Empire', 'Planet', 'Fleet']))
+    // Handle empire updated event
+    privateChannel.listen('empire.updated', (data: any) => {
+      dispatch(apiSlice.util.invalidateTags(['Empire']))
+    })
+
+    // Handle news created event
+    privateChannel.listen('news.created', (data: any) => {
+      toast.info('New news item available')
+      dispatch(apiSlice.util.invalidateTags(['Empire']))
+    })
+
+    // Handle mail received event
+    privateChannel.listen('mail.received', (data: any) => {
+      toast.info('New mail received')
+      dispatch(apiSlice.util.invalidateTags(['Empire']))
     })
 
     // Handle fleet arrived event
-    privateChannel.listen('.fleet.arrived', (data: any) => {
+    privateChannel.listen('fleet.arrived', (data: any) => {
       dispatch(handleFleetArrived({
         fleetId: data.fleet_id,
         destination: data.destination_coordinate || data.destination,
@@ -55,19 +62,16 @@ export function useWebSocket() {
       dispatch(apiSlice.util.invalidateTags(['Fleet', 'Planet']))
     })
 
-    // Handle combat resolved event
-    privateChannel.listen('.combat.resolved', (data: any) => {
-      toast.warning(`Combat resolved at ${data.location_coordinate}`)
-      dispatch(apiSlice.util.invalidateTags(['Fleet', 'Planet', 'Empire']))
+    // Handle planet updated event (if owned)
+    privateChannel.listen('planet.updated', (data: any) => {
+      dispatch(apiSlice.util.invalidateTags(['Planet']))
     })
 
-    // Handle mail received event
-    privateChannel.listen('.mail.received', (data: any) => {
-      toast.info('New mail received')
-      dispatch(apiSlice.util.invalidateTags(['Empire']))
-    })
+    // Note: The following events may not be in the official API but keeping for backward compatibility
+    // These use dot-prefixed names which Laravel may broadcast differently
 
-    // Handle construction completed event
+    // Note: construction.completed, research.completed, etc. may not be in the official API
+    // but keeping them for backward compatibility
     privateChannel.listen('.construction.completed', (data: any) => {
       dispatch(handleConstructionCompleted({
         planetId: data.planet_id,
@@ -135,10 +139,11 @@ export function useWebSocket() {
       dispatch(apiSlice.util.invalidateTags(['Fleet']))
     })
 
-    // Subscribe to public tick channel
-    const publicTickChannel = echo.channel('public.tick')
+    // Subscribe to public tick channel (Echo may auto-add 'public-' prefix, but docs show 'public.tick')
+    // Try both formats to be safe
+    const publicTickChannel = echo.channel('tick')
     
-    publicTickChannel.listen('.tick.processed', (data: any) => {
+    publicTickChannel.listen('tick.processed', (data: any) => {
       dispatch(handleTickProcessed({
         tickNumber: data.tick_number,
         nextTickEta: data.next_tick_eta,
@@ -148,17 +153,21 @@ export function useWebSocket() {
     })
 
           // Subscribe to galaxy channels for map updates
+          // Echo may auto-add 'public-' prefix, so use 'galaxy.{q}.{s}.{g}' format
           if (meData?.planets) {
             const galaxyChannels = new Set<string>()
             meData.planets.forEach((planet: any) => {
         const coordString = formatCoordinate(planet.coordinate)
         const [quad, sec, gal] = coordString.split(':')
-        const channelName = `public-galaxy.${quad}.${sec}.${gal}`
+        const channelName = `galaxy.${quad}.${sec}.${gal}`
         if (!galaxyChannels.has(channelName)) {
           galaxyChannels.add(channelName)
           const galaxyChannel = echo.channel(channelName)
-          galaxyChannel.listen('.planet.updated', () => {
+          galaxyChannel.listen('planet.updated', () => {
             dispatch(apiSlice.util.invalidateTags(['Universe', 'Planet']))
+          })
+          galaxyChannel.listen('combat.resolved', () => {
+            dispatch(apiSlice.util.invalidateTags(['Universe', 'Planet', 'Fleet']))
           })
         }
       })

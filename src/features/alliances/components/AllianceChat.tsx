@@ -1,86 +1,134 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/formatters'
+import { useGetAllianceChatMessagesQuery, useSendAllianceChatMessageMutation } from '@/api/endpoints/alliancesApi'
+import { useAuth } from '@/hooks/useAuth'
+import { getEcho } from '@/lib/websocket'
 import { 
   MessageSquare, 
   Send, 
-  Users,
   Crown,
   Shield
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { AllianceChatMessage } from '@/types/api.types'
 
 interface AllianceChatProps {
   allianceId: number
 }
 
-interface ChatMessage {
-  id: number
-  empire_name: string
-  empire_role: string
-  message: string
-  created_at: string
-}
-
 export function AllianceChat({ allianceId }: AllianceChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const { empire } = useAuth()
   const [newMessage, setNewMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const subscriptionRef = useRef<any>(null)
 
-  // Mock data for now - in real implementation, this would come from WebSocket
-  useEffect(() => {
-    // Simulate loading messages
-    setTimeout(() => {
-      setMessages([
-        {
-          id: 1,
-          empire_name: 'CommanderZen',
-          empire_role: 'leader',
-          message: 'Welcome to the alliance! Let\'s work together to dominate the galaxy.',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 2,
-          empire_name: 'SpaceAdmiral',
-          empire_role: 'officer',
-          message: 'I\'ve spotted some enemy activity near sector 3:2:1. Should we investigate?',
-          created_at: new Date(Date.now() - 300000).toISOString()
-        },
-        {
-          id: 3,
-          empire_name: 'GalaxyRuler',
-          empire_role: 'member',
-          message: 'I can send a fleet to scout the area.',
-          created_at: new Date(Date.now() - 180000).toISOString()
-        }
-      ])
-      setIsLoading(false)
-    }, 1000)
-  }, [allianceId])
+  const { data: messagesData, isLoading, refetch } = useGetAllianceChatMessagesQuery({
+    allianceId,
+    limit: 50,
+    offset: 0
+  })
+
+  const [sendMessage, { isLoading: isSending }] = useSendAllianceChatMessageMutation()
+
+  // Sort messages by created_at ascending (oldest first, newest last)
+  const messages = useMemo(() => {
+    const msgs = messagesData?.messages || []
+    return [...msgs].sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime()
+      const dateB = new Date(b.created_at).getTime()
+      return dateA - dateB
+    })
+  }, [messagesData?.messages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newMessage.trim()) return
+  // Scroll to bottom on initial load
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+      }, 100)
+    }
+  }, [isLoading, messages.length])
 
-    // Mock sending message - in real implementation, this would send via WebSocket
-    const message: ChatMessage = {
-      id: Date.now(),
-      empire_name: 'You', // In real implementation, get from user context
-      empire_role: 'member',
-      message: newMessage.trim(),
-      created_at: new Date().toISOString()
+  // WebSocket subscription
+  useEffect(() => {
+    if (!allianceId) return
+
+    // Wait for WebSocket to be initialized
+    let retryCount = 0
+    const maxRetries = 10
+    const retryInterval = 500
+
+    const subscribeToChannel = () => {
+      const echo = getEcho()
+      if (!echo) {
+        if (retryCount < maxRetries) {
+          retryCount++
+          console.log(`WebSocket not ready, retrying... (${retryCount}/${maxRetries})`)
+          setTimeout(subscribeToChannel, retryInterval)
+          return
+        } else {
+          console.warn('WebSocket not available for alliance chat after retries')
+          return
+        }
+      }
+
+      // Echo automatically adds 'private-' prefix, so use 'alliance.{id}' not 'private-alliance.{id}'
+      const channelName = `alliance.${allianceId}`
+      console.log('Subscribing to alliance chat channel:', channelName)
+      
+      try {
+        const channel = echo.private(channelName)
+        subscriptionRef.current = channel
+        
+        // Listen for alliance chat message event (no dot prefix per docs)
+        channel.listen('alliance.chat.message', (e: any) => {
+          console.log('New alliance chat message received:', e)
+          // Refresh messages when new message arrives
+          refetch()
+        })
+
+        console.log('Successfully subscribed to alliance chat channel')
+      } catch (error) {
+        console.error('Error subscribing to alliance chat channel:', error)
+      }
     }
 
-    setMessages(prev => [...prev, message])
-    setNewMessage('')
+    subscribeToChannel()
+
+    return () => {
+      if (subscriptionRef.current) {
+        try {
+          subscriptionRef.current.stopListening('alliance.chat.message')
+        } catch (error) {
+          console.error('Error unsubscribing from alliance chat channel:', error)
+        }
+      }
+    }
+  }, [allianceId, refetch])
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMessage.trim() || isSending) return
+
+    try {
+      await sendMessage({
+        allianceId,
+        data: { message: newMessage.trim() }
+      }).unwrap()
+      setNewMessage('')
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to send message')
+    }
   }
 
   const getRoleIcon = (role: string) => {
@@ -89,10 +137,8 @@ export function AllianceChat({ allianceId }: AllianceChatProps) {
         return <Crown className="w-3 h-3 text-yellow-400" />
       case 'officer':
         return <Shield className="w-3 h-3 text-blue-400" />
-      case 'member':
-        return <Users className="w-3 h-3 text-green-400" />
       default:
-        return <Users className="w-3 h-3 text-muted-foreground" />
+        return null
     }
   }
 
@@ -102,8 +148,6 @@ export function AllianceChat({ allianceId }: AllianceChatProps) {
         return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
       case 'officer':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'member':
-        return 'bg-green-500/20 text-green-400 border-green-500/30'
       default:
         return 'bg-muted/20 text-muted-foreground border-border'
     }
@@ -149,35 +193,42 @@ export function AllianceChat({ allianceId }: AllianceChatProps) {
             </div>
           ) : (
             <>
-              {messages.map((message) => (
-                <div key={message.id} className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center">
-                    <span className="text-sm font-semibold">
-                      {message.empire_name.charAt(0)}
-                    </span>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{message.empire_name}</span>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs ${getRoleColor(message.empire_role)}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          {getRoleIcon(message.empire_role)}
-                          {message.empire_role}
-                        </div>
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDateTime(message.created_at)}
+              {messages.map((message: AllianceChatMessage) => {
+                const senderName = message.sender_empire?.name || 'Unknown'
+                const role = 'member' // Default role, could be enhanced with member data
+                
+                return (
+                  <div key={message.id} className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center">
+                      <span className="text-sm font-semibold">
+                        {senderName.charAt(0)}
                       </span>
                     </div>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">
-                      {message.message}
-                    </p>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">{senderName}</span>
+                        {getRoleIcon(role) && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${getRoleColor(role)}`}
+                          >
+                            <div className="flex items-center gap-1">
+                              {getRoleIcon(role)}
+                              {role}
+                            </div>
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {formatDateTime(message.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {message.message}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               <div ref={messagesEndRef} />
             </>
           )}
@@ -191,11 +242,11 @@ export function AllianceChat({ allianceId }: AllianceChatProps) {
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type your message..."
               className="flex-1"
-              disabled={isLoading}
+              disabled={isSending}
             />
             <Button 
               type="submit" 
-              disabled={!newMessage.trim() || isLoading}
+              disabled={!newMessage.trim() || isSending}
               className="bg-primary hover:bg-primary/90"
             >
               <Send className="w-4 h-4" />
@@ -206,4 +257,3 @@ export function AllianceChat({ allianceId }: AllianceChatProps) {
     </Card>
   )
 }
-

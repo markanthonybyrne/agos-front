@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAppDispatch } from '@/app/hooks'
 import { getEcho } from '@/lib/websocket'
+import { useAuth } from '@/hooks/useAuth'
 import {
   handleConstructionCompleted,
   handleFleetArrived,
@@ -18,18 +19,19 @@ interface UseWebSocketNotificationsProps {
 
 export function useWebSocketNotifications({ enabled = true }: UseWebSocketNotificationsProps) {
   const dispatch = useAppDispatch()
+  const { empire } = useAuth()
   const echo = getEcho()
 
   useEffect(() => {
-    if (!echo || !enabled) {
-      console.log('WebSocket not available or notifications disabled:', { echo: !!echo, enabled })
+    if (!echo || !enabled || !empire) {
+      console.log('WebSocket not available or notifications disabled:', { echo: !!echo, enabled, empire: !!empire })
       return
     }
 
     console.log('Setting up WebSocket notifications...')
 
-    // Private channel for user-specific notifications
-    const privateChannel = echo.private('user')
+    // Private channel for empire-specific notifications (matches useWebSocket hook)
+    const privateChannel = echo.private(`empire.${empire.id}`)
 
     // Listen for construction completed events
     privateChannel.listen('.construction.completed', (data: any) => {
@@ -150,7 +152,7 @@ export function useWebSocketNotifications({ enabled = true }: UseWebSocketNotifi
       privateChannel.stopListening('.resources.updated')
       privateChannel.stopListening('.planet.colonized')
     }
-  }, [echo, enabled, dispatch])
+  }, [echo, enabled, dispatch, empire])
 
   return {
     isConnected: !!echo

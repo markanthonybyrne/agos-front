@@ -14,6 +14,7 @@ import { UniverseMap } from '@/features/map/UniverseMap'
 import { MessagingPage } from '@/features/messaging/MessagingPage'
 import { SignalsPage } from '@/features/signals/SignalsPage'
 import { AlliancesPage } from '@/features/alliances/AlliancesPage'
+import { PoliticsPage } from '@/features/politics/PoliticsPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 
@@ -37,7 +38,7 @@ function App() {
                           <Route path="/fleets" element={<FleetsPage />} />
                           <Route path="/fleets/:id" element={<FleetDetail />} />
                           <Route path="/signals" element={<SignalsPage />} />
-                          <Route path="/alliances" element={<AlliancesPage />} />
+                          <Route path="/alliances" element={<PoliticsPage />} />
                           <Route path="/mail" element={<MessagingPage />} />
                           <Route path="/rankings" element={<RankingsPage />} />
                           <Route path="/settings" element={<SettingsPage />} />

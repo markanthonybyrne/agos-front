@@ -25,7 +25,7 @@ const navItems = [
   { path: '/planets', label: 'Planets', icon: Building2 },
   { path: '/fleets', label: 'Fleets', icon: Rocket },
   { path: '/signals', label: 'Signals', icon: Scan },
-  { path: '/alliances', label: 'Alliances', icon: Users },
+  { path: '/alliances', label: 'Politics', icon: Users },
   { path: '/mail', label: 'Mail', icon: Mail },
   { path: '/rankings', label: 'Rankings', icon: Trophy },
   { path: '/settings', label: 'Settings', icon: Settings },

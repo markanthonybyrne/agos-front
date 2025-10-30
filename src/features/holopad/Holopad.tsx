@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
+import { useGetAllianceHomepageQuery } from '@/api/endpoints/alliancesApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setTick } from '@/app/slices/gameSlice'
 import { logout, updateEmpire } from '@/app/slices/authSlice'
@@ -11,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/common/Avatar'
+import { AlertCircle } from 'lucide-react'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -20,6 +22,11 @@ export function Holopad() {
   const { data, isLoading, error } = useGetMeQuery(undefined, {
     pollingInterval: 30000, // Poll every 30 seconds
     skip: !isAuthenticated, // Skip the query if not authenticated
+  })
+
+  const allianceId = data?.empire?.alliance_id || empire?.alliance_id
+  const { data: allianceHomepageData } = useGetAllianceHomepageQuery(allianceId!, {
+    skip: !allianceId
   })
 
   // Handle authentication errors
@@ -142,6 +149,25 @@ export function Holopad() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Alliance MOTD */}
+      {allianceHomepageData?.alliance?.motd && (
+        <Card className="panel-glass border-yellow-500/20">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-yellow-400 mb-1">
+                  {allianceHomepageData.alliance.name} - Message of the Day
+                </h4>
+                <p className="text-sm text-foreground whitespace-pre-wrap">
+                  {allianceHomepageData.alliance.motd}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Resource Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

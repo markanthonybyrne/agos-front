@@ -99,12 +99,14 @@ export interface Alliance {
   tag: string
   description?: string
   avatar_path?: string
+  avatar_url?: string
   leader: {
     id: number
     name: string
   }
   member_count: number
   total_score?: number
+  average_score?: number
   fund_tellerium: number
   fund_krypton: number
   funds?: {
@@ -121,6 +123,201 @@ export interface Alliance {
     joined_at: string
   }>
   created_at: string
+  // New alliance system fields
+  mission_statement?: string
+  homepage_url?: string | null
+  motd?: string | null
+  open_membership?: boolean
+}
+
+// Alliance Permission Types
+export type AlliancePermission = 
+  | 'manage_fund'
+  | 'recruit_members'
+  | 'kick_members'
+  | 'manage_groups'
+  | 'edit_global_options'
+  | 'view_join_requests'
+  | 'view_status'
+
+export interface AlliancePermissions {
+  manage_fund: boolean
+  recruit_members: boolean
+  kick_members: boolean
+  manage_groups: boolean
+  edit_global_options: boolean
+  view_join_requests: boolean
+  view_status: boolean
+}
+
+// Alliance Creation Request Types
+export interface AllianceCreationRequestCoordinate {
+  quadrant: number
+  sector: number
+  galaxy: number
+  planet: number
+}
+
+export interface AllianceCreationRequest {
+  id: number
+  creator: {
+    id: number
+    name: string
+  }
+  name: string
+  tag: string
+  status: 'pending' | 'approved' | 'rejected' | 'completed'
+  approvals_required: number
+  approvals_received: number
+  my_status?: 'pending' | 'approved' | 'rejected'
+  supporters?: Array<{
+    empire_id: number
+    empire_name: string
+    status: 'pending' | 'approved' | 'rejected'
+  }>
+  created_at: string
+}
+
+export interface CreateAllianceCreationRequest {
+  name: string
+  tag: string
+  coordinates: AllianceCreationRequestCoordinate[]
+}
+
+export interface SupportAllianceCreationRequest {
+  action: 'approve' | 'reject'
+}
+
+// Alliance Join Request Types
+export interface AllianceJoinRequest {
+  id: number
+  alliance_id: number
+  applicant: {
+    id: number
+    name: string
+    score: number
+    planets_owned: number
+  }
+  alliance?: {
+    id: number
+    name: string
+    tag: string
+  }
+  message: string
+  status: 'pending' | 'accepted' | 'rejected'
+  created_at: string
+}
+
+export interface CreateJoinRequest {
+  message: string
+}
+
+export interface RespondToJoinRequest {
+  action: 'accept' | 'reject'
+}
+
+// Alliance Group Types
+export interface AllianceGroup {
+  id: number
+  name: string
+  members: Array<{
+    id: number
+    name: string
+  }>
+  permissions: AlliancePermissions
+}
+
+export interface CreateAllianceGroup {
+  name: string
+  members: number[]
+  permissions: AlliancePermissions
+}
+
+export interface UpdateAllianceGroup {
+  name?: string
+  members?: number[]
+  permissions?: Partial<AlliancePermissions>
+}
+
+// Alliance Member Types
+export interface AllianceMember {
+  id: number
+  name: string
+  score: number
+  planets_owned: number
+  percentile: number
+  online: boolean
+  homeworld: {
+    name: string
+    quadrant: number
+    sector: number
+    galaxy: number
+    planet: number
+  }
+  role: string
+}
+
+// Alliance Status Types
+export interface AllianceStatusFleet {
+  fleet_id: number
+  owner: {
+    id: number
+    name: string
+  }
+  origin: {
+    quadrant: number
+    sector: number
+    galaxy: number
+    planet: number
+  }
+  destination: {
+    quadrant: number
+    sector: number
+    galaxy: number
+    planet: number
+  }
+  order_type: string
+  arrival_tick: number
+  current_tick: number
+}
+
+export interface AllianceStatus {
+  outgoing: AllianceStatusFleet[]
+  incoming: AllianceStatusFleet[]
+}
+
+// Alliance Homepage Types
+export interface AllianceHomepage {
+  alliance: {
+    id: number
+    name: string
+    tag: string
+    mission_statement?: string
+    homepage_url?: string | null
+    avatar_url?: string
+    member_count: number
+    total_score: number
+    average_score: number
+    leaders: Array<{
+      id: number
+      name: string
+      score: number
+    }>
+    members: Array<{
+      id: number
+      name: string
+      score: number
+      role: string
+    }>
+  }
+}
+
+// Global Options Types
+export interface AllianceGlobalOptions {
+  open_membership?: boolean
+  mission_statement?: string
+  homepage_url?: string | null
+  motd?: string | null
 }
 
 export interface UniverseMap {
@@ -524,8 +721,7 @@ export interface ReplyMailRequest {
 export interface AllianceChatMessage {
   id: number
   alliance_id: number
-  empire_id: number
-  empire: {
+  sender_empire: {
     id: number
     name: string
   }

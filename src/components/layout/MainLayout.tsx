@@ -1,6 +1,7 @@
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { useAppSelector } from '@/app/hooks'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import { useWebSocketNotifications } from '@/hooks/useWebSocketNotifications'
 
 interface MainLayoutProps {
@@ -9,6 +10,9 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
+  
+  // Initialize WebSocket connection (this initializes Echo)
+  useWebSocket()
   
   // Initialize WebSocket notifications when authenticated
   useWebSocketNotifications({ enabled: isAuthenticated })
