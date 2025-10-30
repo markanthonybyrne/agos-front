@@ -3,6 +3,7 @@ import {
   ApiResponse, 
   FleetDetails, 
   CreateFleetRequest, 
+  MoveFleetRequest,
   TravelTimeRequest,
   TravelTime,
   TravelEstimate,
@@ -34,6 +35,14 @@ export const fleetsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Fleet', 'Planet'],
     }),
+    moveFleet: builder.mutation<ApiResponse<{ fleet: FleetDetails }>, { id: number; data: MoveFleetRequest }>({
+      query: ({ id, data }) => ({
+        url: `/fleets/${id}/move`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Fleet', 'Planet'],
+    }),
     getTravelTime: builder.mutation<TravelTime, TravelTimeRequest>({
       query: (data) => ({
         url: '/fleets/travel-time',
@@ -62,6 +71,7 @@ export const {
   useGetFleetQuery, 
   useCreateFleetMutation, 
   useCancelFleetMutation,
+  useMoveFleetMutation,
   useGetTravelTimeMutation,
   useGetTravelEstimatesQuery,
 } = fleetsApi

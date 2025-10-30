@@ -121,21 +121,19 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
     }
 
     try {
-      // Convert ships Record to FleetShip[] format
-      // ships is keyed by ship slug, we need to convert to definition_id format
-      const fleetShips = Object.entries(ships)
-        .filter(([_, count]) => count > 0)
-        .map(([shipSlug, count]) => {
-          // Find ship definition by slug to get definition_id
-          const shipDef = shipDefinitions?.ships?.find(s => s.slug === shipSlug)
-          if (!shipDef) {
-            throw new Error(`Ship definition not found for slug: ${shipSlug}`)
-          }
-          return {
-            definition_id: shipDef.id,
-            quantity: count,
-          }
-        })
+      // Ships are already in slug-based format from the form state
+      // Just filter out ships with quantity 0
+      const fleetShips: Record<string, number> = {}
+      Object.entries(ships).forEach(([shipSlug, count]) => {
+        if (count > 0) {
+          fleetShips[shipSlug] = count
+        }
+      })
+
+      if (Object.keys(fleetShips).length === 0) {
+        toast.error('Please select at least one ship')
+        return
+      }
 
       // Parse destination coordinate
       const coordParts = data.destination_coordinate.split(':').map(Number)
@@ -145,13 +143,15 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
       }
 
       await createFleet({
-        ships: fleetShips as any,
+        ships: fleetShips,
         origin_planet_id: data.origin_planet_id,
         destination_quadrant: coordParts[0],
         destination_sector: coordParts[1],
         destination_galaxy: coordParts[2],
         destination_planet: coordParts[3],
         order_type: data.order_type,
+        auto_return_on_failure: data.auto_return_on_failure,
+        name: data.name,
       }).unwrap()
 
       toast.success('Fleet created successfully!')

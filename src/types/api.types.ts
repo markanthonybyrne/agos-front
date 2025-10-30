@@ -624,9 +624,11 @@ export interface CostBreakdown {
 // Travel Time Types
 export interface TravelTime {
   travel_ticks: number
-  travel_seconds: number
-  arrival_tick: number
-  arrival_time: string
+  slowest_ship: string
+  slowest_ship_travel_ticks: number
+  distance_multiplier: number
+  origin: string // Coordinate format: "1:1:1:1"
+  destination: string // Coordinate format: "1:1:2:1"
 }
 
 export interface TravelEstimate {
@@ -665,18 +667,28 @@ export interface FleetDetails {
 
 // Updated Request Types
 export interface CreateFleetRequest {
-  ships: FleetShip[]
+  ships: Record<string, number> // Associative array: { "fighter": 10, "cruiser": 5 }
   origin_planet_id: number
   destination_quadrant: number
   destination_sector: number
   destination_galaxy: number
   destination_planet: number
   order_type: 'attack' | 'defend' | 'station' | 'return'
+  auto_return_on_failure?: boolean
   name?: string
 }
 
+export interface MoveFleetRequest {
+  destination_quadrant: number
+  destination_sector: number
+  destination_galaxy: number
+  destination_planet: number
+  order_type?: 'attack' | 'defend' | 'station' | 'return'
+  auto_return_on_failure?: boolean
+}
+
 export interface TravelTimeRequest {
-  ships: FleetShip[]
+  ships: Record<string, number> // Associative array: { "fighter": 10, "cruiser": 5 }
   origin_quadrant: number
   origin_sector: number
   origin_galaxy: number

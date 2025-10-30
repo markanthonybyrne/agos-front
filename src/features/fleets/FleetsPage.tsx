@@ -6,16 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Ship, Plus, Clock, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
+import { Ship, Plus, Clock, MapPin, AlertCircle, CheckCircle, Rocket } from 'lucide-react'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber } from '@/lib/formatters'
 import { FleetBuilder } from './FleetBuilder'
+import { MoveFleetDialog } from './MoveFleetDialog'
 import { toast } from 'sonner'
+import { FleetDetails } from '@/types/api.types'
 
 type ViewType = 'list' | 'builder'
 
 export function FleetsPage() {
   const [activeView, setActiveView] = useState<ViewType>('list')
+  const [selectedFleetForMove, setSelectedFleetForMove] = useState<FleetDetails | null>(null)
   const navigate = useNavigate()
   const { data: fleets, isLoading, error } = useGetFleetsQuery()
   const { data: shipDefinitions } = useGetShipDefinitionsQuery()
@@ -277,6 +280,16 @@ export function FleetsPage() {
                         >
                           View
                         </Button>
+                        {fleet.status === 'stationed' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedFleetForMove(fleet)}
+                          >
+                            <Rocket className="w-4 h-4 mr-1" />
+                            Move
+                          </Button>
+                        )}
                         {fleet.status === 'in_transit' && (
                           <Button 
                             variant="outline" 
@@ -317,6 +330,15 @@ export function FleetsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Move Fleet Dialog */}
+      {selectedFleetForMove && (
+        <MoveFleetDialog
+          fleet={selectedFleetForMove}
+          isOpen={!!selectedFleetForMove}
+          onClose={() => setSelectedFleetForMove(null)}
+        />
+      )}
     </div>
   )
 }
