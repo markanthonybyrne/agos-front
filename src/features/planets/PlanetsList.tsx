@@ -135,9 +135,9 @@ export function PlanetsList() {
               </div>
 
               {/* Hover stats parallelogram box */}
-              <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-64">
-                <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-4 shadow-xl">
-                  <div className="space-y-2">
+              <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-80">
+                <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-6 shadow-xl">
+                  <div className="space-y-2 max-w-[200px] mr-[30px] ml-auto">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Resources</span>
                     </div>

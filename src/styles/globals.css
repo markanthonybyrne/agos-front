@@ -365,14 +365,54 @@
     animation: planet-spin 20s linear infinite;
   }
 
-  /* Parallelogram box for planet stats */
+  /* Sci-fi holographic info panel for planet stats */
   .parallelogram-box {
-    transform: skewY(-2deg);
+    position: relative;
     border-width: 2px;
+    border-image: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(6, 182, 212, 0.1)) 1;
+    background: 
+      linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.1), transparent 70%);
+    clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
+  }
+  
+  .parallelogram-box::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(6, 182, 212, 0)) border-box;
+    clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  
+  .parallelogram-box::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.5), transparent);
+    animation: scanline 3s ease-in-out infinite;
   }
   
   .parallelogram-box > * {
-    transform: skewY(2deg);
+    position: relative;
+    z-index: 1;
+  }
+  
+  @keyframes scanline {
+    0%, 100% {
+      opacity: 0;
+      transform: translateX(-100%);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(100%);
+    }
   }
 
   /* Planet glow animation for large display */
