@@ -14,6 +14,12 @@ export interface DirectResponse<T> {
   [key: string]: T
 }
 
+export interface Role {
+  id: number
+  name: string
+  slug: string
+}
+
 export interface User {
   id: number
   username: string
@@ -22,10 +28,13 @@ export interface User {
   created_at: string
   // Optional fields used in settings UI
   api_token?: string
-  role?: string
+  role?: string // Legacy field, use roles array instead
+  roles?: Role[] // Array of roles from /auth/me
   token_expires_at?: string
   avatar_path?: string // Deprecated - use avatar_url instead
   avatar_url?: string
+  suspended_at?: string | null
+  suspended_reason?: string | null
 }
 
 export interface TickTiming {
@@ -921,6 +930,425 @@ export interface UserPreferences {
     planet_colonized: boolean
     alliance_messages: boolean
     empire_attacked: boolean
+  }
+}
+
+// Admin Panel Types
+
+// Admin Role Types
+export interface AdminRole {
+  id: number
+  name: string
+  slug: string
+  description: string
+  permissions: string[]
+  user_count: number
+}
+
+export interface AdminRoleListResponse {
+  roles: AdminRole[]
+}
+
+// Admin User Types
+export interface AdminUser {
+  id: number
+  username: string
+  email: string
+  last_login: string | null
+  suspended_at: string | null
+  suspended_reason: string | null
+  created_at: string
+  empire: Empire | null
+  roles: Role[]
+}
+
+export interface AdminUserListResponse {
+  data: AdminUser[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface AdminUserDetailResponse {
+  user: AdminUser
+}
+
+export interface UpdateUserRequest {
+  email?: string
+  username?: string
+  suspended?: boolean
+  suspended_reason?: string
+}
+
+export interface ResetPasswordRequest {
+  new_password: string
+}
+
+export interface AssignRoleRequest {
+  role_id: number
+}
+
+export interface UserActivityLog {
+  id: number
+  action: string
+  description: string
+  ip_address?: string
+  user_agent?: string
+  created_at: string
+}
+
+export interface UserActivityLogResponse {
+  data: UserActivityLog[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+// Admin Empire Types
+export interface AdminEmpire {
+  id: number
+  name: string
+  description?: string
+  score: number
+  planets_owned: number
+  homeworld_planet_id: number
+  alliance_id?: number
+  created_at: string
+  user?: {
+    id: number
+    username: string
+    email: string
+  }
+}
+
+export interface AdminEmpireListResponse {
+  data: AdminEmpire[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface AdminEmpireDetailResponse {
+  empire: AdminEmpire
+}
+
+export interface UpdateEmpireRequest {
+  name?: string
+  description?: string
+  score?: number
+}
+
+export interface TransferEmpireRequest {
+  user_id: number
+}
+
+export interface EmpireHistoryItem {
+  id: number
+  action: string
+  description: string
+  performed_by?: {
+    id: number
+    username: string
+  }
+  created_at: string
+}
+
+export interface EmpireHistoryResponse {
+  data: EmpireHistoryItem[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+// Admin Planet Types
+export interface AdminPlanet {
+  id: number
+  name: string
+  coordinate: string | Coordinate
+  state: 'unsettled' | 'colony' | 'homeworld'
+  mines: number
+  probes: number
+  tellerium_balance: number
+  krypton_balance: number
+  owner_empire_id?: number
+  owner_empire?: {
+    id: number
+    name: string
+  }
+}
+
+export interface AdminPlanetListResponse {
+  data: AdminPlanet[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface AdminPlanetDetailResponse {
+  planet: AdminPlanet
+}
+
+export interface UpdatePlanetRequest {
+  name?: string
+  state?: 'unsettled' | 'colony' | 'homeworld'
+  tellerium_balance?: number
+  krypton_balance?: number
+  mines?: number
+  probes?: number
+}
+
+export interface TransferPlanetRequest {
+  empire_id: number
+}
+
+export interface ModifyPlanetResourcesRequest {
+  tellerium?: number
+  krypton?: number
+  reason: string
+}
+
+// Admin Fleet Types
+export interface AdminFleet {
+  id: number
+  ships: Record<string, number>
+  origin_coordinate: string | FleetCoordinate
+  destination_coordinate: string | FleetCoordinate
+  status: 'stationed' | 'in_transit' | 'arrived'
+  order_type: 'attack' | 'defend' | 'station' | 'return'
+  departure_tick: number
+  arrival_tick: number
+  owner?: {
+    id: number
+    name: string
+  }
+  owner_empire_id?: number
+}
+
+export interface AdminFleetListResponse {
+  data: AdminFleet[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface TeleportFleetRequest {
+  quadrant: number
+  sector: number
+  galaxy: number
+  planet: number
+}
+
+// Admin Alliance Types
+export interface AdminAlliance {
+  id: number
+  name: string
+  tag: string
+  description?: string
+  fund_tellerium: number
+  fund_krypton: number
+  leader: {
+    id: number
+    name: string
+  }
+  member_count: number
+  created_at: string
+}
+
+export interface AdminAllianceListResponse {
+  data: AdminAlliance[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface UpdateAllianceRequest {
+  name?: string
+  tag?: string
+  fund_tellerium?: number
+  fund_krypton?: number
+}
+
+export interface TransferAllianceLeadershipRequest {
+  empire_id: number
+}
+
+export interface AdminAllianceChatMessage {
+  id: number
+  alliance_id: number
+  sender_empire: {
+    id: number
+    name: string
+  }
+  message: string
+  created_at: string
+}
+
+export interface AdminAllianceChatResponse {
+  data: AdminAllianceChatMessage[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+// Admin Mail Types
+export interface AdminMail {
+  id: number
+  subject: string
+  body: string
+  from_empire: {
+    id: number
+    name: string
+  }
+  to_empire: {
+    id: number
+    name: string
+  }
+  is_read: boolean
+  created_at: string
+}
+
+export interface AdminMailListResponse {
+  data: AdminMail[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+// Admin Tick Types
+export interface AdminTick {
+  id: number // Use tick number as id for DataTable compatibility
+  number: number
+  processed_at: string
+  duration_seconds?: number
+  status: 'completed' | 'failed' | 'processing'
+}
+
+export interface AdminTickListResponse {
+  data: AdminTick[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface AdminTickDetailResponse {
+  tick: AdminTick
+}
+
+export interface RollbackTickRequest {
+  tick_number: number
+  reason: string
+}
+
+// Admin Resource Types
+export interface BulkResourceAdjustment {
+  planet_id: number
+  tellerium?: number
+  krypton?: number
+}
+
+export interface BulkAdjustResourcesRequest {
+  adjustments: BulkResourceAdjustment[]
+  reason: string
+}
+
+export interface BulkAdjustResourcesResponse {
+  message: string
+  adjusted: number
+}
+
+// Admin Statistics Types
+export interface AdminStatistics {
+  users: {
+    total: number
+    active: number
+    suspended: number
+    with_empires: number
+  }
+  empires: {
+    total: number
+    active: number
+    in_alliances: number
+  }
+  planets: {
+    total: number
+    colonized: number
+    unsettled: number
+    homeworlds: number
+    colonies: number
+  }
+  alliances: {
+    total: number
+    average_members: number
+  }
+  fleets: {
+    total: number
+    in_transit: number
+    stationed: number
+  }
+  resources: {
+    total_tellerium: number
+    total_krypton: number
+    total_mines: number
+    total_probes: number
+  }
+  tick: {
+    current: number
+    next_eta: string
+  }
+}
+
+// Admin Combat Types
+export interface AdminCombat {
+  id: number
+  tick_number: number
+  attacker_empire_id: number
+  attacker_empire_name: string
+  defender_empire_id: number
+  defender_empire_name: string
+  planet_id: number
+  planet_coordinate: string
+  attacker_won: boolean
+  planet_captured: boolean
+  created_at: string
+}
+
+export interface AdminCombatListResponse {
+  data: AdminCombat[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
   }
 }
 

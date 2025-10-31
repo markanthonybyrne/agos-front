@@ -4,6 +4,7 @@ import { useAppDispatch } from '@/app/hooks'
 import { toggleSidebar } from '@/app/slices/uiSlice'
 import { cn } from '@/lib/utils'
 import { useUnreadMailCount } from '@/hooks/useUnreadMailCount'
+import { useIsAdmin } from '@/hooks/useAdminPermission'
 import {
   LayoutDashboard,
   Globe,
@@ -16,6 +17,7 @@ import {
   Settings,
   Menu,
   Sword,
+  Shield,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,10 +35,13 @@ const navItems = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const adminNavItem = { path: '/admin', label: 'Admin', icon: Shield }
+
 export function Sidebar() {
   const sidebarOpen = useAppSelector((state) => state.ui.sidebarOpen)
   const dispatch = useAppDispatch()
   const { unreadCount } = useUnreadMailCount()
+  const isAdmin = useIsAdmin()
 
   return (
     <aside
@@ -86,6 +91,30 @@ export function Sidebar() {
               </NavLink>
             )
           })}
+          {isAdmin && (
+            <>
+              <div className="my-2 border-t border-border" />
+              {(() => {
+                const Icon = adminNavItem.icon
+                return (
+                  <NavLink
+                    to={adminNavItem.path}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
+                        'hover:bg-accent hover:text-accent-foreground',
+                        isActive && 'bg-accent text-accent-foreground',
+                        !sidebarOpen && 'justify-center'
+                      )
+                    }
+                  >
+                    <Icon className="h-5 w-5 flex-shrink-0 text-primary" />
+                    {sidebarOpen && <span className="text-sm font-semibold">{adminNavItem.label}</span>}
+                  </NavLink>
+                )
+              })()}
+            </>
+          )}
         </nav>
       </div>
     </aside>

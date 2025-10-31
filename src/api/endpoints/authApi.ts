@@ -6,6 +6,7 @@ import {
   LoginRequest,
   Planet,
 } from '@/types/api.types'
+import { updateUser } from '@/app/slices/authSlice'
 
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -73,6 +74,17 @@ export const authApi = apiSlice.injectEndpoints({
           return response.data
         }
         return response as unknown as { user: User; empire: Empire; planets?: Planet[]; current_tick?: number; next_tick_eta?: string }
+      },
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled
+          // Update auth state with latest user data (including roles)
+          if (data.user) {
+            dispatch(updateUser(data.user))
+          }
+        } catch {
+          // Error handling is done by the query itself
+        }
       },
       providesTags: ['Empire'],
     }),

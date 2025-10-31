@@ -61,10 +61,15 @@ const authSlice = createSlice({
     },
     updateEmpire: (state, action: PayloadAction<Empire>) => {
       state.empire = action.payload
+      localStorage.setItem('empire', JSON.stringify(action.payload))
+    },
+    updateUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload
+      localStorage.setItem('user', JSON.stringify(action.payload))
     },
   },
 })
 
-export const { setCredentials, logout, updateEmpire } = authSlice.actions
+export const { setCredentials, logout, updateEmpire, updateUser } = authSlice.actions
 export default authSlice.reducer
 
