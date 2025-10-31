@@ -30,6 +30,7 @@ export const shipsApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Ship', id: planetId },
         'Planet',
+        'Buildable',
       ],
     }),
     cancelShipConstruction: builder.mutation<

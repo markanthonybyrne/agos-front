@@ -13,8 +13,12 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ planet }: OverviewTabProps) {
-  const { data: resourcesData, isLoading: isLoadingResources } = useGetPlanetResourcesQuery(Number(planet.id))
-  const { data: facilitiesData, isLoading: isLoadingFacilities } = useGetPlanetFacilitiesQuery(Number(planet.id))
+  const { data: resourcesData, isLoading: isLoadingResources } = useGetPlanetResourcesQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: facilitiesData, isLoading: isLoadingFacilities } = useGetPlanetFacilitiesQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
 
   // Get production data from resources API
   const production = resourcesData?.production || {

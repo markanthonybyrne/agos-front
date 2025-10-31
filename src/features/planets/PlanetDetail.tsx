@@ -39,7 +39,7 @@ export function PlanetDetail() {
 
   const { data: planetData, isLoading, error, refetch: refetchPlanet } = useGetPlanetQuery(Number(id), {
     skip: !id,
-    refetchOnMountOrArgChange: false, // Prevent unnecessary refetches
+    refetchOnMountOrArgChange: true, // Refetch when component mounts or id changes
   })
   const planet = planetData?.planet
   const { data: buildableItemsData } = useGetBuildableItemsQuery(Number(id), {

@@ -150,19 +150,6 @@ export function FleetDetail() {
           </Card>
         )}
 
-        {fleet.departure_tick && fleet.status === 'stationed' && (
-          <Card className="panel-glass border-green/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Departed Tick</p>
-                  <p className="text-2xl font-mono glow-green">{fleet.departure_tick}</p>
-                </div>
-                <Clock className="w-8 h-8 text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Fleet Details */}
@@ -208,51 +195,27 @@ export function FleetDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {fleet.origin && (
+            {fleet.origin_coordinate && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Origin</p>
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-purple-400" />
-                  <div>
-                    <p className="font-medium">{fleet.origin.name || 'Unknown Planet'}</p>
-                    {fleet.origin.coordinate && (
-                      <p className="text-sm text-muted-foreground">
-                        {formatCoordinate(fleet.origin.coordinate)}
+                  <p className="font-mono text-sm">
+                    {formatCoordinate(fleet.origin_coordinate)}
                       </p>
-                    )}
-                    {fleet.origin.id && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 h-auto text-xs"
-                        onClick={() => navigate(`/planets/${fleet.origin.id}`)}
-                      >
-                        View Planet →
-                      </Button>
-                    )}
-                  </div>
                 </div>
               </div>
             )}
 
-            {fleet.destination && (
+            {fleet.destination_coordinate && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Destination</p>
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-purple-400" />
                   <p className="font-mono text-sm">
-                    {formatCoordinate(fleet.destination.coordinate)}
+                    {formatCoordinate(fleet.destination_coordinate)}
                   </p>
                 </div>
-              </div>
-            )}
-
-            {fleet.auto_return_on_failure && (
-              <div className="mt-4 p-3 bg-yellow/10 border border-yellow/20 rounded-lg">
-                <p className="text-sm text-yellow-400 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  Auto-return on failure enabled
-                </p>
               </div>
             )}
           </CardContent>

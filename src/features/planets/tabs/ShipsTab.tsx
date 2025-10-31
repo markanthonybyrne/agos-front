@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useGetShipDefinitionsQuery, useGetPlanetShipsQuery, useBuildShipsMutation } from '@/api/endpoints/shipsApi'
+import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
 import { usePrerequisites } from '@/hooks/usePrerequisites'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,8 +32,12 @@ type BuildShipFormData = z.infer<typeof buildShipSchema>
 export function ShipsTab({ planet }: ShipsTabProps) {
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
 
-  const { data: definitions, isLoading: isLoadingDefinitions } = useGetShipDefinitionsQuery()
-  const { data: planetShips, isLoading: isLoadingShips } = useGetPlanetShipsQuery(Number(planet.id))
+  const { data: definitions, isLoading: isLoadingDefinitions } = useGetShipDefinitionsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: planetShips, isLoading: isLoadingShips } = useGetPlanetShipsQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
   const [buildShips, { isLoading: isBuilding }] = useBuildShipsMutation()
 
   // Debug logging for ship definitions
@@ -43,9 +48,127 @@ export function ShipsTab({ planet }: ShipsTabProps) {
     console.log('First ship definition keys:', Object.keys(definitions.ships[0] || {}))
   }
 
-  // Get all ship definitions for prerequisite checking
+  // Get buildable items to check what ships can be built on this planet
+  const { data: buildableItemsData } = useGetBuildableItemsQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
+  
+  // Get all ship definitions
   const allShipDefinitions = definitions?.ships || []
-  const { canBuildItem } = usePrerequisites(Number(planet.id), allShipDefinitions as unknown as any[])
+  
+  // Extract buildable ships from buildable items data - memoized to prevent recalculation
+  const buildableShips = useMemo(() => {
+    if (!buildableItemsData?.ships) {
+      return []
+    }
+    
+    console.log('Raw buildableItemsData.ships:', buildableItemsData.ships)
+    console.log('Type of buildableItemsData.ships:', typeof buildableItemsData.ships)
+    console.log('Is array?', Array.isArray(buildableItemsData.ships))
+    
+    if (Array.isArray(buildableItemsData.ships)) {
+      console.log('✅ Extracted ships as array:', buildableItemsData.ships)
+      return buildableItemsData.ships
+    } else if (typeof buildableItemsData.ships === 'object') {
+      // If it's an object, try to extract array from it
+      const values = Object.values(buildableItemsData.ships)
+      console.log('Object values:', values)
+      
+      // Check if any value is an array
+      const arrayValue = values.find(Array.isArray)
+      if (arrayValue) {
+        console.log('✅ Extracted ships from nested array:', arrayValue)
+        return arrayValue as any[]
+      } else {
+        // Try to get ships from object keys directly
+        console.log('✅ Extracted ships from object values:', values)
+        return values as any[]
+      }
+    }
+    
+    return []
+  }, [buildableItemsData?.ships])
+  
+  // For prerequisite checking, we need to combine all buildable items (facilities, defences, ships, research)
+  const facilitiesArray = Array.isArray(buildableItemsData?.facilities) 
+    ? buildableItemsData.facilities 
+    : (buildableItemsData?.facilities ? Object.values(buildableItemsData.facilities) : [])
+  
+  const defencesArray = Array.isArray(buildableItemsData?.defences)
+    ? buildableItemsData.defences
+    : (buildableItemsData?.defences ? Object.values(buildableItemsData.defences) : [])
+  
+  const researchArray = Array.isArray(buildableItemsData?.research)
+    ? buildableItemsData.research
+    : (buildableItemsData?.research ? Object.values(buildableItemsData.research) : [])
+  
+  const allBuildableItems = buildableItemsData
+    ? [
+        ...facilitiesArray,
+        ...defencesArray,
+        ...buildableShips,
+        ...researchArray,
+      ]
+    : allShipDefinitions
+  
+  const { canBuildItem } = usePrerequisites(Number(planet.id), allBuildableItems as unknown as any[])
+  
+  // Debug logging
+  console.log('Buildable items data:', buildableItemsData)
+  console.log('Buildable ships extracted:', buildableShips)
+  console.log('Buildable ships length:', buildableShips.length)
+  console.log('Buildable ships content:', buildableShips)
+  console.log('All ship definitions:', allShipDefinitions)
+  console.log('All ship definitions length:', allShipDefinitions.length)
+  
+  // Determine which ships to show in dropdown using useMemo to prevent recalculation issues
+  // Priority: 1) Buildable ships from API (already filtered by backend), 2) All definitions as fallback
+  const availableShips = useMemo(() => {
+    // If we have buildable ships, use them directly (they already have all needed fields)
+    if (buildableShips.length > 0) {
+      console.log('✅ Using buildable ships from API:', buildableShips.length)
+      console.log('Buildable ships details:', buildableShips.map(bs => ({ 
+        slug: bs.slug, 
+        name: bs.name, 
+        class: bs.class,
+        hasSlug: !!bs.slug,
+        hasName: !!bs.name 
+      })))
+      // Buildable ships already have all fields needed (slug, name, class, etc.)
+      // No need to merge with definitions, they're already complete
+      return buildableShips
+    }
+    
+    // Wait for definitions to load before using fallback
+    if (isLoadingDefinitions || !definitions?.ships || allShipDefinitions.length === 0) {
+      console.log('⏳ Waiting for ship definitions to load...')
+      return []
+    }
+    
+    // Fallback: Show all ship definitions if buildable ships aren't available
+    // Backend will validate prerequisites when building
+    console.log('✅ Using all ship definitions (buildable ships not available or not extracted):', allShipDefinitions.length)
+    console.log('Available ships:', allShipDefinitions.map(s => s.name || s.slug))
+    return allShipDefinitions
+  }, [isLoadingDefinitions, definitions?.ships, allShipDefinitions, buildableShips])
+  
+  console.log('🎯 FINAL Available ships for dropdown:', availableShips.length)
+  if (availableShips.length > 0) {
+    console.log('🎯 Ship details:', availableShips.map(s => ({ 
+      slug: s.slug, 
+      name: s.name, 
+      class: s.class,
+      hasSlug: !!s.slug,
+      hasName: !!s.name
+    })))
+  } else {
+    console.log('⚠️ No ships available!')
+    console.log('  - isLoadingDefinitions:', isLoadingDefinitions)
+    console.log('  - definitions?.ships:', definitions?.ships)
+    console.log('  - allShipDefinitions.length:', allShipDefinitions.length)
+    console.log('  - buildableShips.length:', buildableShips.length)
+    console.log('  - buildableItemsData:', buildableItemsData)
+  }
 
   const buildForm = useForm<BuildShipFormData>({
     resolver: zodResolver(buildShipSchema),
@@ -97,7 +220,7 @@ export function ShipsTab({ planet }: ShipsTabProps) {
       }).unwrap()
 
       console.log('Build ships result:', result)
-      toast.success(`Built ${result.data?.ships_built || data.quantity} ${shipDef.name}!`)
+      toast.success(`Queued ${data.quantity} ${shipDef.name} for construction!`)
       setBuildDialogOpen(false)
       buildForm.reset()
     } catch (error: any) {
@@ -107,6 +230,12 @@ export function ShipsTab({ planet }: ShipsTabProps) {
   }
 
   const getShipDefinition = (slug: string) => {
+    // First check buildable ships (they have all the fields we need)
+    const buildableShip = buildableShips.find(s => s.slug === slug)
+    if (buildableShip) {
+      return buildableShip
+    }
+    // Fallback to definitions
     return definitions?.ships?.find(s => s.slug === slug)
   }
 
@@ -146,6 +275,8 @@ export function ShipsTab({ planet }: ShipsTabProps) {
   const selectedShipSlug = buildForm.watch('ship_slug')
   const selectedShipDef = selectedShipSlug ? getShipDefinition(selectedShipSlug) : null
   const buildQuantity = buildForm.watch('quantity') || 1
+
+  const isLoadingBuildable = !buildableItemsData && buildableItemsData !== undefined // Still loading
 
   if (isLoadingDefinitions || isLoadingShips) {
     return (
@@ -252,11 +383,23 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                     <SelectValue placeholder="Select ship type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {definitions?.ships?.filter(ship => canBuildItem(ship.slug)).map((ship) => (
-                      <SelectItem key={ship.slug} value={ship.slug}>
-                        {ship.name} ({ship.class})
+                    {availableShips.length > 0 ? (
+                      availableShips.map((ship) => {
+                        const shipSlug = ship.slug || ship.id
+                        const shipName = ship.name || shipSlug
+                        const shipClass = ship.class || ''
+                        console.log('Rendering ship in dropdown:', { slug: shipSlug, name: shipName, class: shipClass })
+                        return (
+                          <SelectItem key={shipSlug} value={shipSlug}>
+                            {shipName} {shipClass ? `(${shipClass})` : ''}
+                          </SelectItem>
+                        )
+                      })
+                    ) : (
+                      <SelectItem value="" disabled>
+                        {isLoadingDefinitions ? 'Loading ships...' : 'No ships available - check prerequisites'}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
                 {buildForm.formState.errors.ship_slug && (

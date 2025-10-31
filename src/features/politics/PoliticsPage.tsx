@@ -36,6 +36,7 @@ import { JoinRequestManagement } from './components/JoinRequestManagement'
 import { MyJoinRequests } from './components/MyJoinRequests'
 import { AllianceFund } from './components/AllianceFund'
 import { LeaveAlliance } from './components/LeaveAlliance'
+import { JoinRequestForm } from './components/JoinRequestForm'
 import { useAuth } from '@/hooks/useAuth'
 
 export function PoliticsPage() {
@@ -235,7 +236,7 @@ export function PoliticsPage() {
         <JoinRequestForm
           allianceId={selectedAlliance}
           open={joinRequestOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setJoinRequestOpen(open)
             if (!open) setSelectedAlliance(null)
           }}

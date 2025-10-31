@@ -346,6 +346,32 @@ export interface FundTransferResponse {
   fund_balance: AllianceFundBalance
 }
 
+// Combat Log Types
+export interface CombatLog {
+  id: number
+  tick_number: number
+  attacker_empire_id: number
+  attacker_empire_name: string
+  defender_empire_id: number
+  defender_empire_name: string
+  planet_id: number
+  planet_coordinate: string
+  attacker_ships: Record<string, number>
+  defender_ships: Record<string, number>
+  defender_defences: Record<string, number>
+  attacker_losses: Record<string, number>
+  defender_losses: Record<string, number>
+  defender_defence_losses: Record<string, number>
+  resources_stolen?: {
+    tellerium: number
+    krypton: number
+  }
+  planet_captured: boolean
+  attacker_won: boolean
+  rounds: number
+  created_at: string
+}
+
 export interface UniverseMap {
   quadrants: Array<{
     id: number
@@ -389,10 +415,11 @@ export interface LoginRequest {
   password: string
 }
 
-export interface ColonizePlanetRequest {
-  coordinate: string
-  name: string
-}
+// Legacy interface - use the one below instead
+// export interface ColonizePlanetRequest {
+//   coordinate: string
+//   name: string
+// }
 
 export interface BuyMinesRequest {
   quantity: number

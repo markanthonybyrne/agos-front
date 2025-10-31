@@ -251,10 +251,20 @@ export function FleetsPage() {
                           })}
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
-                          {fleet.destination && (
+                          {fleet.destination_coordinate && fleet.order_type !== 'return' && (
                             <div className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
-                              To: {formatCoordinate(fleet.destination.coordinate)}
+                              To: {typeof fleet.destination_coordinate === 'string' 
+                                ? fleet.destination_coordinate 
+                                : formatCoordinate(fleet.destination_coordinate)}
+                            </div>
+                          )}
+                          {fleet.order_type === 'return' && fleet.destination_coordinate && (
+                            <div className="flex items-center gap-1 text-orange-400">
+                              <MapPin className="w-3 h-3" />
+                              Returning to: {typeof fleet.destination_coordinate === 'string' 
+                                ? fleet.destination_coordinate 
+                                : formatCoordinate(fleet.destination_coordinate)}
                             </div>
                           )}
                           {fleet.arrival_tick && fleet.status === 'in_transit' && (
@@ -298,9 +308,11 @@ export function FleetsPage() {
                             onClick={async () => {
                               if (confirm('Are you sure you want to cancel this fleet?')) {
                                 try {
-                                  await cancelFleet(fleet.id).unwrap()
+                                  const result = await cancelFleet(fleet.id).unwrap()
+                                  console.log('Cancel fleet result:', result)
                                   toast.success('Fleet cancelled successfully')
                                 } catch (error: any) {
+                                  console.error('Cancel fleet error:', error)
                                   toast.error(error?.data?.message || 'Failed to cancel fleet')
                                 }
                               }

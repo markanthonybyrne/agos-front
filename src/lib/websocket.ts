@@ -134,25 +134,25 @@ export function initializeEcho(token: string): Echo {
     console.log('  Auth endpoint:', authEndpoint)
     
     echoConfig = {
-      broadcaster: 'reverb',
+    broadcaster: 'reverb',
       key: wsKey,
-      wsHost: wsConfig.host,
-      wsPort: finalPort,
-      wssPort: finalPort,
-      forceTLS: wsConfig.forceTLS,
-      encrypted: wsConfig.forceTLS,
-      disableStats: true,
+    wsHost: wsConfig.host,
+    wsPort: finalPort,
+    wssPort: finalPort,
+    forceTLS: wsConfig.forceTLS,
+    encrypted: wsConfig.forceTLS,
+    disableStats: true,
       enabledTransports: wsConfig.forceTLS ? ['ws', 'wss'] : ['ws'],
-      authEndpoint: authEndpoint,
-      auth: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
+    authEndpoint: authEndpoint,
+    auth: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
       },
+    },
     }
   }
-  
+
   console.log('Echo configuration:', echoConfig)
 
   echo = new Echo(echoConfig)

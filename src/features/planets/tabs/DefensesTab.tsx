@@ -34,8 +34,12 @@ export function DefensesTab({ planet }: DefensesTabProps) {
   const [destroyDefenceId, setDestroyDefenceId] = useState<number | null>(null)
   const [destroyQuantity, setDestroyQuantity] = useState<number>(1)
 
-  const { data: definitions, isLoading: isLoadingDefinitions } = useGetDefenceDefinitionsQuery()
-  const { data: planetDefences, isLoading: isLoadingDefences } = useGetPlanetDefencesQuery(Number(planet.id))
+  const { data: definitions, isLoading: isLoadingDefinitions } = useGetDefenceDefinitionsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: planetDefences, isLoading: isLoadingDefences } = useGetPlanetDefencesQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
   const { data: meData } = useGetMeQuery()
 
   // Debug logging for defence definitions
@@ -86,7 +90,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
         },
       }).unwrap()
 
-      toast.success(`Built ${data.quantity} ${getDefenceDefinition(data.defence_slug)?.name || 'defences'}!`)
+      toast.success(`Queued ${data.quantity} ${getDefenceDefinition(data.defence_slug)?.name || 'defences'} for construction!`)
       setBuildDialogOpen(false)
       buildForm.reset()
     } catch (error: any) {

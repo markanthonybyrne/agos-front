@@ -30,6 +30,7 @@ export const defencesApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Defence', id: planetId },
         'Planet',
+        'Buildable', // Invalidate buildable items so new defences become available
       ],
     }),
     destroyDefences: builder.mutation<
@@ -41,7 +42,7 @@ export const defencesApi = apiSlice.injectEndpoints({
         method: 'DELETE',
         body: quantity ? { quantity } : {},
       }),
-      invalidatesTags: ['Defence', 'Planet'],
+      invalidatesTags: ['Defence', 'Planet', 'Buildable'],
     }),
     cancelDefenceConstruction: builder.mutation<
       ApiResponse<{ message: string; refund: { tellerium: number; krypton: number } }>,

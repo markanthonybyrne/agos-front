@@ -52,6 +52,15 @@ export function LoginPage() {
     resolver: zodResolver(registerSchema),
   })
 
+  // Set register mode if coming from /register route
+  useEffect(() => {
+    if (location.pathname === '/register') {
+      setAuthMode('register')
+    } else {
+      setAuthMode('login')
+    }
+  }, [location.pathname])
+
   // Redirect to holopad if already authenticated
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -250,43 +259,43 @@ export function LoginPage() {
                   >
                     <div className="space-y-6 p-6">
                       <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-5">
-                      <div className="space-y-2">
+                  <div className="space-y-2">
                         <Label htmlFor="email" className="text-sm font-semibold flex items-center gap-2">
                           <span>Email Address</span>
                         </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="commander@empire.com"
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="commander@empire.com"
                           className="h-12 bg-background/50 border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                           {...loginForm.register('email')}
-                        />
+                    />
                         {loginForm.formState.errors.email && (
                           <p className="text-sm text-destructive flex items-center gap-1">
                             <span className="text-xs">⚠</span>
                             {loginForm.formState.errors.email.message}
                           </p>
-                        )}
-                      </div>
+                    )}
+                  </div>
                       
-                      <div className="space-y-2">
+                  <div className="space-y-2">
                         <Label htmlFor="password" className="text-sm font-semibold flex items-center gap-2">
                           <span>Password</span>
                         </Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="••••••••"
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
                           className="h-12 bg-background/50 border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                           {...loginForm.register('password')}
-                        />
+                    />
                         {loginForm.formState.errors.password && (
                           <p className="text-sm text-destructive flex items-center gap-1">
                             <span className="text-xs">⚠</span>
                             {loginForm.formState.errors.password.message}
                           </p>
-                        )}
-                      </div>
+                    )}
+                  </div>
                       
                       <Button 
                         type="submit" 
@@ -304,7 +313,7 @@ export function LoginPage() {
                             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                           </span>
                         )}
-                      </Button>
+                  </Button>
                     </form>
                     
                     <div className="relative">
@@ -317,9 +326,9 @@ export function LoginPage() {
                     </div>
 
                     <div className="space-y-3">
-                      <Button
-                        type="button"
-                        variant="outline"
+                  <Button 
+                    type="button" 
+                    variant="outline" 
                         className="w-full h-11 border-primary/30 hover:border-primary hover:bg-primary/10 transition-all"
                         onClick={() => setAuthMode('register')}
                       >
@@ -437,8 +446,8 @@ export function LoginPage() {
                             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                           </span>
                         )}
-                      </Button>
-                    </form>
+                  </Button>
+                </form>
                     
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
@@ -470,7 +479,7 @@ export function LoginPage() {
                       </Button>
                     </div>
                     </div>
-                  </div>
+                </div>
                 )}
               </CardContent>
             </Card>

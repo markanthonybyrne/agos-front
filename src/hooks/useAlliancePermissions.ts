@@ -58,7 +58,7 @@ export function useAlliancePermissions(allianceId: number | null | undefined): U
     const isLeader = leaderId === empireId
     
     // Debug logging
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('Permission check:', {
         allianceId,
         leaderId,

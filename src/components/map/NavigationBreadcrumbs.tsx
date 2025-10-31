@@ -29,12 +29,14 @@ export function NavigationBreadcrumbs({
     }
   }
 
-  const breadcrumbParts = [
-    { label: 'Universe', level: 'quadrant' as const },
-    quadrant && { label: `Quadrant ${quadrant}`, level: 'sector' as const, data: { id: quadrant } },
-    sector && { label: `Sector ${sector}`, level: 'galaxy' as const, data: { id: sector } },
-    galaxy && { label: `Galaxy ${galaxy}`, level: 'planet' as const, data: { id: galaxy } },
-  ].filter(Boolean)
+  type BreadcrumbPart = { label: string; level: 'quadrant' | 'sector' | 'galaxy' | 'planet'; data?: { id: number } }
+  
+  const breadcrumbParts: BreadcrumbPart[] = [
+    { label: 'Universe', level: 'quadrant' },
+    quadrant && { label: `Quadrant ${quadrant}`, level: 'sector', data: { id: quadrant } },
+    sector && { label: `Sector ${sector}`, level: 'galaxy', data: { id: sector } },
+    galaxy && { label: `Galaxy ${galaxy}`, level: 'planet', data: { id: galaxy } },
+  ].filter((part): part is BreadcrumbPart => Boolean(part))
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -47,7 +49,7 @@ export function NavigationBreadcrumbs({
             onClick={() => part && onNavigate(part.level, part.data)}
             className="h-auto py-1 px-2"
           >
-            {part?.label}
+            {part.label}
           </Button>
         </div>
       ))}

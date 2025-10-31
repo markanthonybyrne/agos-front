@@ -1,14 +1,11 @@
-import { useGetMailQuery } from '@/api/endpoints/mailApi'
+import { useGetUnreadMailCountQuery } from '@/api/endpoints/mailApi'
 
 export function useUnreadMailCount() {
-  const { data: inboxData, isLoading } = useGetMailQuery({
-    type: 'inbox',
-    page: 1,
-    per_page: 100, // Get more messages to count unread
+  const { data, isLoading } = useGetUnreadMailCountQuery(undefined, {
+    refetchOnMountOrArgChange: true, // Refetch when component mounts or query args change
   })
 
-  const mailList: any[] = (inboxData as any)?.mail || (inboxData as any)?.data || []
-  const unreadCount = mailList.filter((mail: any) => !mail?.is_read).length || 0
+  const unreadCount = data?.unread_count || 0
 
   return {
     unreadCount,

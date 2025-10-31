@@ -10,7 +10,9 @@ import { getPlanetImage } from '@/lib/planetImages'
 
 export function PlanetsList() {
   const navigate = useNavigate()
-  const { data, isLoading, error } = useGetPlanetsQuery()
+  const { data, isLoading, error } = useGetPlanetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
 
   if (isLoading) {
     return (

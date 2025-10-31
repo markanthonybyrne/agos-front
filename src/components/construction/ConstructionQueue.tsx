@@ -37,6 +37,8 @@ export function ConstructionQueue({
   const { data: constructionData, isLoading, error, refetch } = useGetConstructionQueueQuery(planetId, {
     // Refetch when the component mounts or when planetId changes
     refetchOnMountOrArgChange: true,
+    // Poll for updates every 30 seconds as a fallback
+    pollingInterval: 30000,
   })
   const [cancelFacility] = useCancelFacilityConstructionMutation()
   const [cancelDefence] = useCancelDefenceConstructionMutation()

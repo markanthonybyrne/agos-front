@@ -1,5 +1,5 @@
 import { apiSlice } from '../apiSlice'
-import { ApiResponse, Empire, Planet, Fleet, PaginatedResponse } from '@/types/api.types'
+import { ApiResponse, Empire, Planet, Fleet, PaginatedResponse, CombatLog } from '@/types/api.types'
 
 export const empiresApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -19,8 +19,15 @@ export const empiresApi = apiSlice.injectEndpoints({
         providesTags: (_result, _error, id) => [{ type: 'Empire', id }],
       }
     ),
+    getCombatLogs: builder.query<{ combat_logs: CombatLog[] }, number>({
+      query: (empireId) => `/empires/${empireId}/combat-logs`,
+      providesTags: (result, _error, empireId) => [
+        { type: 'CombatLog', id: 'LIST' },
+        { type: 'CombatLog', id: `empire-${empireId}` },
+      ],
+    }),
   }),
 })
 
-export const { useGetEmpiresQuery, useGetEmpireQuery } = empiresApi
+export const { useGetEmpiresQuery, useGetEmpireQuery, useGetCombatLogsQuery } = empiresApi
 

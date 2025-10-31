@@ -44,12 +44,16 @@ export function MessagingPage() {
     type: 'inbox',
     page: currentPage,
     per_page: 25,
+  }, {
+    refetchOnMountOrArgChange: true, // Ensure mail list refetches when tags are invalidated
   })
 
   const { data: sentData, isLoading: isLoadingSent, error: sentError } = useGetMailQuery({
     type: 'sent',
     page: currentPage,
     per_page: 25,
+  }, {
+    refetchOnMountOrArgChange: true, // Ensure mail list refetches when tags are invalidated
   })
 
   const { data: empiresData } = useGetEmpiresQuery({ page: 1, per_page: 100 })
@@ -62,6 +66,15 @@ export function MessagingPage() {
   const { data: mailDetails } = useGetMailDetailsQuery(selectedMail || 0, {
     skip: !selectedMail
   })
+  
+  // Mark mail as read when mail details are successfully fetched
+  useEffect(() => {
+    if (mailDetails?.mail && activeTab === 'inbox' && !mailDetails.mail.is_read) {
+      markMailAsRead(mailDetails.mail.id).catch((error: any) => {
+        console.error('Failed to mark mail as read:', error)
+      })
+    }
+  }, [mailDetails?.mail, activeTab, markMailAsRead])
 
   const currentData = activeTab === 'inbox' ? inboxData : sentData
   const isLoading = activeTab === 'inbox' ? isLoadingInbox : isLoadingSent
@@ -140,17 +153,32 @@ export function MessagingPage() {
     setSelectedMail(null)
   }
 
-  // Mark mail as read when viewing details
+  // Mark mail as read when viewing details - use mailDetails query result for more reliable check
   useEffect(() => {
     if (selectedMail && activeTab === 'inbox') {
-      const mail = currentData?.data.find(m => m.id === selectedMail)
+      // Check both mailDetails (from API) and currentData
+      const mail = mailDetails?.mail || currentData?.data.find(m => m.id === selectedMail)
       if (mail && !mail.is_read) {
         markMailAsRead(selectedMail).catch((error: any) => {
           console.error('Failed to mark mail as read:', error)
         })
       }
     }
-  }, [selectedMail, activeTab, currentData?.data, markMailAsRead])
+  }, [selectedMail, activeTab, mailDetails?.mail, currentData?.data, markMailAsRead])
+  
+  // Mark all unread messages in a thread as read when thread is viewed
+  useEffect(() => {
+    if (viewMode === 'thread' && selectedThread && activeTab === 'inbox') {
+      const threadMessages = groupedThreads[selectedThread] || []
+      threadMessages.forEach((mail) => {
+        if (!mail.is_read) {
+          markMailAsRead(mail.id).catch((error: any) => {
+            console.error(`Failed to mark mail ${mail.id} as read:`, error)
+          })
+        }
+      })
+    }
+  }, [selectedThread, viewMode, activeTab, groupedThreads, markMailAsRead])
 
   const handleSelectMail = async (mailId: number) => {
     setSelectedMail(mailId)
@@ -160,11 +188,28 @@ export function MessagingPage() {
       if (mail && !mail.is_read) {
         try {
           await markMailAsRead(mailId).unwrap()
+          // Force refetch to update UI immediately
+          // The invalidatesTags in markMailAsRead mutation should handle this
         } catch (error: any) {
           console.error('Failed to mark mail as read:', error)
           // Don't show error toast as this is a background operation
         }
       }
+    }
+  }
+  
+  const handleSelectThread = (threadKey: string) => {
+    setSelectedThread(threadKey)
+    // Mark all unread messages in thread as read
+    const threadMessages = groupedThreads[threadKey] || []
+    if (activeTab === 'inbox') {
+      threadMessages.forEach((mail) => {
+        if (!mail.is_read) {
+          markMailAsRead(mail.id).catch((error: any) => {
+            console.error(`Failed to mark mail ${mail.id} as read:`, error)
+          })
+        }
+      })
     }
   }
 
@@ -321,7 +366,7 @@ export function MessagingPage() {
               className={`flex items-center space-x-4 p-4 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50 ${
                 selectedThread === threadKey ? 'bg-muted/30 border-primary' : 'border-border'
               } ${unreadCount > 0 ? 'bg-blue-500/10 border-blue-500/30' : ''}`}
-              onClick={() => setSelectedThread(threadKey)}
+              onClick={() => handleSelectThread(threadKey)}
             >
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <User className="w-5 h-5 text-primary" />

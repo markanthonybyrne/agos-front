@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar'
 import { useAppSelector } from '@/app/hooks'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useWebSocketNotifications } from '@/hooks/useWebSocketNotifications'
+import { useAutoRefetchOnInvalidation } from '@/hooks/useAutoRefetchOnInvalidation'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -16,6 +17,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   
   // Initialize WebSocket notifications when authenticated
   useWebSocketNotifications({ enabled: isAuthenticated })
+  
+  // Keep critical queries active so they auto-refetch when tags are invalidated
+  useAutoRefetchOnInvalidation()
 
   if (!isAuthenticated) {
     return <>{children}</>

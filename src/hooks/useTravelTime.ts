@@ -1,6 +1,7 @@
 import { useGetTravelTimeMutation } from '@/api/endpoints/fleetsApi'
 import { parseCoordinate, formatCoordinate } from '@/lib/coordinates'
-import { TravelTimeRequest, Coordinate, Planet, ShipDefinition } from '@/types/api.types'
+import { TravelTimeRequest, Planet, ShipDefinition } from '@/types/api.types'
+import { Coordinate } from '@/types/game.types'
 
 export function useTravelTime() {
   const [getTravelTime, { isLoading }] = useGetTravelTimeMutation()

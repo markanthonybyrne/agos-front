@@ -34,8 +34,12 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   const [upgradeFacilityId, setUpgradeFacilityId] = useState<number | null>(null)
   const [destroyFacilityId, setDestroyFacilityId] = useState<number | null>(null)
 
-  const { data: definitions, isLoading: isLoadingDefinitions } = useGetFacilityDefinitionsQuery()
-  const { data: planetFacilities, isLoading: isLoadingFacilities } = useGetPlanetFacilitiesQuery(Number(planet.id))
+  const { data: definitions, isLoading: isLoadingDefinitions } = useGetFacilityDefinitionsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: planetFacilities, isLoading: isLoadingFacilities } = useGetPlanetFacilitiesQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
   const { data: meData } = useGetMeQuery()
 
   // Debug logging for facility definitions
@@ -110,7 +114,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
         },
       }).unwrap()
 
-      toast.success(`Facility built successfully!`)
+      toast.success(`Facility queued for construction!`)
       setBuildDialogOpen(false)
       buildForm.reset()
     } catch (error: any) {

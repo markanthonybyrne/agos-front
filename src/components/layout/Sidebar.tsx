@@ -15,6 +15,7 @@ import {
   Trophy,
   Settings,
   Menu,
+  Sword,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +25,7 @@ const navItems = [
   { path: '/map', label: 'Universe Map', icon: Globe },
   { path: '/planets', label: 'Planets', icon: Building2 },
   { path: '/fleets', label: 'Fleets', icon: Rocket },
+  { path: '/combat', label: 'Battle Reports', icon: Sword },
   { path: '/signals', label: 'Signals', icon: Scan },
   { path: '/alliances', label: 'Politics', icon: Users },
   { path: '/mail', label: 'Mail', icon: Mail },

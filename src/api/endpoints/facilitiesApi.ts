@@ -30,6 +30,7 @@ export const facilitiesApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Facility', id: planetId },
         'Planet',
+        'Buildable', // Invalidate buildable items so new facilities become available
       ],
     }),
     upgradeFacility: builder.mutation<
@@ -40,7 +41,7 @@ export const facilitiesApi = apiSlice.injectEndpoints({
         url: `/facilities/${facilityId}/upgrade`,
         method: 'PUT',
       }),
-      invalidatesTags: ['Facility', 'Planet'],
+      invalidatesTags: ['Facility', 'Planet', 'Buildable'],
     }),
     upgradeFacilityBySlug: builder.mutation<
       ApiResponse<{ facility: Facility }>,
@@ -55,6 +56,7 @@ export const facilitiesApi = apiSlice.injectEndpoints({
         { type: 'Facility', id: planetId },
         'Facility',
         'Planet',
+        'Buildable',
       ],
     }),
     destroyFacility: builder.mutation<
@@ -65,7 +67,7 @@ export const facilitiesApi = apiSlice.injectEndpoints({
         url: `/facilities/${facilityId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Facility', 'Planet'],
+      invalidatesTags: ['Facility', 'Planet', 'Buildable'],
     }),
     cancelFacilityConstruction: builder.mutation<
       ApiResponse<{ message: string; refund: { tellerium: number; krypton: number } }>,

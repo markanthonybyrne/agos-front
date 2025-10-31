@@ -37,6 +37,7 @@ export const researchApi = apiSlice.injectEndpoints({
         'Research',
         'Planet',
         { type: 'Research', id: planet_id },
+        'Buildable',
       ],
     }),
     cancelResearch: builder.mutation<

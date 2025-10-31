@@ -18,9 +18,15 @@ export function ResearchTab({ planet }: ResearchTabProps) {
   const [startResearchDialogOpen, setStartResearchDialogOpen] = useState(false)
   const [selectedResearchSlug, setSelectedResearchSlug] = useState<string | null>(null)
 
-  const { data: definitions, isLoading: isLoadingDefinitions } = useGetResearchDefinitionsQuery()
-  const { data: researchProgress, isLoading: isLoadingProgress } = useGetMyResearchQuery()
-  const { data: planetResearchData, isLoading: isLoadingPlanetResearch } = useGetPlanetAvailableResearchQuery(Number(planet.id))
+  const { data: definitions, isLoading: isLoadingDefinitions } = useGetResearchDefinitionsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: researchProgress, isLoading: isLoadingProgress } = useGetMyResearchQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: planetResearchData, isLoading: isLoadingPlanetResearch } = useGetPlanetAvailableResearchQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
   const [startResearch, { isLoading: isStarting }] = useStartResearchMutation()
 
   const handleStartResearch = async (researchSlug: string) => {
@@ -29,7 +35,7 @@ export function ResearchTab({ planet }: ResearchTabProps) {
         planet_id: Number(planet.id),
         research_slug: researchSlug 
       }).unwrap()
-      toast.success('Research started successfully!')
+      toast.success('Research queued successfully!')
       setStartResearchDialogOpen(false)
       setSelectedResearchSlug(null)
     } catch (error: any) {

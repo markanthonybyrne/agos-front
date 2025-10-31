@@ -31,8 +31,12 @@ export function SignalsPage() {
   const [signalTypeFilter, setSignalTypeFilter] = useState<SignalType | 'all'>('all')
   const [selectedSignal, setSelectedSignal] = useState<number | null>(null)
 
-  const { data: signalsData, isLoading, error: signalsError, refetch } = useGetSignalsQuery()
-  const { data: statisticsData, error: statsError } = useGetSignalStatisticsQuery()
+  const { data: signalsData, isLoading, error: signalsError, refetch } = useGetSignalsQuery(undefined, {
+    refetchOnMountOrArgChange: true, // Ensure signals refetch when tags are invalidated
+  })
+  const { data: statisticsData, error: statsError } = useGetSignalStatisticsQuery(undefined, {
+    refetchOnMountOrArgChange: true, // Ensure statistics refetch when tags are invalidated
+  })
   console.log('SignalsPage - signalsData:', signalsData)
   console.log('SignalsPage - signalsError:', signalsError)
   console.log('SignalsPage - statisticsData:', statisticsData)

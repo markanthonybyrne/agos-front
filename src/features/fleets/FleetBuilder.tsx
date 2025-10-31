@@ -151,7 +151,6 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
         destination_planet: coordParts[3],
         order_type: data.order_type,
         auto_return_on_failure: data.auto_return_on_failure,
-        name: data.name,
       }).unwrap()
 
       toast.success('Fleet created successfully!')

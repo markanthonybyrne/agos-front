@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useMemo, useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { FleetBuilder } from '@/features/fleets/FleetBuilder'
+import { MoveFleetDialog } from '@/features/fleets/MoveFleetDialog'
 
 interface FleetsTabProps {
   planet: Planet
@@ -23,6 +24,8 @@ export function FleetsTab({ planet }: FleetsTabProps) {
   })
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
   const [selectedFleet, setSelectedFleet] = useState<any>(null)
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false)
+  const [fleetToMove, setFleetToMove] = useState<any>(null)
   const [cancelFleet] = useCancelFleetMutation()
   
   // Debug logging
@@ -31,7 +34,6 @@ export function FleetsTab({ planet }: FleetsTabProps) {
   console.log('Fleets query state:', { isLoading, error, hasData: !!fleetsData })
   console.log('Fleets data:', fleetsData)
   console.log('Fleets array:', fleetsData?.fleets)
-  console.log('First fleet origin ID:', fleetsData?.fleets?.[0]?.origin?.id, 'Type:', typeof fleetsData?.fleets?.[0]?.origin?.id)
   
   // Ensure query runs when component mounts
   useEffect(() => {
@@ -385,12 +387,6 @@ export function FleetsTab({ planet }: FleetsTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {console.log('FleetsTab render check:', { 
-            fleetsAtPlanetLength: fleetsAtPlanet.length, 
-            fleetsAtPlanet,
-            isLoading,
-            hasFleetsData: !!fleetsData?.fleets
-          })}
           {fleetsAtPlanet.length > 0 ? (
             <div className="space-y-4">
               {fleetsAtPlanet.map((fleet: any) => {
@@ -410,9 +406,9 @@ export function FleetsTab({ planet }: FleetsTabProps) {
                         <p className="text-sm text-muted-foreground">
                           {totalShips} ship{totalShips !== 1 ? 's' : ''} • {fleet.status.replace('_', ' ')}
                         </p>
-                        {fleet.origin && (
+                        {fleet.origin_coordinate && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            From: {fleet.origin.name} ({fleet.origin.coordinate})
+                            From: {formatCoordinate(fleet.origin_coordinate)}
                           </p>
                         )}
                         {fleet.order_type && (
@@ -440,14 +436,18 @@ export function FleetsTab({ planet }: FleetsTabProps) {
                             Arrives at tick {fleet.arrival_tick}
                           </p>
                         )}
-                        {isStationed && fleet.departure_tick && (
+                        {fleet.destination_coordinate && fleet.order_type !== 'return' && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Departed tick {fleet.departure_tick}
+                            To: {typeof fleet.destination_coordinate === 'string' 
+                              ? fleet.destination_coordinate 
+                              : formatCoordinate(fleet.destination_coordinate)}
                           </p>
                         )}
-                        {fleet.auto_return_on_failure && (
-                          <p className="text-xs text-yellow-400 mt-1">
-                            Auto-return on failure
+                        {fleet.order_type === 'return' && fleet.destination_coordinate && (
+                          <p className="text-xs text-orange-400 mt-1">
+                            Returning to: {typeof fleet.destination_coordinate === 'string' 
+                              ? fleet.destination_coordinate 
+                              : formatCoordinate(fleet.destination_coordinate)}
                           </p>
                         )}
                       </div>
@@ -459,9 +459,8 @@ export function FleetsTab({ planet }: FleetsTabProps) {
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                setSelectedFleet(fleet)
-                                // TODO: Open move fleet dialog
-                                toast.info('Move fleet functionality coming soon')
+                                setFleetToMove(fleet)
+                                setMoveDialogOpen(true)
                               }}
                             >
                               <Move className="w-4 h-4 mr-1" />
@@ -477,9 +476,11 @@ export function FleetsTab({ planet }: FleetsTabProps) {
                             onClick={async () => {
                               if (confirm('Are you sure you want to cancel this fleet?')) {
                                 try {
-                                  await cancelFleet(fleet.id).unwrap()
+                                  const result = await cancelFleet(fleet.id).unwrap()
+                                  console.log('Cancel fleet result:', result)
                                   toast.success('Fleet cancelled successfully')
                                 } catch (error: any) {
+                                  console.error('Cancel fleet error:', error)
                                   toast.error(error?.data?.message || 'Failed to cancel fleet')
                                 }
                               }
@@ -540,6 +541,18 @@ export function FleetsTab({ planet }: FleetsTabProps) {
           </Dialog>
         </CardContent>
       </Card>
+
+      {/* Move Fleet Dialog */}
+      {fleetToMove && (
+        <MoveFleetDialog
+          fleet={fleetToMove}
+          isOpen={moveDialogOpen}
+          onClose={() => {
+            setMoveDialogOpen(false)
+            setFleetToMove(null)
+          }}
+        />
+      )}
     </div>
   )
 }

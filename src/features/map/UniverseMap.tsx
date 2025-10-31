@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { NavigationBreadcrumbs } from '@/components/map/NavigationBreadcrumbs'
 import { PlanetGrid } from '@/components/map/PlanetGrid'
 import { PlanetActionPanel } from '@/components/map/PlanetActionPanel'
+import { StellarMap3D } from '@/components/map/StellarMap3D'
 import { Planet } from '@/types/api.types'
 import { 
   MapPin, 
@@ -65,6 +66,7 @@ export function UniverseMap() {
     offset: 0
   })
   const [discoveryCost, setDiscoveryCost] = useState<{ tellerium: number; krypton: number } | null>(null)
+  const [planetViewMode, setPlanetViewMode] = useState<'grid' | 'stellar'>('stellar')
 
   const { data: mapData, isLoading, error } = useGetMapQuery({
     quadrant: mapState.selectedQuadrant,
@@ -604,6 +606,8 @@ export function UniverseMap() {
       <div className="space-y-4">
         <Card className="panel-glass border-green/20">
           <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
             <CardTitle className="flex items-center gap-2">
               <Star className="w-5 h-5 text-purple-400" />
               Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
@@ -611,14 +615,48 @@ export function UniverseMap() {
             <CardDescription>
               Click on a planet to view details and perform actions
             </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={planetViewMode === 'stellar' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPlanetViewMode('stellar')}
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  3D Stellar
+                </Button>
+                <Button
+                  variant={planetViewMode === 'grid' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPlanetViewMode('grid')}
+                >
+                  <Layers className="w-4 h-4 mr-2" />
+                  Grid
+                </Button>
+              </div>
+            </div>
           </CardHeader>
         </Card>
+        {planetViewMode === 'stellar' ? (
+          <Card className="panel-glass border-purple/20">
+            <CardContent className="p-6">
+              <StellarMap3D
+                planets={planets}
+                onPlanetClick={handlePlanetClick}
+                onPlanetHover={(planet) => {
+                  // Optional: Show hover tooltip or highlight
+                }}
+              />
+            </CardContent>
+          </Card>
+        ) : (
         <PlanetGrid
           planets={planets}
           isLoading={isLoadingGalaxyPlanets}
           onPlanetClick={handlePlanetClick}
           selectedPlanetId={selectedPlanet?.id}
         />
+        )}
       </div>
     )
   }

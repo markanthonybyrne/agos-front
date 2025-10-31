@@ -28,10 +28,10 @@ export const fleetsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Fleet', 'Planet', 'Empire'],
     }),
-    cancelFleet: builder.mutation<ApiResponse<{ fleet: { id: number; status: string } }>, number>({
+    cancelFleet: builder.mutation<ApiResponse<{ fleet: FleetDetails }>, number>({
       query: (id) => ({
-        url: `/fleets/${id}`,
-        method: 'DELETE',
+        url: `/fleets/${id}/cancel`,
+        method: 'POST',
       }),
       invalidatesTags: ['Fleet', 'Planet'],
     }),

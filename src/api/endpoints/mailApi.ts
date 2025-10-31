@@ -42,6 +42,7 @@ export const mailApi = apiSlice.injectEndpoints({
         { type: 'Mail', id: 'inbox' },
         { type: 'Mail', id: 'sent' },
         { type: 'Mail', id: 'LIST' },
+        { type: 'Mail', id: 'UNREAD_COUNT' }, // Invalidate unread count when replying (recipient gets new mail)
       ],
     }),
     deleteMail: builder.mutation<ApiResponse<{ message: string }>, number>({
@@ -60,11 +61,16 @@ export const mailApi = apiSlice.injectEndpoints({
         url: `/mail/${id}/read`,
         method: 'PATCH',
       }),
-      invalidatesTags: [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Mail', id: 'inbox' },
         { type: 'Mail', id: 'LIST' },
-        (result, error, id) => [{ type: 'Mail', id }],
+        { type: 'Mail', id },
+        { type: 'Mail', id: 'UNREAD_COUNT' }, // Also invalidate unread count
       ],
+    }),
+    getUnreadMailCount: builder.query<{ unread_count: number }, void>({
+      query: () => '/mail/unread-count',
+      providesTags: [{ type: 'Mail', id: 'UNREAD_COUNT' }],
     }),
   }),
 })
@@ -76,4 +82,5 @@ export const {
   useReplyMailMutation,
   useDeleteMailMutation,
   useMarkMailAsReadMutation,
+  useGetUnreadMailCountQuery,
 } = mailApi

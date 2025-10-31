@@ -52,9 +52,15 @@ export function Holopad() {
     skip: !isAuthenticated,
   })
   
-  const { data: fleetsData, isLoading: fleetsLoading } = useGetFleetsQuery()
-  const { data: researchData, isLoading: researchLoading } = useGetMyResearchQuery()
-  const { data: planetsData, isLoading: planetsLoading } = useGetPlanetsQuery()
+  const { data: fleetsData, isLoading: fleetsLoading } = useGetFleetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: researchData, isLoading: researchLoading } = useGetMyResearchQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
+  const { data: planetsData, isLoading: planetsLoading } = useGetPlanetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
 
   const allianceId = data?.empire?.alliance_id || empire?.alliance_id
   const { data: allianceHomepageData } = useGetAllianceHomepageQuery(allianceId!, {
@@ -70,22 +76,22 @@ export function Holopad() {
     }
   }, [error, dispatch, navigate])
 
-  useEffect(() => {
-    const d: any = data || {}
-    const tickFromMe = d.current_tick ?? d.tick_timing?.current_tick ?? d.tick?.current ?? d.currentTick ?? d.tickNumber ?? d.next_tick?.tick_number
+        useEffect(() => {
+          const d: any = data || {}
+          const tickFromMe = d.current_tick ?? d.tick_timing?.current_tick ?? d.tick?.current ?? d.currentTick ?? d.tickNumber ?? d.next_tick?.tick_number
     const etaFromMe = d.next_tick_eta ?? d.tick_timing?.next_tick_eta ?? d.next_tick?.next_eta ?? d.next_tick_at ?? d.nextTickEta ?? (typeof d.next_tick?.eta_seconds === 'number' ? new Date(Date.now() + d.next_tick.eta_seconds * 1000).toISOString() : undefined)
-    if (tickFromMe && etaFromMe) {
-      dispatch(
-        setTick({
-          tick: Number(tickFromMe),
-          nextTickETA: String(etaFromMe),
-        })
-      )
-    }
-    if (d.empire) {
-      dispatch(updateEmpire(d.empire))
-    }
-  }, [data, dispatch])
+          if (tickFromMe && etaFromMe) {
+            dispatch(
+              setTick({
+                tick: Number(tickFromMe),
+                nextTickETA: String(etaFromMe),
+              })
+            )
+          }
+          if (d.empire) {
+            dispatch(updateEmpire(d.empire))
+          }
+        }, [data, dispatch])
 
   const d: any = data || {}
   const currentTick = useAppSelector((state) => state.game.currentTick) || d.current_tick || d.tick_timing?.current_tick || d.tick?.current || d.currentTick || d.tickNumber || d.next_tick?.tick_number
@@ -115,7 +121,7 @@ export function Holopad() {
   const fleetsStationed = fleets.filter((f: FleetDetails) => f.status === 'stationed')
 
   // Get active research
-  const activeResearch = researchData?.active_research || []
+  const activeResearch = researchData?.research || []
 
   if (isLoading || fleetsLoading || researchLoading || planetsLoading) {
     return (
@@ -159,21 +165,21 @@ export function Holopad() {
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar
-                src={data?.user?.avatar_path}
-                name={empireData?.name}
-                size="xl"
-                className="border-2 border-cyan/50 shadow-lg shadow-cyan/20"
-              />
+          <div className="flex items-center gap-4">
+            <Avatar
+              src={data?.user?.avatar_path}
+              name={empireData?.name}
+              size="xl"
+              className="border-2 border-cyan/50 shadow-lg shadow-cyan/20"
+            />
               <div>
-                <CardTitle className="text-3xl font-heading glow-cyan">
+              <CardTitle className="text-3xl font-heading glow-cyan">
                   Command Center
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
                   {empireData?.name} • Tick {currentTick?.toLocaleString() || 'N/A'}
-                </p>
-              </div>
+              </p>
+            </div>
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Next Tick</p>
@@ -222,7 +228,7 @@ export function Holopad() {
                   <Button variant="ghost" size="sm" onClick={() => navigate('/planets')}>
                     View <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
-                </div>
+              </div>
               )}
             </div>
           </CardContent>
@@ -230,31 +236,14 @@ export function Holopad() {
       )}
 
       {/* Alliance MOTD */}
-      {allianceHomepageData?.alliance?.motd && (
-        <Card className="panel-glass border-yellow-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-yellow-400 mb-1">
-                  {allianceHomepageData.alliance.name} - Message of the Day
-                </h4>
-                <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {allianceHomepageData.alliance.motd}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Main Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Fleet Operations & Resources */}
         <div className="lg:col-span-2 space-y-6">
           {/* Fleet Operations */}
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Rocket className="w-5 h-5" />
@@ -264,8 +253,8 @@ export function Holopad() {
                   View All
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-card rounded-lg border border-border">
                   <div className="flex items-center justify-between mb-2">
@@ -294,7 +283,7 @@ export function Holopad() {
                   {fleetsInTransit.slice(0, 3).map((fleet: FleetDetails) => (
                     <div key={fleet.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
                       <span className="font-mono text-xs">
-                        {formatCoordinate(fleet.destination_coordinate as string)}
+                        {formatCoordinate(fleet.destination_coordinate)}
                       </span>
                       <Badge variant="outline" className="text-xs">
                         {fleet.order_type}
@@ -364,9 +353,9 @@ export function Holopad() {
                       <div className="flex gap-4 font-mono text-xs">
                         <span className="text-cyan">T: {formatResource(planet.tellerium_balance || 0)}</span>
                         <span className="text-blue">K: {formatResource(planet.krypton_balance || 0)}</span>
-                      </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
                   {planets.length > 5 && (
                     <Button variant="ghost" size="sm" className="w-full" onClick={() => navigate('/planets')}>
                       View {planets.length - 5} more planets...
@@ -484,12 +473,12 @@ export function Holopad() {
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
 
           {/* Planets Summary */}
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
@@ -499,9 +488,9 @@ export function Holopad() {
                   View All
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
                 {planets.slice(0, 5).map((planet) => (
                   <div
                     key={planet.id}
@@ -523,10 +512,10 @@ export function Holopad() {
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No planets owned
                   </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
           {/* Research Status */}
           {activeResearch.length > 0 && (
@@ -547,20 +536,20 @@ export function Holopad() {
                       </p>
                     </div>
                   ))}
-                </div>
+      </div>
               </CardContent>
             </Card>
           )}
 
           {/* Construction Status */}
-          <Card>
-            <CardHeader>
+      <Card>
+        <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
                 Construction Status
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+        </CardHeader>
+        <CardContent>
               <div className="space-y-3">
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground mb-1">Active Construction</p>
@@ -578,9 +567,9 @@ export function Holopad() {
                 >
                   View All Planets
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
+        </CardContent>
+      </Card>
         </div>
       </div>
     </div>
