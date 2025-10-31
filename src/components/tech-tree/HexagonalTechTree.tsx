@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { HexagonNode, HexagonStatus } from './HexagonNode'
 import { cn } from '@/lib/utils'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 export interface TechTreeItem {
   id: string
@@ -10,6 +11,13 @@ export interface TechTreeItem {
   status: HexagonStatus
   prerequisites?: string[] // IDs of prerequisite items
   position?: { row: number; col: number } // Optional manual positioning
+  // Additional info for tooltips
+  description?: string
+  costTellerium?: number
+  costKrypton?: number
+  productionTellerium?: number
+  productionKrypton?: number
+  buildTime?: number
 }
 
 interface Connection {
@@ -54,15 +62,15 @@ function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<str
     tierGroups.get(tier)!.push(item)
   })
 
-  // Position items tier by tier
+  // Position items tier by tier with proper spacing
   tierGroups.forEach((tierItems, tier) => {
-    const itemsPerRow = Math.ceil(Math.sqrt(tierItems.length)) + 1
     tierItems.forEach((item, index) => {
       const row = tier
+      // Spread items evenly horizontally within their tier
       const col = index
-      // Staggered hexagonal grid
-      const x = col * (hexagonSize * 1.2) + (row % 2 === 1 ? hexagonSize * 0.6 : 0)
-      const y = row * (hexagonSize * 1.1)
+      // Staggered hexagonal grid with proper spacing
+      const x = col * (hexagonSize * 1.75) // Increased spacing from 1.2 to 1.75
+      const y = row * (hexagonSize * 1.5) // Increased vertical spacing from 1.1 to 1.5
       positions.set(item.id, { x, y })
     })
   })
@@ -199,17 +207,58 @@ export function HexagonalTechTree({
                 top: pos.y - bounds.offsetY,
               }}
             >
-              <HexagonNode
-                size={hexagonSize}
-                status={item.status}
-                onClick={() => onItemClick?.(item)}
-                imageUrl={item.imageUrl}
-                name={item.name}
-              >
-                <span className="text-xs font-semibold text-center line-clamp-2">
-                  {item.name}
-                </span>
-              </HexagonNode>
+              <div className="relative group">
+                <HexagonNode
+                  size={hexagonSize}
+                  status={item.status}
+                  onClick={() => onItemClick?.(item)}
+                  imageUrl={item.imageUrl}
+                  name={item.name}
+                >
+                  <span className="text-xs font-semibold text-center line-clamp-2">
+                    {item.name}
+                  </span>
+                </HexagonNode>
+                
+                {/* Hover tooltip */}
+                <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-80">
+                  <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-6 shadow-xl">
+                    <div className="space-y-2 max-w-[200px] mr-[30px] ml-auto">
+                      <div className="text-xs font-semibold text-foreground mb-2">
+                        {item.name}
+                      </div>
+                      {item.description && (
+                        <div className="text-xs text-muted-foreground mb-2">
+                          {item.description}
+                        </div>
+                      )}
+                      {(item.costTellerium !== undefined || item.costKrypton !== undefined) && (
+                        <div className="pt-2 border-t border-border/50 space-y-1">
+                          <div className="text-xs text-muted-foreground">Cost:</div>
+                          {item.costTellerium !== undefined && item.costTellerium > 0 && (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <img src={getTelleriumImage()} alt="T" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
+                                <span className="text-xs">T:</span>
+                              </div>
+                              <span className="text-xs font-mono text-tellerium">{item.costTellerium.toLocaleString()}</span>
+                            </div>
+                          )}
+                          {item.costKrypton !== undefined && item.costKrypton > 0 && (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <img src={getKryptonImage()} alt="K" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
+                                <span className="text-xs">K:</span>
+                              </div>
+                              <span className="text-xs font-mono text-krypton">{item.costKrypton.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )
         })}

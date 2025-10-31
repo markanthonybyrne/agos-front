@@ -79,6 +79,12 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
         imageUrl: getFacilityImage(facility.slug),
         status,
         prerequisites,
+        description: facility.description,
+        costTellerium: facility.base_tellerium_cost,
+        costKrypton: facility.base_krypton_cost,
+        productionTellerium: facility.production_tellerium,
+        productionKrypton: facility.production_krypton,
+        buildTime: facility.build_time_ticks,
       }
     })
   }, [definitions, buildableItems, facilitiesList])

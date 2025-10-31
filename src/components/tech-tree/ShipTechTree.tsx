@@ -55,6 +55,10 @@ export function ShipTechTree({ planetId, className }: ShipTechTreeProps) {
         imageUrl: getShipImage(ship.slug),
         status,
         prerequisites,
+        description: ship.description,
+        costTellerium: ship.tellerium_cost,
+        costKrypton: ship.krypton_cost,
+        buildTime: ship.build_time_ticks,
       }
     })
   }, [definitions, buildableItems])

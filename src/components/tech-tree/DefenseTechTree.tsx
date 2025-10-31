@@ -69,6 +69,10 @@ export function DefenseTechTree({ planetId, className }: DefenseTechTreeProps) {
         imageUrl: getDefenseImage(defence.slug),
         status,
         prerequisites,
+        description: defence.description,
+        costTellerium: defence.tellerium_cost,
+        costKrypton: defence.krypton_cost,
+        buildTime: defence.build_time_ticks,
       }
     })
   }, [definitions, buildableItems, defencesList])
