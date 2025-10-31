@@ -46,13 +46,13 @@ export function ProfileSettings({ user, empire, onUpdate, isLoading }: ProfileSe
   const currentUser = meData?.user || user
   const currentEmpire = meData?.empire || empire
   
-  const [empireDescription, setEmpireDescription] = useState(currentEmpire?.description || '')
+  const [empireDescription, setEmpireDescription] = useState('')
   const [isUpdatingDescription, setIsUpdatingDescription] = useState(false)
 
   // Update empire description state when data changes
   useEffect(() => {
     if (currentEmpire?.description !== undefined) {
-      setEmpireDescription(currentEmpire.description)
+      setEmpireDescription(currentEmpire.description || '')
     }
   }, [currentEmpire?.description])
 

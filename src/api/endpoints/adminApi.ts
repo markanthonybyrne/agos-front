@@ -20,7 +20,6 @@ import {
   TransferPlanetRequest,
   ModifyPlanetResourcesRequest,
   AdminFleetListResponse,
-  AdminFleet,
   TeleportFleetRequest,
   AdminAllianceListResponse,
   AdminAlliance,
@@ -28,16 +27,13 @@ import {
   TransferAllianceLeadershipRequest,
   AdminAllianceChatResponse,
   AdminMailListResponse,
-  AdminMail,
   AdminTickListResponse,
   AdminTickDetailResponse,
-  AdminTick,
   RollbackTickRequest,
   BulkAdjustResourcesRequest,
   BulkAdjustResourcesResponse,
   AdminStatistics,
   AdminCombatListResponse,
-  AdminCombat,
   AdminRoleListResponse,
 } from '@/types/api.types'
 
@@ -368,18 +364,11 @@ export const adminApi = apiSlice.injectEndpoints({
         url: '/admin/ticks',
         params,
       }),
-      transformResponse: (response: AdminTickListResponse) => {
-        // Map tick number to id for DataTable compatibility
-        return {
-          ...response,
-          data: response.data.map(tick => ({ ...tick, id: tick.number })),
-        }
-      },
       providesTags: ['Tick'],
     }),
     getTick: builder.query<AdminTickDetailResponse, number>({
-      query: (number) => `/admin/ticks/${number}`,
-      providesTags: (_result, _error, number) => [{ type: 'Tick', id: number }],
+      query: (tickNumber) => `/admin/ticks/${tickNumber}`,
+      providesTags: (_result, _error, tickNumber) => [{ type: 'Tick', id: tickNumber }],
     }),
     rollbackTick: builder.mutation<{ message: string }, RollbackTickRequest>({
       query: (data) => ({

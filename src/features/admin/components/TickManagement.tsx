@@ -3,7 +3,7 @@ import { useListTicksQuery, useGetTickQuery, useRollbackTickMutation } from '@/a
 import { DataTable, Column } from './DataTable'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useForm } from 'react-hook-form'
@@ -32,13 +32,13 @@ export function TickManagement() {
   const form = useForm<z.infer<typeof rollbackSchema>>({ resolver: zodResolver(rollbackSchema) })
 
   const handleView = (tick: AdminTick) => {
-    setSelectedTick(tick.number)
+    setSelectedTick(tick.tick_number)
     setDetailDialogOpen(true)
   }
 
   const handleRollback = (tick: AdminTick) => {
-    form.reset({ tick_number: tick.number, reason: '' })
-    setSelectedTick(tick.number)
+    form.reset({ tick_number: tick.tick_number, reason: '' })
+    setSelectedTick(tick.tick_number)
     setRollbackDialogOpen(true)
   }
 
@@ -53,21 +53,49 @@ export function TickManagement() {
   }
 
   const columns: Column<AdminTick>[] = [
-    { key: 'number', header: 'Tick #', accessor: (t) => <span className="font-mono font-bold">{t.number}</span> },
-    { key: 'processed', header: 'Processed At', accessor: (t) => formatDateTime(t.processed_at) },
+    { 
+      key: 'tick_number', 
+      header: 'Tick #', 
+      accessor: (t) => <span className="font-mono font-bold">{t.tick_number}</span> 
+    },
+    { 
+      key: 'started', 
+      header: 'Started At', 
+      accessor: (t) => formatDateTime(t.started_at) 
+    },
     {
       key: 'status',
       header: 'Status',
-      accessor: (t) => (
-        <Badge variant={t.status === 'completed' ? 'default' : t.status === 'failed' ? 'destructive' : 'secondary'}>
-          {t.status}
-        </Badge>
-      ),
+      accessor: (t) => {
+        // Determine status from stats
+        const hasFinished = t.stats.finished_at
+        const isFailed = t.stats.duration_seconds < 0 && !hasFinished
+        const status = hasFinished ? 'completed' : isFailed ? 'failed' : 'processing'
+        return (
+          <Badge variant={status === 'completed' ? 'default' : status === 'failed' ? 'destructive' : 'secondary'}>
+            {status}
+          </Badge>
+        )
+      },
     },
     {
       key: 'duration',
       header: 'Duration',
-      accessor: (t) => t.duration_seconds ? `${t.duration_seconds}s` : 'N/A',
+      accessor: (t) => {
+        const duration = Math.abs(t.stats.duration_seconds)
+        return duration ? `${duration.toFixed(3)}s` : 'N/A'
+      },
+    },
+    {
+      key: 'stats',
+      header: 'Statistics',
+      accessor: (t) => (
+        <div className="text-xs space-y-0.5">
+          <div>Planets: {t.stats.planets_processed || 0}</div>
+          <div>Combats: {t.stats.combats_resolved || 0}</div>
+          <div>Fleets: {t.stats.fleets_arrived || 0}</div>
+        </div>
+      ),
     },
   ]
 
@@ -122,36 +150,101 @@ export function TickManagement() {
       </Dialog>
 
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Tick {selectedTick} Details</DialogTitle>
+            <DialogDescription>Detailed information about tick processing</DialogDescription>
           </DialogHeader>
-          {tickDetail?.tick && (
+          {tickDetail?.tick ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Tick Number</Label>
-                  <div className="font-mono font-bold">{tickDetail.tick.number}</div>
+                  <div className="font-mono font-bold text-lg">{tickDetail.tick.tick_number}</div>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
                   <div>
-                    <Badge variant={tickDetail.tick.status === 'completed' ? 'default' : 'destructive'}>
-                      {tickDetail.tick.status}
+                    <Badge variant={tickDetail.tick.stats.finished_at ? 'default' : 'destructive'}>
+                      {tickDetail.tick.stats.finished_at ? 'Completed' : 'Processing'}
                     </Badge>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Processed At</Label>
-                  <div>{formatDateTime(tickDetail.tick.processed_at)}</div>
+                  <Label className="text-muted-foreground">Started At</Label>
+                  <div className="text-sm">{formatDateTime(tickDetail.tick.started_at)}</div>
                 </div>
-                {tickDetail.tick.duration_seconds && (
+                {tickDetail.tick.stats.finished_at && (
                   <div>
-                    <Label className="text-muted-foreground">Duration</Label>
-                    <div>{tickDetail.tick.duration_seconds}s</div>
+                    <Label className="text-muted-foreground">Finished At</Label>
+                    <div className="text-sm">{formatDateTime(tickDetail.tick.stats.finished_at)}</div>
                   </div>
                 )}
+                <div>
+                  <Label className="text-muted-foreground">Duration</Label>
+                  <div className="text-sm">
+                    {Math.abs(tickDetail.tick.stats.duration_seconds).toFixed(3)}s
+                  </div>
+                </div>
               </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-muted-foreground mb-2 block">Processing Statistics</Label>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {tickDetail.tick.stats.planets_processed !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Planets Processed:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.planets_processed}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.combats_resolved !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Combats Resolved:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.combats_resolved}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.production_applied !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Production Applied:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.production_applied}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.facilities_completed !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Facilities Completed:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.facilities_completed}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.research_completed !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Research Completed:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.research_completed}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.fleets_arrived !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Fleets Arrived:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.fleets_arrived}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.defences_completed !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Defences Completed:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.defences_completed}</span>
+                    </div>
+                  )}
+                  {tickDetail.tick.stats.ships_completed !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Ships Completed:</span>
+                      <span className="font-medium ml-2">{tickDetail.tick.stats.ships_completed}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>Loading tick details...</p>
             </div>
           )}
         </DialogContent>

@@ -1123,20 +1123,54 @@ export interface ModifyPlanetResourcesRequest {
 }
 
 // Admin Fleet Types
+export interface AdminFleetShip {
+  definition_id: number
+  quantity: number
+}
+
 export interface AdminFleet {
   id: number
-  ships: Record<string, number>
-  origin_coordinate: string | FleetCoordinate
-  destination_coordinate: string | FleetCoordinate
-  status: 'stationed' | 'in_transit' | 'arrived'
-  order_type: 'attack' | 'defend' | 'station' | 'return'
+  owner_empire_id: number
+  ships: AdminFleetShip[]
+  origin_planet_id: number
+  destination_quadrant: number
+  destination_sector: number
+  destination_galaxy: number
+  destination_planet: number
   departure_tick: number
   arrival_tick: number
+  status: 'stationed' | 'in_transit' | 'arrived'
+  order_type: 'attack' | 'defend' | 'station' | 'return'
+  auto_return_on_failure: boolean
+  created_at: string
+  updated_at: string
   owner?: {
     id: number
+    user_id: number
     name: string
+    homeworld_planet_id: number
+    score: number
+    planets_owned: number
+    alliance_id: number | null
+    created_at: string
+    updated_at: string
+    description: string | null
   }
-  owner_empire_id?: number
+  origin?: {
+    id: number
+    name: string
+    quadrant: number
+    sector: number
+    galaxy: number
+    planet: number
+    owner_empire_id: number
+    state: string
+    mines: number
+    probes: number
+    tellerium_balance: number
+    krypton_balance: number
+    [key: string]: any // For facilities and other fields
+  }
 }
 
 export interface AdminFleetListResponse {
@@ -1242,12 +1276,29 @@ export interface AdminMailListResponse {
 }
 
 // Admin Tick Types
+export interface AdminTickStats {
+  tick_number: number
+  started_at: string
+  planets_processed?: number
+  combats_resolved?: number
+  production_applied?: number
+  facilities_completed?: number
+  research_completed?: number
+  fleets_arrived?: number
+  defences_completed?: number
+  ships_completed?: number
+  finished_at: string
+  duration_seconds: number
+}
+
 export interface AdminTick {
-  id: number // Use tick number as id for DataTable compatibility
-  number: number
-  processed_at: string
-  duration_seconds?: number
-  status: 'completed' | 'failed' | 'processing'
+  id: number // Database ID
+  tick_number: number
+  started_at: string
+  finished_at: string
+  stats: AdminTickStats
+  created_at: string
+  updated_at: string
 }
 
 export interface AdminTickListResponse {
@@ -1328,18 +1379,34 @@ export interface AdminStatistics {
 }
 
 // Admin Combat Types
+export interface AdminCombatParticipant {
+  empire_id: number
+  type: 'fleet' | 'planet'
+  fleet_id?: number
+  planet_id?: number
+  ships?: Record<string, number>
+  defences?: Record<string, number> | any[]
+  init: number
+}
+
+export interface AdminCombatResult {
+  winner_empire_id: number
+  ships_lost: any[]
+  facilities_destroyed: any[]
+  planets_captured: any[]
+}
+
 export interface AdminCombat {
   id: number
   tick_number: number
-  attacker_empire_id: number
-  attacker_empire_name: string
-  defender_empire_id: number
-  defender_empire_name: string
-  planet_id: number
-  planet_coordinate: string
-  attacker_won: boolean
-  planet_captured: boolean
+  location_quadrant: number
+  location_sector: number
+  location_galaxy: number
+  location_planet: number
+  participants: AdminCombatParticipant[]
+  result: AdminCombatResult
   created_at: string
+  updated_at: string
 }
 
 export interface AdminCombatListResponse {

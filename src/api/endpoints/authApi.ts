@@ -312,7 +312,7 @@ export const authApi = apiSlice.injectEndpoints({
     >({
       query: (data) => ({
         url: '/empires/my/description',
-        method: 'PATCH',
+        method: 'POST',
         body: data,
       }),
       transformResponse: (response: { status: string; data?: { empire: Empire }; empire?: Empire }) => {

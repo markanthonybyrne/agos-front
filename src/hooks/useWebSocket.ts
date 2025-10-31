@@ -192,16 +192,50 @@ export function useWebSocket() {
       console.log('[WebSocket] ✅ Received combat.resolved event:', data)
       // Invalidate tags to refresh data
       dispatch(apiSlice.util.invalidateTags(['Universe', 'Planet', 'Fleet', 'CombatLog', 'Empire']))
+      
+      // Determine if this empire is the attacker or defender
+      const isAttacker = data.combat_log?.attacker_empire_id === empire?.id
+      const isDefender = data.combat_log?.defender_empire_id === empire?.id
+      const isWinner = (isAttacker && data.combat_log?.attacker_won) || (isDefender && !data.combat_log?.attacker_won)
+      
       // Show notification with battle result
-      if (data.combat_log?.id) {
-        toast.info('Combat resolved! Check battle reports for details.', {
-          action: {
-            label: 'View',
-            onClick: () => {
-              console.log('Navigate to combat log:', data.combat_log.id)
+      if (data.combat_log?.id && (isAttacker || isDefender)) {
+        const opponentName = isAttacker 
+          ? data.combat_log.defender_empire_name 
+          : data.combat_log.attacker_empire_name
+        const planetCoord = data.combat_log.planet_coordinate || 'Unknown'
+        const result = isWinner ? 'Victory' : 'Defeat'
+        
+        // Add notification to notification center
+        dispatch(addNotification({
+          type: isWinner ? 'success' : 'error',
+          title: `Battle ${result} at ${planetCoord}`,
+          message: `${result} against ${opponentName}${data.combat_log.planet_captured ? ' - Planet Captured!' : ''}`,
+          category: 'combat',
+          actionUrl: '/combat',
+          data: {
+            combat_log_id: data.combat_log.id,
+            planet_coordinate: planetCoord,
+            attacker_won: data.combat_log.attacker_won,
+            planet_captured: data.combat_log.planet_captured,
+          }
+        }))
+        
+        // Show toast notification
+        toast[isWinner ? 'success' : 'error'](
+          `Battle ${result} at ${planetCoord}!`,
+          {
+            duration: 10000,
+            description: `${result} against ${opponentName}${data.combat_log.planet_captured ? ' - Planet Captured!' : ''}`,
+            action: {
+              label: 'View Report',
+              onClick: () => {
+                // Navigate to combat logs page
+                window.location.href = '/combat'
+              }
             }
           }
-        })
+        )
       } else {
         toast.info('Combat resolved! Check battle reports for details.')
       }

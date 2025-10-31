@@ -128,12 +128,19 @@ export function PlanetManagement() {
     {
       key: 'name',
       header: 'Name',
-      accessor: (p) => (
-        <div>
-          <div className="font-medium">{p.name}</div>
-          <div className="text-xs text-muted-foreground">{formatCoordinate(p.coordinate)}</div>
-        </div>
-      ),
+      accessor: (p) => {
+        // Debug coordinate format
+        if (!p.coordinate || (typeof p.coordinate === 'string' && !p.coordinate.trim())) {
+          console.warn('Planet missing coordinate:', p.id, p.name, 'coordinate:', p.coordinate)
+        }
+        const coordStr = formatCoordinate(p.coordinate)
+        return (
+          <div>
+            <div className="font-medium">{p.name}</div>
+            <div className="text-xs text-muted-foreground font-mono">{coordStr}</div>
+          </div>
+        )
+      },
     },
     {
       key: 'state',
@@ -147,11 +154,20 @@ export function PlanetManagement() {
     {
       key: 'owner',
       header: 'Owner',
-      accessor: (p) => p.owner_empire ? (
-        <span>{p.owner_empire.name}</span>
-      ) : (
-        <span className="text-muted-foreground">Unsettled</span>
-      ),
+      accessor: (p) => {
+        // Debug: log owner data to see what we're getting
+        if (p.state !== 'unsettled' && !p.owner_empire && !p.owner_empire_id) {
+          console.warn('Planet has state but no owner:', p.id, p.name, p.state, 'owner_empire:', p.owner_empire, 'owner_empire_id:', p.owner_empire_id)
+        }
+        
+        if (p.owner_empire) {
+          return <span>{p.owner_empire.name} (ID: {p.owner_empire.id})</span>
+        } else if (p.owner_empire_id) {
+          return <span>Empire ID: {p.owner_empire_id}</span>
+        } else {
+          return <span className="text-muted-foreground">Unsettled</span>
+        }
+      },
     },
     {
       key: 'resources',
