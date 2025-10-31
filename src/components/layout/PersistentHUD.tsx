@@ -166,7 +166,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
             {/* User Avatar Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Button variant="ghost" className="relative h-10 w-10 p-0">
                   <Avatar
                     src={getUserAvatarUrl(data?.user)}
                     name={data?.user?.username || 'User'}

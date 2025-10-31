@@ -86,7 +86,7 @@ export function SlidingPanel({
       <div
         ref={panelRef}
         className={cn(
-          'fixed right-0 h-full bg-card border-l border-border z-50',
+          'fixed right-0 h-full bg-card border-l border-border z-50 shadow-2xl',
           'transform transition-all duration-300 ease-out',
           'overflow-hidden',
           SIZE_MAP[size],
@@ -96,30 +96,31 @@ export function SlidingPanel({
         style={{ zIndex }}
       >
         <Card className="h-full rounded-none border-0 panel-glass">
-          {/* Header with minimize/maximize */}
+          {/* Sleek header with minimize/maximize */}
           <CardHeader className={cn(
-            "sticky top-0 bg-card/95 backdrop-blur-sm z-10 border-b transition-all duration-200",
-            isMinimized && "border-0"
+            "sticky top-0 bg-muted/20 backdrop-blur-sm z-10 border-b border-border/50 transition-all duration-200",
+            isMinimized && "border-0",
+            "p-3"
           )}>
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <CardTitle className="truncate">{title}</CardTitle>
+                <CardTitle className="truncate text-base font-semibold">{title}</CardTitle>
                 {description && !isMinimized && (
-                  <CardDescription className="mt-1">{description}</CardDescription>
+                  <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>
                 )}
               </div>
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-1 ml-4">
                 {onMinimize && onMaximize && (
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={isMinimized ? onMaximize : onMinimize}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
                   >
                     {isMinimized ? (
-                      <Maximize2 className="w-4 h-4" />
+                      <Maximize2 className="w-3 h-3" />
                     ) : (
-                      <Minimize2 className="w-4 h-4" />
+                      <Minimize2 className="w-3 h-3" />
                     )}
                   </Button>
                 )}
@@ -127,9 +128,9 @@ export function SlidingPanel({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="h-6 w-6 text-muted-foreground hover:text-red-400 hover:bg-red-500/20"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3 h-3" />
                 </Button>
               </div>
             </div>
@@ -139,7 +140,7 @@ export function SlidingPanel({
           <CardContent className={cn(
             "p-6 transition-all duration-200 overflow-y-auto",
             isMinimized && "hidden",
-            !isMinimized && "h-[calc(100%-80px)]"
+            !isMinimized && "h-[calc(100%-56px)]"
           )}>
             {children}
           </CardContent>

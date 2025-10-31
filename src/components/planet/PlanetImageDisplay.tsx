@@ -105,7 +105,7 @@ export function PlanetImageDisplay({
 
         {/* Resources */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-background/80 backdrop-blur-sm border border-tellerium/30 rounded-lg p-3">
+          <div className="panel-glass border-tellerium/30 rounded-lg p-3 vignette">
             <div className="flex items-center gap-2 mb-1">
               <img src={getTelleriumImage()} alt="T" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
               <span className="text-xs text-tellerium font-semibold">Tellerium</span>
@@ -114,7 +114,7 @@ export function PlanetImageDisplay({
               {formatResource(planet.tellerium_balance)}
             </p>
           </div>
-          <div className="bg-background/80 backdrop-blur-sm border border-krypton/30 rounded-lg p-3">
+          <div className="panel-glass border-krypton/30 rounded-lg p-3 vignette">
             <div className="flex items-center gap-2 mb-1">
               <img src={getKryptonImage()} alt="K" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
               <span className="text-xs text-krypton font-semibold">Krypton</span>

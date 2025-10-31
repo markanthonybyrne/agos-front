@@ -184,10 +184,12 @@
   /* Custom Toast Styling - Glassmorphism Theme */
   .toast-glass-base {
     @apply backdrop-blur-sm border border-border/50 relative overflow-hidden;
-    background: linear-gradient(180deg, hsl(var(--card) / 0.85) 0%, hsl(var(--card) / 0.75) 100%);
+    background: radial-gradient(300px 200px at -10% -10%, hsl(var(--primary) / 0.08), transparent 60%),
+                radial-gradient(200px 150px at 110% -20%, hsl(var(--ring) / 0.06), transparent 55%),
+                linear-gradient(180deg, hsl(var(--card) / 0.75) 0%, hsl(var(--card) / 0.6) 100%);
     box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2) inset, 
                 0 8px 32px rgba(0, 0, 0, 0.4),
-                0 0 20px hsl(var(--primary) / 0.1);
+                0 0 20px hsl(var(--primary) / 0.05);
     border-radius: var(--radius);
     padding: 0.875rem 1rem;
     min-width: 300px;
@@ -198,7 +200,7 @@
   .toast-glass-base:hover {
     box-shadow: 0 0 0 1px hsl(var(--ring) / 0.4) inset, 
                 0 12px 40px rgba(0, 0, 0, 0.5),
-                0 0 30px hsl(var(--primary) / 0.15);
+                0 0 30px hsl(var(--primary) / 0.08);
     transform: translateY(-2px);
   }
 
@@ -826,6 +828,7 @@
   .react-grid-item {
     transition: all 200ms ease;
     transition-property: left, top, width, height;
+    pointer-events: auto !important;
   }
   
   .react-grid-item.cssTransforms {
@@ -886,6 +889,12 @@
 
   .react-grid-item > * {
     height: 100%;
+    pointer-events: auto !important;
+  }
+  
+  /* Ensure resize handle doesn't block interactions */
+  .react-grid-item > .react-resizable-handle {
+    pointer-events: auto !important;
   }
 }
 
