@@ -11,6 +11,7 @@ import {
   handleResearchCompleted,
   handleAllianceMessage,
   handleTickProcessed,
+  addNotification,
 } from '@/app/slices/notificationSlice'
 import { initializeEcho, disconnectEcho, getEcho } from '@/lib/websocket'
 import { formatCoordinate } from '@/lib/coordinates'
@@ -69,7 +70,26 @@ export function useWebSocket() {
     // Handle empire updated event
     const handleEmpireUpdated = (data: any) => {
       console.log('[WebSocket] ✅ Received empire.updated event:', data)
-      dispatch(apiSlice.util.invalidateTags(['Empire']))
+      // Update empire state if data includes empire object
+      if (data.empire) {
+        dispatch(updateEmpire(data.empire))
+      }
+      
+      // Check for significant changes that warrant notifications
+      const changes = data.changes || {}
+      if (changes.score || changes.planets_owned || changes.alliance_id) {
+        const changeMessages: string[] = []
+        if (changes.score) changeMessages.push(`Score: ${changes.score > 0 ? '+' : ''}${changes.score}`)
+        if (changes.planets_owned) changeMessages.push(`${changes.planets_owned > 0 ? 'Gained' : 'Lost'} planet`)
+        if (changes.alliance_id) changeMessages.push(`Alliance ${changes.alliance_id ? 'joined' : 'left'}`)
+        
+        if (changeMessages.length > 0) {
+          toast.info(`Empire updated: ${changeMessages.join(', ')}`)
+        }
+      }
+      
+      // Invalidate Empire, Universe, and Resource tags to refresh all related data
+      dispatch(apiSlice.util.invalidateTags(['Empire', 'Universe', 'Resource']))
     }
     
     // Handle planet updated event
@@ -119,7 +139,7 @@ export function useWebSocket() {
     const handleResourcesUpdated = (data: any) => {
       console.log('[WebSocket] ✅ Received resources.updated event:', data)
       // Real-time resource updates - invalidate planet resources
-      const tags: any[] = ['Resource', 'Planet', 'Empire']
+      const tags: any[] = ['Resource', 'Planet', 'Empire', 'Universe']
       if (data.planet_id) {
         tags.push({ type: 'Resource', id: Number(data.planet_id) })
         tags.push({ type: 'Planet', id: Number(data.planet_id) })
@@ -194,7 +214,6 @@ export function useWebSocket() {
         researchName: data.research_name || data.research_slug?.replace(/_/g, ' '),
         planetId: data.planet_id,
       }))
-      toast.success(`Research completed: ${data.research_name}`)
       const tags: any[] = ['Research', 'Planet', 'Buildable', 'Empire']
       if (data.planet_id) {
         tags.push({ type: 'Research', id: Number(data.planet_id) })
@@ -212,7 +231,6 @@ export function useWebSocket() {
         itemType: data.item_type,
         itemName: data.item_name || data.item_type?.replace(/_/g, ' '),
       }))
-      toast.success(`${data.item_type || 'Construction'} completed on planet ${data.planet_id}`)
       // Invalidate specific collections depending on item type
       const tags: any[] = ['Planet', 'ConstructionQueue', 'Buildable', 'Resource']
       // Also invalidate the specific planet's construction queue and related data

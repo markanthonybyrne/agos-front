@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useGetDefenceDefinitionsQuery, useGetPlanetDefencesQuery, useBuildDefencesMutation, useDestroyDefencesMutation } from '@/api/endpoints/defencesApi'
+import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { usePrerequisites } from '@/hooks/usePrerequisites'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,6 +43,11 @@ export function DefensesTab({ planet }: DefensesTabProps) {
   })
   const { data: meData } = useGetMeQuery()
 
+  // Get buildable items to see what can be built on this planet
+  const { data: buildableItemsData } = useGetBuildableItemsQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
+
   // Debug logging for defence definitions
   console.log('Full defence definitions response:', definitions)
   if (definitions?.defences) {
@@ -49,12 +55,69 @@ export function DefensesTab({ planet }: DefensesTabProps) {
     console.log('First defence definition:', definitions.defences[0])
     console.log('First defence definition keys:', Object.keys(definitions.defences[0] || {}))
   }
+  
+  console.log('BuildableItems data:', buildableItemsData)
+  
   const [buildDefences, { isLoading: isBuilding }] = useBuildDefencesMutation()
   const [destroyDefences, { isLoading: isDestroying }] = useDestroyDefencesMutation()
 
   // Get all defence definitions for prerequisite checking
   const allDefenceDefinitions = (definitions?.defences || []) as any[]
+  
+  // Extract buildable defences from buildable items data
+  const buildableDefences = useMemo(() => {
+    if (!buildableItemsData?.defences) {
+      return []
+    }
+    
+    console.log('Raw buildableItemsData.defences:', buildableItemsData.defences)
+    console.log('Type of buildableItemsData.defences:', typeof buildableItemsData.defences)
+    console.log('Is array?', Array.isArray(buildableItemsData.defences))
+    
+    if (Array.isArray(buildableItemsData.defences)) {
+      console.log('✅ Extracted defences as array:', buildableItemsData.defences)
+      return buildableItemsData.defences
+    } else if (typeof buildableItemsData.defences === 'object') {
+      // If it's an object, try to extract array from it
+      const values = Object.values(buildableItemsData.defences)
+      console.log('Object values:', values)
+      
+      // Check if any value is an array
+      const arrayValue = values.find(Array.isArray)
+      if (arrayValue) {
+        console.log('✅ Extracted defences from nested array:', arrayValue)
+        return arrayValue as any[]
+      } else {
+        // Try to get defences from object keys directly
+        console.log('✅ Extracted defences from object values:', values)
+        return values as any[]
+      }
+    }
+    
+    return []
+  }, [buildableItemsData?.defences])
+  
   const { canBuildItem } = usePrerequisites(Number(planet.id), allDefenceDefinitions as any)
+  
+  // Determine which defences to show in dropdown
+  const availableDefences = useMemo(() => {
+    // If we have buildable defences, use them directly (they already have all needed fields)
+    if (buildableDefences.length > 0) {
+      console.log('✅ Using buildable defences from API:', buildableDefences.length)
+      return buildableDefences
+    }
+    
+    // Wait for definitions to load before using fallback
+    if (isLoadingDefinitions || !definitions?.defences || allDefenceDefinitions.length === 0) {
+      console.log('⏳ Waiting for defence definitions to load...')
+      return []
+    }
+    
+    // Fallback: Show all defence definitions if buildable defences aren't available
+    // Backend will validate prerequisites when building
+    console.log('⚠️ Using fallback: all defence definitions')
+    return allDefenceDefinitions
+  }, [buildableDefences, isLoadingDefinitions, definitions?.defences, allDefenceDefinitions])
 
   const buildForm = useForm<BuildDefenceFormData>({
     resolver: zodResolver(buildDefenceSchema),
@@ -114,6 +177,12 @@ export function DefensesTab({ planet }: DefensesTabProps) {
   }
 
   const getDefenceDefinition = (slug: string) => {
+    // First check buildable defences (they already have all needed fields)
+    if (buildableDefences.length > 0) {
+      const found = buildableDefences.find(d => d.slug === slug)
+      if (found) return found
+    }
+    // Fallback to all definitions
     return definitions?.defences?.find(d => d.slug === slug)
   }
 
@@ -226,7 +295,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                     <SelectValue placeholder="Select defense type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {definitions?.defences?.filter(defence => canBuildItem(defence.slug)).map((defence) => (
+                    {availableDefences.map((defence) => (
                       <SelectItem key={defence.slug} value={defence.slug}>
                         {defence.name}
                       </SelectItem>

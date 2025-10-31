@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useGetFacilityDefinitionsQuery, useGetPlanetFacilitiesQuery, useBuildFacilityMutation, useUpgradeFacilityMutation, useUpgradeFacilityBySlugMutation, useDestroyFacilityMutation } from '@/api/endpoints/facilitiesApi'
+import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
 import { usePrerequisites } from '@/hooks/usePrerequisites'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -42,6 +43,11 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   })
   const { data: meData } = useGetMeQuery()
 
+  // Get buildable items to see what can be built on this planet
+  const { data: buildableItemsData } = useGetBuildableItemsQuery(Number(planet.id), {
+    refetchOnMountOrArgChange: true,
+  })
+
   // Debug logging for facility definitions
   console.log('Full facility definitions response:', definitions)
   if (definitions?.facilities) {
@@ -49,6 +55,9 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
     console.log('First facility definition:', definitions.facilities[0])
     console.log('First facility definition keys:', Object.keys(definitions.facilities[0] || {}))
   }
+  
+  console.log('BuildableItems data:', buildableItemsData)
+  
   const [buildFacility, { isLoading: isBuilding }] = useBuildFacilityMutation()
   const [upgradeFacility, { isLoading: isUpgrading }] = useUpgradeFacilityMutation()
   const [upgradeFacilityBySlug] = useUpgradeFacilityBySlugMutation()
@@ -56,6 +65,40 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
 
   // Get all facility definitions for prerequisite checking
   const allFacilityDefinitions = (definitions?.facilities || []) as any[]
+  
+  // Extract buildable facilities from buildable items data
+  const buildableFacilities = useMemo(() => {
+    if (!buildableItemsData?.facilities) {
+      return []
+    }
+    
+    console.log('Raw buildableItemsData.facilities:', buildableItemsData.facilities)
+    console.log('Type of buildableItemsData.facilities:', typeof buildableItemsData.facilities)
+    console.log('Is array?', Array.isArray(buildableItemsData.facilities))
+    
+    if (Array.isArray(buildableItemsData.facilities)) {
+      console.log('✅ Extracted facilities as array:', buildableItemsData.facilities)
+      return buildableItemsData.facilities
+    } else if (typeof buildableItemsData.facilities === 'object') {
+      // If it's an object, try to extract array from it
+      const values = Object.values(buildableItemsData.facilities)
+      console.log('Object values:', values)
+      
+      // Check if any value is an array
+      const arrayValue = values.find(Array.isArray)
+      if (arrayValue) {
+        console.log('✅ Extracted facilities from nested array:', arrayValue)
+        return arrayValue as any[]
+      } else {
+        // Try to get facilities from object keys directly
+        console.log('✅ Extracted facilities from object values:', values)
+        return values as any[]
+      }
+    }
+    
+    return []
+  }, [buildableItemsData?.facilities])
+  
   const { canBuildItem } = usePrerequisites(Number(planet.id), allFacilityDefinitions as any)
 
   const buildForm = useForm<BuildFacilityFormData>({
@@ -178,8 +221,34 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   }
 
   const getFacilityDefinition = (slug: string) => {
+    // First check buildable facilities (they already have all needed fields)
+    if (buildableFacilities.length > 0) {
+      const found = buildableFacilities.find(f => f.slug === slug)
+      if (found) return found
+    }
+    // Fallback to all definitions
     return definitions?.facilities?.find(f => f.slug === slug)
   }
+  
+  // Determine which facilities to show in dropdown
+  const availableFacilities = useMemo(() => {
+    // If we have buildable facilities, use them directly (they already have all needed fields)
+    if (buildableFacilities.length > 0) {
+      console.log('✅ Using buildable facilities from API:', buildableFacilities.length)
+      return buildableFacilities
+    }
+    
+    // Wait for definitions to load before using fallback
+    if (isLoadingDefinitions || !definitions?.facilities || allFacilityDefinitions.length === 0) {
+      console.log('⏳ Waiting for facility definitions to load...')
+      return []
+    }
+    
+    // Fallback: Show all facility definitions if buildable facilities aren't available
+    // Backend will validate prerequisites when building
+    console.log('⚠️ Using fallback: all facility definitions')
+    return allFacilityDefinitions
+  }, [buildableFacilities, isLoadingDefinitions, definitions?.facilities, allFacilityDefinitions])
 
   const getFacilityLevel = (slug: string) => {
     const facility = facilitiesList.find(f => f.facility_slug === slug)
@@ -253,7 +322,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                     <SelectValue placeholder="Select facility type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {definitions?.facilities?.filter(facility => canBuildItem(facility.slug)).map((facility) => (
+                    {availableFacilities.map((facility) => (
                       <SelectItem key={facility.slug} value={facility.slug}>
                         {facility.name}
                       </SelectItem>
