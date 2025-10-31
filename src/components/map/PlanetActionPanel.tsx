@@ -99,7 +99,7 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto panel-glass surface-gradient card-glow vignette border-muted/20">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <img
