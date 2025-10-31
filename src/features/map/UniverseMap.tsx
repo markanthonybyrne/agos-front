@@ -18,6 +18,10 @@ import { StellarMap3D } from '@/components/map/StellarMap3D'
 import { PlanetView } from '@/components/map/PlanetView'
 import { GalaxyView } from '@/components/map/GalaxyView'
 import { Planet } from '@/types/api.types'
+import { getGalaxyImage } from '@/lib/galaxyImages'
+import { getQuadrantImage } from '@/lib/quadrantImages'
+import { getPlanetImage } from '@/lib/planetImages'
+import { cn } from '@/lib/utils'
 import { 
   MapPin, 
   Search, 
@@ -33,7 +37,9 @@ import {
   Telescope,
   Zap,
   Filter,
-  RefreshCw
+  RefreshCw,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react'
 
 type MapLevel = 'quadrant' | 'sector' | 'galaxy' | 'planet'
@@ -68,6 +74,8 @@ export function UniverseMap() {
     offset: 0
   })
   const [discoveryCost, setDiscoveryCost] = useState<{ tellerium: number; krypton: number } | null>(null)
+  const [hoveredSectorId, setHoveredSectorId] = useState<number | null>(null)
+  const [zoomLevel, setZoomLevel] = useState(1)
 
   const { data: mapData, isLoading, error } = useGetMapQuery({
     quadrant: mapState.selectedQuadrant,
@@ -814,6 +822,528 @@ export function UniverseMap() {
           default:
             return null
         }
+    }
+  }
+
+  // Early return for immersive quadrant view
+  if (viewMode === 'explore' && mapState.level === 'quadrant' && !isLoading) {
+    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    
+    let quadrantsToDisplay: any[] = []
+    if (quadrants && quadrants.length > 0) {
+      quadrantsToDisplay = quadrants
+    } else if (universeStructure?.structure) {
+      quadrantsToDisplay = universeStructure.structure.map((q: any) => ({
+        id: q.quadrant,
+        sectors: q.sectors.map((s: any) => ({
+          id: s.sector,
+          galaxies: s.galaxies.map((g: any) => ({
+            id: g.galaxy,
+            planets: []
+          }))
+        }))
+      }))
+    }
+    
+    if (quadrantsToDisplay.length > 0) {
+      return (
+        <>
+          <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
+            {/* Header */}
+            <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
+              <div>
+                <h1 className="text-5xl font-heading glow-cyan mb-2">Universe Map</h1>
+                <p className="text-lg text-muted-foreground">Select a quadrant to explore</p>
+              </div>
+            </div>
+
+            {/* Quadrants in 2x2 grid */}
+            <div className="absolute inset-0 flex items-center justify-center pt-24">
+              <div className="grid grid-cols-2 gap-8">
+                {quadrantsToDisplay.map((quadrant: any) => {
+                  const totalGalaxies = quadrant.sectors?.reduce((total: number, sector: any) => 
+                    total + (sector.galaxies?.length || 0), 0) || 0
+                  
+                  return (
+                    <div
+                      key={quadrant.id}
+                      className="group cursor-pointer relative"
+                      onClick={() => navigateToLevel('sector', quadrant)}
+                    >
+                      <img
+                        src={getQuadrantImage(quadrant.id)}
+                        alt={`Quadrant ${quadrant.id}`}
+                        className={cn(
+                          "w-96 h-96 object-contain filter drop-shadow-2xl transition-all duration-300",
+                          "group-hover:scale-110 group-hover:brightness-125"
+                        )}
+                        style={{ imageRendering: 'auto' }}
+                      />
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full text-center mt-2">
+                        <h3 className="text-2xl font-heading glow-cyan">Quadrant {quadrant.id}</h3>
+                        <p className="text-sm text-muted-foreground font-mono mt-1">
+                          {quadrant.sectors?.length || 0} Sectors • {totalGalaxies} Galaxies
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+          <PlanetActionPanel
+            planet={selectedPlanet}
+            isOpen={!!selectedPlanet}
+            onClose={handlePlanetPanelClose}
+            onRefresh={() => {}}
+          />
+        </>
+      )
+    }
+  }
+
+  // Early return for immersive sector view
+  if (viewMode === 'explore' && mapState.level === 'sector' && !isLoading) {
+    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
+    let sectors = quadrant?.sectors || []
+    
+    if ((!sectors || sectors.length === 0) && universeStructure?.structure && mapState.selectedQuadrant) {
+      const structureQuadrant = universeStructure.structure.find((q: any) => q.quadrant === mapState.selectedQuadrant)
+      if (structureQuadrant) {
+        sectors = structureQuadrant.sectors.map((s: any) => ({
+          id: s.sector,
+          galaxies: s.galaxies.map((g: any) => ({
+            id: g.galaxy,
+            planets: []
+          }))
+        }))
+      }
+    }
+    
+    if (sectors && sectors.length > 0) {
+      return (
+        <>
+          <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
+            {/* Header */}
+            <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
+              <div>
+                <h1 className="text-5xl font-heading glow-cyan mb-2">Quadrant {mapState.selectedQuadrant}</h1>
+                <p className="text-lg text-muted-foreground">Select a sector to explore</p>
+              </div>
+              <Button variant="outline" onClick={goBack} size="lg">
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back
+              </Button>
+            </div>
+
+            {/* Sector view with orbital rings */}
+            <div className="absolute inset-0 flex items-center justify-center pt-24">
+              <div className="relative w-full h-full flex items-center justify-center">
+                {/* SVG for orbital rings and pie chart segments */}
+                <svg className="absolute w-[250%] h-[250%]" style={{ left: '-75%', top: '-75%', overflow: 'visible' }}>
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r="400"
+                    fill="none"
+                    stroke="rgba(6, 182, 212, 0.2)"
+                    strokeWidth="2"
+                    strokeDasharray="8,8"
+                  />
+                  
+                  {/* Pie chart sectors for hover effect */}
+                  {sectors.map((sector: any, index: number) => {
+                    const anglePerSector = 360 / sectors.length
+                    const startAngle = index * anglePerSector
+                    const endAngle = (index + 1) * anglePerSector
+                    
+                    const radius = 400
+                    const x1 = 50 + radius * Math.cos((startAngle - 90) * Math.PI / 180)
+                    const y1 = 50 + radius * Math.sin((startAngle - 90) * Math.PI / 180)
+                    const x2 = 50 + radius * Math.cos((endAngle - 90) * Math.PI / 180)
+                    const y2 = 50 + radius * Math.sin((endAngle - 90) * Math.PI / 180)
+                    const largeArc = anglePerSector > 180 ? 1 : 0
+                    const pathData = `M 50%,50% L ${x1}%,${y1}% A ${radius},${radius} 0 ${largeArc},1 ${x2}%,${y2}% Z`
+                    
+                    return (
+                      <path
+                        key={`sector-${sector.id}`}
+                        d={pathData}
+                        fill={hoveredSectorId === sector.id ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0)"}
+                        stroke={hoveredSectorId === sector.id ? "rgba(6, 182, 212, 0.5)" : "none"}
+                        strokeWidth="2"
+                        className="transition-all duration-200 pointer-events-none"
+                      />
+                    )
+                  })}
+                </svg>
+                
+                {/* Sectors positioned on ring */}
+                <div className="absolute inset-0">
+                  {sectors.map((sector: any, index: number) => {
+                    const totalGalaxies = sector.galaxies?.length || 0
+                    const totalPlanets = sector.galaxies?.reduce((total: number, galaxy: any) => 
+                      total + (galaxy.planets?.length || 0), 0) || 0
+                    
+                    const angle = (index * 360) / sectors.length
+                    const radius = 400 / 25
+                    const centerX = 50
+                    const centerY = 50
+                    const x = centerX + (radius * Math.cos((angle - 90) * Math.PI / 180))
+                    const y = centerY + (radius * Math.sin((angle - 90) * Math.PI / 180))
+                    
+                    return (
+                      <div
+                        key={sector.id}
+                        className="group cursor-pointer absolute"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          transform: 'translate(-50%, -50%)',
+                        }}
+                        onMouseEnter={() => setHoveredSectorId(sector.id)}
+                        onMouseLeave={() => setHoveredSectorId(null)}
+                        onClick={() => navigateToLevel('galaxy', sector)}
+                      >
+                        <div className="text-center">
+                          <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-3 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none mb-2">
+                            <div className="text-xs font-semibold text-foreground mb-1">Sector {sector.id}</div>
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <div>{totalGalaxies} Galaxies</div>
+                              <div>{totalPlanets} Planets</div>
+                            </div>
+                          </div>
+                          <h3 className="text-xl font-heading glow-cyan">Sector {sector.id}</h3>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+          <PlanetActionPanel
+            planet={selectedPlanet}
+            isOpen={!!selectedPlanet}
+            onClose={handlePlanetPanelClose}
+            onRefresh={() => {}}
+          />
+        </>
+      )
+    }
+  }
+
+  // Early return for immersive galaxy view
+  if (viewMode === 'explore' && mapState.level === 'galaxy' && !isLoading) {
+    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
+    const sectors = quadrant?.sectors || []
+    const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
+    let galaxies = sector?.galaxies || []
+    
+    if ((!galaxies || galaxies.length === 0) && universeStructure?.structure && mapState.selectedQuadrant && mapState.selectedSector) {
+      const structureQuadrant = universeStructure.structure.find((q: any) => q.quadrant === mapState.selectedQuadrant)
+      if (structureQuadrant) {
+        const structureSector = structureQuadrant.sectors.find((s: any) => s.sector === mapState.selectedSector)
+        if (structureSector) {
+          galaxies = structureSector.galaxies.map((g: any, index: number) => ({
+            id: g.galaxy,
+            planets: [],
+            planet_count: g.planet_count || 0,
+            type: (index % 4) + 1
+          }))
+        }
+      }
+    }
+    
+    if (galaxies && galaxies.length > 0) {
+      return (
+        <>
+          <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
+            {/* Header */}
+            <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
+              <div>
+                <h1 className="text-5xl font-heading glow-cyan mb-2">
+                  Quadrant {mapState.selectedQuadrant}: Sector {mapState.selectedSector}
+                </h1>
+                <p className="text-lg text-muted-foreground">Select a galaxy to explore</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg p-1">
+                  <Button variant="ghost" size="icon" onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))} className="h-8 w-8">
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                  <span className="text-xs font-mono px-2 min-w-[60px] text-center">{Math.round(zoomLevel * 100)}%</span>
+                  <Button variant="ghost" size="icon" onClick={() => setZoomLevel(prev => Math.min(2, prev + 0.1))} className="h-8 w-8">
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </div>
+                <Button variant="outline" onClick={goBack} size="lg">
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back
+                </Button>
+              </div>
+            </div>
+
+            {/* Galaxy view with spiral positioning */}
+            <div className="absolute inset-0 flex items-center justify-center pt-24">
+              <div className="relative w-full h-full" style={{ transform: `scale(${zoomLevel})`, transformOrigin: '50% 50%' }}>
+                {/* Travel route lines */}
+                <svg className="absolute w-full h-full pointer-events-none">
+                  {galaxies.map((galaxy: any, index: number) => {
+                    const goldenAngle = 137.508 * (index * 0.8)
+                    const radius = 15 + (index * 8)
+                    const angle = goldenAngle * (Math.PI / 180)
+                    const offsetX = radius * Math.cos(angle)
+                    const offsetY = radius * Math.sin(angle)
+                    const x1 = 50 + offsetX
+                    const y1 = 50 + offsetY
+                    
+                    return galaxies.slice(index + 1, index + Math.min(4, galaxies.length - index + 1)).map((targetGalaxy: any, targetOffset: number) => {
+                      const targetIndex = index + targetOffset + 1
+                      const targetGoldenAngle = 137.508 * (targetIndex * 0.8)
+                      const targetRadius = 15 + (targetIndex * 8)
+                      const targetAngle = targetGoldenAngle * (Math.PI / 180)
+                      const targetOffsetX = targetRadius * Math.cos(targetAngle)
+                      const targetOffsetY = targetRadius * Math.sin(targetAngle)
+                      const x2 = 50 + targetOffsetX
+                      const y2 = 50 + targetOffsetY
+                      
+                      return (
+                        <line
+                          key={`route-${galaxy.id}-${targetGalaxy.id}`}
+                          x1={`${x1}%`}
+                          y1={`${y1}%`}
+                          x2={`${x2}%`}
+                          y2={`${y2}%`}
+                          stroke="rgba(6, 182, 212, 0.15)"
+                          strokeWidth="1.5"
+                          strokeDasharray="4,6"
+                        />
+                      )
+                    })
+                  }).flat()}
+                </svg>
+                
+                {galaxies.map((galaxy: any, index: number) => {
+                  const planetCount = galaxy.planets?.length || galaxy.planet_count || 0
+                  const colonizedCount = galaxy.planets?.filter((p: any) => p.owner_empire_id).length || 0
+                  
+                  const goldenAngle = 137.508 * (index * 0.8)
+                  const radius = 15 + (index * 8)
+                  const angle = goldenAngle * (Math.PI / 180)
+                  const centerX = 50
+                  const centerY = 50
+                  const offsetX = radius * Math.cos(angle)
+                  const offsetY = radius * Math.sin(angle)
+                  const x = centerX + offsetX
+                  const y = centerY + offsetY
+                  
+                  return (
+                    <div
+                      key={galaxy.id}
+                      className="group cursor-pointer absolute"
+                      style={{
+                        left: `${x}%`,
+                        top: `${y}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                      onClick={() => navigateToLevel('planet', galaxy)}
+                    >
+                      <img
+                        src={getGalaxyImage(galaxy.type)}
+                        alt={`Galaxy ${galaxy.id}`}
+                        className={cn(
+                          "w-64 h-64 object-contain filter drop-shadow-2xl transition-all duration-300",
+                          "group-hover:scale-125 group-hover:brightness-125"
+                        )}
+                        style={{ imageRendering: 'auto' }}
+                      />
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-full text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none -mt-4 mb-4">
+                        <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-purple-500/30 p-4 shadow-xl">
+                          <div className="text-xs font-semibold text-foreground mb-1">Galaxy {galaxy.id}</div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div>{planetCount} Planets</div>
+                            {colonizedCount > 0 && <div>{colonizedCount} Colonized</div>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 w-full text-center mt-2">
+                        <h3 className="text-xl font-heading glow-purple">Galaxy {galaxy.id}</h3>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+          <PlanetActionPanel
+            planet={selectedPlanet}
+            isOpen={!!selectedPlanet}
+            onClose={handlePlanetPanelClose}
+            onRefresh={() => {}}
+          />
+        </>
+      )
+    }
+  }
+
+  // Early return for immersive planet view
+  if (viewMode === 'explore' && mapState.level === 'planet' && !isLoading) {
+    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
+    const sectors = quadrant?.sectors || []
+    const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
+    const galaxies = sector?.galaxies || []
+    const galaxy = galaxies.find((g: any) => g.id === mapState.selectedGalaxy) || galaxies[0]
+    let planets: Planet[] = galaxy?.planets || []
+    
+    if (planets.length === 0 && mapDataAny?.planets) {
+      planets = mapDataAny.planets.filter((p: any) => {
+        const coord = parseCoordinate(p.coordinate)
+        return coord && 
+          coord.quadrant === mapState.selectedQuadrant &&
+          coord.sector === mapState.selectedSector &&
+          coord.galaxy === mapState.selectedGalaxy
+      })
+    }
+    
+    if (planets.length === 0 && galaxyPlanetsData?.planets) {
+      planets = galaxyPlanetsData.planets
+    }
+    
+    if (planets && planets.length > 0) {
+      return (
+        <>
+          <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
+            {/* Header */}
+            <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
+              <div>
+                <h1 className="text-5xl font-heading glow-cyan mb-2">
+                  Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
+                </h1>
+                <p className="text-lg text-muted-foreground">Select a planet to view details</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg p-1">
+                  <Button variant="ghost" size="icon" onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))} className="h-8 w-8">
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                  <span className="text-xs font-mono px-2 min-w-[60px] text-center">{Math.round(zoomLevel * 100)}%</span>
+                  <Button variant="ghost" size="icon" onClick={() => setZoomLevel(prev => Math.min(2, prev + 0.1))} className="h-8 w-8">
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </div>
+                <Button variant="outline" onClick={goBack} size="lg">
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back
+                </Button>
+              </div>
+            </div>
+
+            {/* Planets with orbital rings */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg 
+                className="absolute w-[250%] h-[250%]" 
+                style={{ 
+                  left: '-75%',
+                  top: '-75%',
+                  overflow: 'visible',
+                  animation: 'planet-orbit 300s linear infinite',
+                  transform: `scale(${zoomLevel})`,
+                  transformOrigin: '50% 50%',
+                }}
+              >
+                {planets.map((_, index) => {
+                  const radius = 300 + (index * 150)
+                  return (
+                    <circle
+                      key={`orbit-${index}`}
+                      cx="50%"
+                      cy="50%"
+                      r={radius}
+                      fill="none"
+                      stroke="rgba(6, 182, 212, 0.2)"
+                      strokeWidth="2"
+                      strokeDasharray="8,8"
+                    />
+                  )
+                })}
+              </svg>
+
+              <div className="absolute inset-0" style={{ transform: `scale(${zoomLevel})`, transformOrigin: '50% 50%' }}>
+                {planets.map((planet, index) => {
+                  const radius = 300 + (index * 150)
+                  const angle = (index * 137.5) * (Math.PI / 180)
+                  const centerX = 50
+                  const centerY = 50
+                  const x = centerX + (radius * Math.cos(angle)) / 25
+                  const y = centerY + (radius * Math.sin(angle)) / 25
+                  
+                  return (
+                    <div
+                      key={planet.id || formatCoordinate(planet.coordinate) || index}
+                      className="absolute group cursor-pointer"
+                      style={{
+                        left: `${x}%`,
+                        top: `${y}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                      onClick={() => handlePlanetClick(planet)}
+                    >
+                      <div className="relative">
+                        <img
+                          src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+                          alt={planet?.type?.name || 'Planet'}
+                          className={cn(
+                            "w-56 h-56 object-contain filter drop-shadow-2xl transition-all duration-300",
+                            "group-hover:scale-125",
+                            "group-hover:brightness-125"
+                          )}
+                          style={{ imageRendering: 'auto' }}
+                        />
+                        <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 w-full text-center mt-2">
+                          <h3 className="text-base font-heading glow-cyan truncate">{planet.name}</h3>
+                          <p className="text-xs text-muted-foreground font-mono mt-1">
+                            {formatCoordinate(planet.coordinate)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="absolute -top-40 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-72">
+                        <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-4 shadow-xl">
+                          <div className="space-y-1 max-w-[180px] mr-[30px] ml-auto">
+                            <div className="text-xs font-semibold text-foreground mb-1">
+                              {planet.name}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">T:</span>
+                              <span className="text-xs font-mono text-tellerium">{formatResource(planet.tellerium_balance)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">K:</span>
+                              <span className="text-xs font-mono text-krypton">{formatResource(planet.krypton_balance)}</span>
+                            </div>
+                            <div className="pt-1 border-t border-border/50">
+                              <span className="text-xs text-muted-foreground capitalize">{planet.type?.name || planet.type?.slug}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+          <PlanetActionPanel
+            planet={selectedPlanet}
+            isOpen={!!selectedPlanet}
+            onClose={handlePlanetPanelClose}
+            onRefresh={() => {}}
+          />
+        </>
+      )
     }
   }
 

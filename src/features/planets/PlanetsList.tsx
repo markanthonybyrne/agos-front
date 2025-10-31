@@ -41,7 +41,7 @@ export function PlanetsList() {
     )
   }
 
-  const planets = Array.isArray(data?.planets) ? data.planets : []
+        const planets = Array.isArray(data?.planets) ? data.planets : []
 
   if (planets.length === 0) {
     return (
@@ -139,7 +139,7 @@ export function PlanetsList() {
             
             return (
               <div
-                key={planet.id}
+            key={planet.id}
                 className="absolute group cursor-pointer"
                 style={{
                   left: `${x}%`,
@@ -147,11 +147,11 @@ export function PlanetsList() {
                   transform: 'translate(-50%, -50%)',
                 }}
                 onClick={() => handlePlanetClick(planet)}
-              >
+          >
                 {/* Planet image */}
                 <div className="relative">
-                  <img
-                    src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+                <img
+                  src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
                     alt={planet?.type?.name || 'Planet'}
                     className={cn(
                       "w-56 h-56 object-contain filter drop-shadow-2xl transition-all duration-300",
@@ -185,15 +185,15 @@ export function PlanetsList() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">T:</span>
                         <span className="text-xs font-mono text-tellerium">{formatResource(planet.tellerium_balance)}</span>
-                      </div>
+                  </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">K:</span>
                         <span className="text-xs font-mono text-krypton">{formatResource(planet.krypton_balance)}</span>
-                      </div>
+                </div>
                       <div className="pt-1 border-t border-border/50">
                         <span className="text-xs text-muted-foreground capitalize">{planet.type?.name || planet.type?.slug}</span>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                   </div>
                 </div>
               </div>

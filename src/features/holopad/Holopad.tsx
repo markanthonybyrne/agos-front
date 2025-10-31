@@ -58,22 +58,22 @@ export function Holopad() {
     }
   }, [error, dispatch, navigate])
 
-  useEffect(() => {
-    const d: any = data || {}
-    const tickFromMe = d.current_tick ?? d.tick_timing?.current_tick ?? d.tick?.current ?? d.currentTick ?? d.tickNumber ?? d.next_tick?.tick_number
+        useEffect(() => {
+          const d: any = data || {}
+          const tickFromMe = d.current_tick ?? d.tick_timing?.current_tick ?? d.tick?.current ?? d.currentTick ?? d.tickNumber ?? d.next_tick?.tick_number
     const etaFromMe = d.next_tick_eta ?? d.tick_timing?.next_tick_eta ?? d.next_tick?.next_eta ?? d.next_tick_at ?? d.nextTickEta ?? (typeof d.next_tick?.eta_seconds === 'number' ? new Date(Date.now() + d.next_tick.eta_seconds * 1000).toISOString() : undefined)
-    if (tickFromMe && etaFromMe) {
-      dispatch(
-        setTick({
-          tick: Number(tickFromMe),
-          nextTickETA: String(etaFromMe),
-        })
-      )
-    }
-    if (d.empire) {
-      dispatch(updateEmpire(d.empire))
-    }
-  }, [data, dispatch])
+          if (tickFromMe && etaFromMe) {
+            dispatch(
+              setTick({
+                tick: Number(tickFromMe),
+                nextTickETA: String(etaFromMe),
+              })
+            )
+          }
+          if (d.empire) {
+            dispatch(updateEmpire(d.empire))
+          }
+        }, [data, dispatch])
 
   const d: any = data || {}
   const currentTick = useAppSelector((state) => state.game.currentTick) || d.current_tick || d.tick_timing?.current_tick || d.tick?.current || d.currentTick || d.tickNumber || d.next_tick?.tick_number
@@ -215,7 +215,7 @@ export function Holopad() {
             currentTick={currentTick || 0}
             nextTickETA={nextTickETA || ''}
           />
-        </div>
+          </div>
 
         {/* Fleet Operations Widget */}
         <div key="operations">
@@ -225,8 +225,8 @@ export function Holopad() {
             onMinimize={() => handleMinimizeWidget('operations')}
             onClose={() => handleCloseWidget('operations')}
             isMinimized={minimizedWidgets.has('operations')}
-          />
-        </div>
+                  />
+                </div>
 
         {/* Resources Widget */}
         <div key="resources">
@@ -238,8 +238,8 @@ export function Holopad() {
             onMinimize={() => handleMinimizeWidget('resources')}
             onClose={() => handleCloseWidget('resources')}
             isMinimized={minimizedWidgets.has('resources')}
-          />
-        </div>
+                  />
+                </div>
 
         {/* Planets Widget */}
         <div key="planets">
@@ -262,7 +262,7 @@ export function Holopad() {
             onClose={() => handleCloseWidget('status')}
             isMinimized={minimizedWidgets.has('status')}
           />
-        </div>
+                </div>
       </GridLayout>
 
       {/* Active Operations Widget - Conditional */}

@@ -52,8 +52,7 @@ const HUD_BUTTONS: HUDButton[] = [
     id: 'map',
     icon: Map,
     label: 'Map',
-    panelType: PanelType.GALAXY_MAP,
-    panelSize: PanelSize.FULL_HEIGHT,
+    route: '/map',
     color: 'text-space-blue',
   },
   {
@@ -117,6 +116,15 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
     )}>
       <div className="container mx-auto px-4 py-2">
         <div className="flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex-shrink-0 mr-4">
+            <img 
+              src="/assets/images/logo.png" 
+              alt="War For Galaxy" 
+              className="h-8 w-auto object-contain"
+            />
+          </div>
+
           {/* HUD Buttons - Centered */}
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 justify-center">
             {HUD_BUTTONS.map((button) => {
