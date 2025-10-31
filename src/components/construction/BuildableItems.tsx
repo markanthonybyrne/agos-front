@@ -1,12 +1,9 @@
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { BuildableItems as BuildableItemsType, BuildableItem } from '@/types/api.types'
 import { formatResource, formatNumber } from '@/lib/formatters'
-import { usePrerequisites } from '@/hooks/usePrerequisites'
 import { 
   Settings, 
   Shield, 
@@ -14,11 +11,8 @@ import {
   FlaskConical, 
   Plus,
   CheckCircle,
-  XCircle,
   Clock,
-  Zap,
-  Lock,
-  AlertCircle
+  Zap
 } from 'lucide-react'
 
 interface BuildableItemsProps {
@@ -59,29 +53,30 @@ export function BuildableItems({
     )
   }
 
+  // Helper function to safely get arrays
+  // Handles both arrays and objects with numeric keys (array-like objects)
+  const safeArray = (arr: any): any[] => {
+    if (Array.isArray(arr)) {
+      return arr
+    }
+    if (arr && typeof arr === 'object') {
+      // Convert object to array by taking its values
+      const values = Object.values(arr)
+      // Filter out any undefined/null values and ensure we have valid items
+      return values.filter(item => item != null && typeof item === 'object')
+    }
+    return []
+  }
+
   // Debug logging
   console.log('BuildableItems in component:', buildableItems)
   console.log('Facilities type:', typeof buildableItems?.facilities, Array.isArray(buildableItems?.facilities))
-
-  // Helper function to safely get arrays
-  const safeArray = (arr: any): any[] => {
-    return Array.isArray(arr) ? arr : []
-  }
-
-  // Get all buildable items for prerequisites checking
-  const allItems = [
-    ...safeArray(buildableItems?.facilities),
-    ...safeArray(buildableItems?.defences),
-    ...safeArray(buildableItems?.ships),
-    ...safeArray(buildableItems?.research),
-  ]
-
-  const {
-    canBuildItem,
-    getMissingPrerequisites,
-    getCompletedPrerequisites,
-    getCompletionPercentage,
-  } = usePrerequisites(planetId, allItems)
+  
+  // Test safeArray with logging
+  const facilitiesArray = safeArray(buildableItems?.facilities)
+  const shipsArray = safeArray(buildableItems?.ships)
+  console.log('Extracted facilities array:', facilitiesArray.length, facilitiesArray)
+  console.log('Extracted ships array:', shipsArray.length, shipsArray)
 
   const getItemIcon = (type: string) => {
     switch (type) {
@@ -115,39 +110,24 @@ export function BuildableItems({
 
   const renderItem = (item: BuildableItem, type: string) => {
     const Icon = getItemIcon(type)
-    const canBuild = canBuildItem(item.slug)
-    const missingPrerequisites = getMissingPrerequisites(item.slug)
-    const completedPrerequisites = getCompletedPrerequisites(item.slug)
-    const completionPercentage = getCompletionPercentage(item.slug)
     const costTellerium = 'tellerium_cost' in item ? (item as any).tellerium_cost : item.base_tellerium_cost
     const costKrypton = 'krypton_cost' in item ? (item as any).krypton_cost : item.base_krypton_cost
 
     return (
       <div
         key={item.slug}
-        className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-          canBuild 
-            ? 'bg-muted/10 border-border/50 hover:bg-muted/20' 
-            : 'bg-muted/5 border-border/30 opacity-75'
-        }`}
+        className="flex items-center justify-between p-4 rounded-lg border transition-colors bg-muted/10 border-border/50 hover:bg-muted/20"
       >
         <div className="flex items-center gap-3 flex-1">
           <div className="relative">
             <Icon className={`w-5 h-5 ${getItemColor(type)}`} />
-            {!canBuild && (
-              <Lock className="w-3 h-3 text-red-400 absolute -top-1 -right-1" />
-            )}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className={`font-medium ${!canBuild ? 'text-muted-foreground' : ''}`}>
+              <h4 className="font-medium">
                 {item.name}
               </h4>
-              {canBuild ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
-              ) : (
-                <XCircle className="w-4 h-4 text-red-400" />
-              )}
+              <CheckCircle className="w-4 h-4 text-green-400" />
             </div>
             <p className="text-sm text-muted-foreground mb-2">
               {item.description}
@@ -172,89 +152,17 @@ export function BuildableItems({
                 </span>
               </div>
             </div>
-            
-            {/* Prerequisites Display */}
-            {(completedPrerequisites.length > 0 || missingPrerequisites.length > 0) && (
-              <div className="mt-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-xs text-muted-foreground">Prerequisites:</p>
-                  <div className="flex-1 bg-muted/20 rounded-full h-1.5">
-                    <div 
-                      className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                      style={{ width: `${completionPercentage}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {Math.round(completionPercentage)}%
-                  </span>
-                </div>
-                
-                <div className="flex flex-wrap gap-1">
-                  {completedPrerequisites.map((prereq, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="text-xs text-green-400 border-green-400/50"
-                    >
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      {prereq.replace(/_/g, ' ')}
-                    </Badge>
-                  ))}
-                  {missingPrerequisites.map((prereq, index) => (
-                    <Badge
-                      key={index}
-                      variant="destructive"
-                      className="text-xs"
-                    >
-                      <XCircle className="w-3 h-3 mr-1" />
-                      {prereq.replace(/_/g, ' ')}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
         
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                onClick={() => onBuildItem(type, item.slug)}
-                disabled={!canBuild}
-                className="ml-4"
-              >
-                {canBuild ? (
-                  <>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Build
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 mr-1" />
-                    Locked
-                  </>
-                )}
-              </Button>
-            </TooltipTrigger>
-            {!canBuild && missingPrerequisites.length > 0 && (
-              <TooltipContent>
-                <div className="max-w-xs">
-                  <p className="font-medium mb-1">Missing Prerequisites:</p>
-                  <ul className="text-xs space-y-1">
-                    {missingPrerequisites.map((prereq, index) => (
-                      <li key={index} className="flex items-center gap-1">
-                        <XCircle className="w-3 h-3 text-red-400" />
-                        {prereq.replace(/_/g, ' ')}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          size="sm"
+          onClick={() => onBuildItem(type, item.slug)}
+          className="ml-4"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Build
+        </Button>
       </div>
     )
   }
