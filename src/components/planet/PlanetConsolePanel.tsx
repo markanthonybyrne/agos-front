@@ -53,7 +53,7 @@ export function PlanetConsolePanel({ planetId }: PlanetConsolePanelProps) {
       label: 'Facilities',
       description: 'Build and manage facilities',
       panelType: PanelType.TECH_TREE_FACILITIES,
-      panelSize: PanelSize.LARGE,
+      panelSize: PanelSize.XLARGE,
       color: 'text-purple-400',
     },
     {
@@ -62,7 +62,7 @@ export function PlanetConsolePanel({ planetId }: PlanetConsolePanelProps) {
       label: 'Ships',
       description: 'Build ships',
       panelType: PanelType.TECH_TREE_SHIPS,
-      panelSize: PanelSize.LARGE,
+      panelSize: PanelSize.XLARGE,
       color: 'text-blue-400',
     },
     {
@@ -71,7 +71,7 @@ export function PlanetConsolePanel({ planetId }: PlanetConsolePanelProps) {
       label: 'Defenses',
       description: 'Build defenses',
       panelType: PanelType.TECH_TREE_DEFENSES,
-      panelSize: PanelSize.LARGE,
+      panelSize: PanelSize.XLARGE,
       color: 'text-red-400',
     },
     {
@@ -80,7 +80,7 @@ export function PlanetConsolePanel({ planetId }: PlanetConsolePanelProps) {
       label: 'Research',
       description: 'Conduct research',
       panelType: PanelType.TECH_TREE_RESEARCH,
-      panelSize: PanelSize.LARGE,
+      panelSize: PanelSize.XLARGE,
       color: 'text-green-400',
     },
     {
