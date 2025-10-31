@@ -195,19 +195,7 @@ export function Holopad() {
   }
 
   return (
-    <div className="px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-4xl font-heading glow-cyan mb-2">Command Center</h1>
-        <p className="text-muted-foreground flex items-center gap-2">
-          <span>✨ Customize your dashboard:</span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-cyan/10 border border-cyan/20 text-cyan-400 text-sm">
-            <span>Click and drag</span>
-            <span className="opacity-50">•</span>
-            <span>Resize by corners</span>
-          </span>
-        </p>
-      </div>
-
+    <div className="px-6 py-8 holopad-enter">
       <GridLayout
         className="layout"
         layout={layout}

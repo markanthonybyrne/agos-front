@@ -12,6 +12,7 @@ import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { formatResource } from '@/lib/formatters'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 import { cn } from '@/lib/utils'
+import { Planet } from '@/types/api.types'
 
 export function PlanetsList() {
   const navigate = useNavigate()
@@ -55,7 +56,7 @@ export function PlanetsList() {
     )
   }
 
-  const handlePlanetClick = (planet: any) => {
+  const handlePlanetClick = (planet: Planet) => {
     // Trigger click animation
     setClickedPlanetId(planet.id)
     
@@ -119,7 +120,7 @@ export function PlanetsList() {
                       clickedPlanetId === planet.id && "planet-click-animate"
                     )}
                     style={{ imageRendering: 'auto' }}
-                    onError={(e) => {
+                    onError={() => {
                       console.error('Planet image failed to load:', planet?.type?.slug)
                     }}
                   />
