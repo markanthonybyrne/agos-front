@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { BuildingPanel } from '@/components/planet/BuildingPanel'
 import { Planet } from '@/types/api.types'
 import { formatResource, formatNumber } from '@/lib/formatters'
 import { toast } from 'sonner'
@@ -271,22 +272,24 @@ export function DefensesTab({ planet }: DefensesTabProps) {
       </div>
 
       {/* Build Defenses Button */}
-      <div className="flex justify-end">
-        <Dialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Build Defenses
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="panel-glass border-red/20">
-            <DialogHeader>
-              <DialogTitle>Build Defenses</DialogTitle>
-              <DialogDescription>
-                Select a defense type and quantity to build on this planet
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={buildForm.handleSubmit(handleBuildDefences)} className="space-y-4">
+      <div className="flex justify-end mb-6">
+        <Button onClick={() => setBuildDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Build Defenses
+        </Button>
+      </div>
+
+      {/* Building Panel */}
+      <BuildingPanel
+        isOpen={buildDialogOpen}
+        onClose={() => {
+          setBuildDialogOpen(false)
+          buildForm.reset()
+        }}
+        title="Build Defenses"
+        description="Select a defense type and quantity to build on this planet"
+      >
+        <form onSubmit={buildForm.handleSubmit(handleBuildDefences)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="defence_slug">Defense Type</Label>
                 <Select
@@ -334,14 +337,14 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                       <img
                         src={getDefenseImage(selectedDefenceDef.slug)}
                         alt={selectedDefenceDef.name}
-                        className="w-20 h-20 object-contain flex-shrink-0"
+                        className="w-32 h-32 object-contain flex-shrink-0"
                         style={{ imageRendering: 'auto' }}
                       />
                     ) : (
-                      <Shield className="w-20 h-20 text-red-400 opacity-50 flex-shrink-0" />
+                      <Shield className="w-32 h-32 text-red-400 opacity-50 flex-shrink-0" />
                     )}
                     <div className="flex-1">
-                      <h4 className="font-semibold mb-2">{selectedDefenceDef.name}</h4>
+                      <h4 className="font-semibold mb-2 text-lg">{selectedDefenceDef.name}</h4>
                       <p className="text-sm text-muted-foreground mb-3">
                         {selectedDefenceDef.description}
                       </p>
@@ -446,43 +449,43 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                 </div>
               )}
 
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setBuildDialogOpen(false)
-                    buildForm.reset()
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    isBuilding ||
-                    !selectedDefenceDef ||
-                    planet.tellerium_balance < ((selectedDefenceDef?.tellerium_cost || 0) * buildQuantity) ||
-                    planet.krypton_balance < ((selectedDefenceDef?.krypton_cost || 0) * buildQuantity)
-                  }
-                >
-                  {isBuilding ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Building...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Build Defenses
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+          <div className="flex gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setBuildDialogOpen(false)
+                buildForm.reset()
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                isBuilding ||
+                !selectedDefenceDef ||
+                planet.tellerium_balance < ((selectedDefenceDef?.tellerium_cost || 0) * buildQuantity) ||
+                planet.krypton_balance < ((selectedDefenceDef?.krypton_cost || 0) * buildQuantity)
+              }
+              className="flex-1"
+            >
+              {isBuilding ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Building...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Build Defenses
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </BuildingPanel>
 
       {/* Defense Systems */}
       {defencesList.length > 0 ? (

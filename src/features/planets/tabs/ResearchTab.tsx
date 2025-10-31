@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ResearchTree } from '@/components/research/ResearchTree'
 import { Planet } from '@/types/api.types'
 import { formatResource } from '@/lib/formatters'
 import { toast } from 'sonner'
@@ -163,21 +164,56 @@ export function ResearchTab({ planet }: ResearchTabProps) {
         </Card>
       )}
 
-      {/* Available Research */}
+      {/* Visual Research Tree */}
       {availableResearch.length > 0 && (
         <Card className="panel-glass border-cyan/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FlaskConical className="w-5 h-5 text-cyan-400" />
-              Available Research ({availableResearch.length})
+              Research Tree
             </CardTitle>
             <CardDescription>
-              Technologies you can research at this planet
+              Technologies organized by prerequisites - click to research
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableResearch.map((research) => {
+            <ResearchTree
+              researchItems={availableResearch.map(r => ({
+                slug: r.slug,
+                name: r.name,
+                description: r.description,
+                cost_tellerium: r.cost_tellerium,
+                cost_krypton: r.cost_krypton,
+                completed: r.completed,
+                can_research: r.can_research,
+                prerequisite_research: r.prerequisite_research,
+                prerequisite_facilities: r.prerequisite_facilities,
+              }))}
+              completedResearch={completedResearch}
+              planetTellerium={planet.tellerium_balance}
+              planetKrypton={planet.krypton_balance}
+              onResearchClick={(slug) => {
+                const research = availableResearch.find(r => r.slug === slug)
+                if (research) {
+                  const canAffordTellerium = planet.tellerium_balance >= research.cost_tellerium
+                  const canAffordKrypton = planet.krypton_balance >= research.cost_krypton
+                  const canAfford = canAffordTellerium && canAffordKrypton
+                  if (research.can_research && canAfford && !research.completed) {
+                    handleStartResearch(slug)
+                  }
+                }
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detailed Research List (Optional - can be hidden with a toggle) */}
+      {availableResearch.length > 0 && (
+        <details className="panel-glass border-cyan/20 rounded-lg p-4">
+          <summary className="cursor-pointer font-semibold mb-4">View Detailed List</summary>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {availableResearch.map((research) => {
                 const canAffordTellerium = planet.tellerium_balance >= research.cost_tellerium
                 const canAffordKrypton = planet.krypton_balance >= research.cost_krypton
                 const canAfford = canAffordTellerium && canAffordKrypton
@@ -488,8 +524,7 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                 )
               })}
             </div>
-          </CardContent>
-        </Card>
+          </details>
       )}
 
       {/* No Available Research */}

@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BuildingPanel } from '@/components/planet/BuildingPanel'
+import { VisualItemGrid } from '@/components/planet/VisualItemGrid'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Planet } from '@/types/api.types'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
@@ -298,83 +300,133 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
       )}
 
       {/* Build Facility Button */}
-      <div className="flex justify-end">
-        <Dialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Build Facility
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="panel-glass border-cyan/20">
-            <DialogHeader>
-              <DialogTitle>Build New Facility</DialogTitle>
-              <DialogDescription>
-                Select a facility type and initial level to build on this planet
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={buildForm.handleSubmit(handleBuildFacility)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="facility_slug">Facility Type</Label>
-                <Select
-                  value={buildForm.watch('facility_slug')}
-                  onValueChange={(value) => buildForm.setValue('facility_slug', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select facility type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableFacilities.map((facility) => (
-                      <SelectItem key={facility.slug} value={facility.slug}>
-                        {facility.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {buildForm.formState.errors.facility_slug && (
-                  <p className="text-sm text-destructive">
-                    {buildForm.formState.errors.facility_slug.message}
-                  </p>
+      <div className="flex justify-end mb-6">
+        <Button onClick={() => setBuildDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Build Facility
+        </Button>
+      </div>
+
+      {/* Building Panel */}
+      <BuildingPanel
+        isOpen={buildDialogOpen}
+        onClose={() => {
+          setBuildDialogOpen(false)
+          buildForm.reset()
+        }}
+        title="Build New Facility"
+        description="Select a facility type and initial level to build on this planet"
+      >
+        <form onSubmit={buildForm.handleSubmit(handleBuildFacility)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="facility_slug">Facility Type</Label>
+            <Select
+              value={buildForm.watch('facility_slug')}
+              onValueChange={(value) => buildForm.setValue('facility_slug', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select facility type" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableFacilities.map((facility) => (
+                  <SelectItem key={facility.slug} value={facility.slug}>
+                    {facility.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {buildForm.formState.errors.facility_slug && (
+              <p className="text-sm text-destructive">
+                {buildForm.formState.errors.facility_slug.message}
+              </p>
+            )}
+          </div>
+
+          {selectedFacilityDef && (
+            <div className="space-y-4 p-4 bg-muted/20 rounded-lg">
+              <div className="flex items-start gap-4">
+                {getFacilityImage(selectedFacilityDef.slug) ? (
+                  <img
+                    src={getFacilityImage(selectedFacilityDef.slug)}
+                    alt={selectedFacilityDef.name}
+                    className="w-32 h-32 object-contain flex-shrink-0"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                ) : (
+                  <Building className="w-32 h-32 text-purple-400 opacity-50 flex-shrink-0" />
                 )}
+                <div className="flex-1">
+                  <h4 className="font-semibold mb-2 text-lg">{selectedFacilityDef.name}</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {selectedFacilityDef.description}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="level">Initial Level</Label>
+                <Input
+                  id="level"
+                  type="number"
+                  min="1"
+                  max="10"
+                  {...buildForm.register('level', { valueAsNumber: true })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Default: 1 (can be upgraded later)
+                </p>
               </div>
 
-              {selectedFacilityDef && (
-                <div className="space-y-4 p-4 bg-muted/20 rounded-lg">
-                  <div className="flex items-start gap-4">
-                    {getFacilityImage(selectedFacilityDef.slug) ? (
-                      <img
-                        src={getFacilityImage(selectedFacilityDef.slug)}
-                        alt={selectedFacilityDef.name}
-                        className="w-20 h-20 object-contain flex-shrink-0"
-                        style={{ imageRendering: 'auto' }}
-                      />
-                    ) : (
-                      <Building className="w-20 h-20 text-purple-400 opacity-50 flex-shrink-0" />
-                    )}
-                    <div className="flex-1">
-                      <h4 className="font-semibold mb-2">{selectedFacilityDef.name}</h4>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {selectedFacilityDef.description}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="level">Initial Level</Label>
-                    <Input
-                      id="level"
-                      type="number"
-                      min="1"
-                      max="10"
-                      {...buildForm.register('level', { valueAsNumber: true })}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <h5 className="text-sm font-semibold">Cost:</h5>
+                <div className="flex justify-between text-sm items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getTelleriumImage()}
+                      alt="T"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Default: 1 (can be upgraded later)
-                    </p>
+                    <span className="text-tellerium">Tellerium:</span>
                   </div>
+                  <span className={`font-mono ${
+                    planet.tellerium_balance >= selectedFacilityDef.base_tellerium_cost
+                      ? 'text-tellerium'
+                      : 'text-destructive'
+                  }`}>
+                    {formatResource(selectedFacilityDef.base_tellerium_cost)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getKryptonImage()}
+                      alt="K"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span className="text-krypton">Krypton:</span>
+                  </div>
+                  <span className={`font-mono ${
+                    planet.krypton_balance >= selectedFacilityDef.base_krypton_cost
+                      ? 'text-krypton'
+                      : 'text-destructive'
+                  }`}>
+                    {formatResource(selectedFacilityDef.base_krypton_cost)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Build Time:</span>
+                  <span className="text-muted-foreground">
+                    {selectedFacilityDef.build_time_ticks || 0} ticks
+                  </span>
+                </div>
+              </div>
 
-                  <div className="space-y-2 pt-2 border-t border-border">
-                    <h5 className="text-sm font-semibold">Cost:</h5>
+              {(selectedFacilityDef.production_tellerium || selectedFacilityDef.production_krypton || selectedFacilityDef.energy_consumption) && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <h5 className="text-sm font-semibold">Production:</h5>
+                  {selectedFacilityDef.production_tellerium && (
                     <div className="flex justify-between text-sm items-center">
                       <div className="flex items-center gap-1.5">
                         <img
@@ -385,14 +437,12 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                         />
                         <span className="text-tellerium">Tellerium:</span>
                       </div>
-                      <span className={`font-mono ${
-                        planet.tellerium_balance >= selectedFacilityDef.base_tellerium_cost
-                          ? 'text-tellerium'
-                          : 'text-destructive'
-                      }`}>
-                        {formatResource(selectedFacilityDef.base_tellerium_cost)}
+                      <span className="text-tellerium">
+                        +{formatNumber(selectedFacilityDef.production_tellerium)}/tick
                       </span>
                     </div>
+                  )}
+                  {selectedFacilityDef.production_krypton && (
                     <div className="flex justify-between text-sm items-center">
                       <div className="flex items-center gap-1.5">
                         <img
@@ -403,117 +453,71 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                         />
                         <span className="text-krypton">Krypton:</span>
                       </div>
-                      <span className={`font-mono ${
-                        planet.krypton_balance >= selectedFacilityDef.base_krypton_cost
-                          ? 'text-krypton'
-                          : 'text-destructive'
-                      }`}>
-                        {formatResource(selectedFacilityDef.base_krypton_cost)}
+                      <span className="text-krypton">
+                        +{formatNumber(selectedFacilityDef.production_krypton)}/tick
                       </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Build Time:</span>
-                      <span className="text-muted-foreground">
-                        {selectedFacilityDef.build_time_ticks || 0} ticks
-                      </span>
-                    </div>
-                  </div>
-
-                  {(selectedFacilityDef.production_tellerium || selectedFacilityDef.production_krypton || selectedFacilityDef.energy_consumption) && (
-                    <div className="space-y-2 pt-2 border-t border-border">
-                      <h5 className="text-sm font-semibold">Production:</h5>
-                      {selectedFacilityDef.production_tellerium && (
-                        <div className="flex justify-between text-sm items-center">
-                          <div className="flex items-center gap-1.5">
-                            <img
-                              src={getTelleriumImage()}
-                              alt="T"
-                              className="w-4 h-4 object-contain"
-                              style={{ imageRendering: 'auto' }}
-                            />
-                            <span className="text-tellerium">Tellerium:</span>
-                          </div>
-                          <span className="text-tellerium">
-                            +{formatNumber(selectedFacilityDef.production_tellerium)}/tick
-                          </span>
-                        </div>
-                      )}
-                      {selectedFacilityDef.production_krypton && (
-                        <div className="flex justify-between text-sm items-center">
-                          <div className="flex items-center gap-1.5">
-                            <img
-                              src={getKryptonImage()}
-                              alt="K"
-                              className="w-4 h-4 object-contain"
-                              style={{ imageRendering: 'auto' }}
-                            />
-                            <span className="text-krypton">Krypton:</span>
-                          </div>
-                          <span className="text-krypton">
-                            +{formatNumber(selectedFacilityDef.production_krypton)}/tick
-                          </span>
-                        </div>
-                      )}
-                      {selectedFacilityDef.energy_consumption && (
-                        <div className="flex justify-between text-sm">
-                          <span>Energy Consumption:</span>
-                          <span className="text-yellow-400">
-                            {selectedFacilityDef.energy_consumption}/tick
-                          </span>
-                        </div>
-                      )}
                     </div>
                   )}
-
-                  {((planet.tellerium_balance < selectedFacilityDef.base_tellerium_cost) ||
-                    (planet.krypton_balance < selectedFacilityDef.base_krypton_cost)) && (
-                    <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-destructive" />
-                      <span className="text-sm text-destructive">
-                        Insufficient resources
+                  {selectedFacilityDef.energy_consumption && (
+                    <div className="flex justify-between text-sm">
+                      <span>Energy Consumption:</span>
+                      <span className="text-yellow-400">
+                        {selectedFacilityDef.energy_consumption}/tick
                       </span>
                     </div>
                   )}
                 </div>
               )}
 
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setBuildDialogOpen(false)
-                    buildForm.reset()
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    isBuilding ||
-                    !selectedFacilityDef ||
-                    planet.tellerium_balance < (selectedFacilityDef?.base_tellerium_cost || 0) ||
-                    planet.krypton_balance < (selectedFacilityDef?.base_krypton_cost || 0)
-                  }
-                >
-                  {isBuilding ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Building...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Build Facility
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              {((planet.tellerium_balance < selectedFacilityDef.base_tellerium_cost) ||
+                (planet.krypton_balance < selectedFacilityDef.base_krypton_cost)) && (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-destructive" />
+                  <span className="text-sm text-destructive">
+                    Insufficient resources
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setBuildDialogOpen(false)
+                buildForm.reset()
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                isBuilding ||
+                !selectedFacilityDef ||
+                planet.tellerium_balance < (selectedFacilityDef?.base_tellerium_cost || 0) ||
+                planet.krypton_balance < (selectedFacilityDef?.base_krypton_cost || 0)
+              }
+              className="flex-1"
+            >
+              {isBuilding ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Building...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Build Facility
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </BuildingPanel>
 
       {/* Facilities Grid */}
       {facilitiesList.length > 0 ? (

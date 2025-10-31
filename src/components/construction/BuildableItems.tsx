@@ -14,6 +14,11 @@ import {
   Clock,
   Zap
 } from 'lucide-react'
+import { VisualItemGrid } from '@/components/planet/VisualItemGrid'
+import { Badge } from '@/components/ui/badge'
+import { getFacilityImage } from '@/lib/facilityImages'
+import { getDefenseImage } from '@/lib/defenseImages'
+import { getShipImage } from '@/lib/shipImages'
 
 interface BuildableItemsProps {
   planetId: number
@@ -108,63 +113,17 @@ export function BuildableItems({
     }
   }
 
-  const renderItem = (item: BuildableItem, type: string) => {
-    const Icon = getItemIcon(type)
-    const costTellerium = 'tellerium_cost' in item ? (item as any).tellerium_cost : item.base_tellerium_cost
-    const costKrypton = 'krypton_cost' in item ? (item as any).krypton_cost : item.base_krypton_cost
-
-    return (
-      <div
-        key={item.slug}
-        className="flex items-center justify-between p-4 rounded-lg border transition-colors bg-muted/10 border-border/50 hover:bg-muted/20"
-      >
-        <div className="flex items-center gap-3 flex-1">
-          <div className="relative">
-            <Icon className={`w-5 h-5 ${getItemColor(type)}`} />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium">
-                {item.name}
-              </h4>
-              <CheckCircle className="w-4 h-4 text-green-400" />
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">
-              {item.description}
-            </p>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <Zap className="w-3 h-3 text-cyan-400" />
-                <span className="text-cyan-400">
-                  {formatResource(costTellerium)} T
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Zap className="w-3 h-3 text-blue-400" />
-                <span className="text-blue-400">
-                  {formatResource(costKrypton)} K
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Clock className="w-3 h-3 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  {formatNumber((item as any).build_time_ticks ?? item.build_time ?? 0)} {((item as any).build_time_ticks || item.build_time) ? 'ticks' : ''}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <Button
-          size="sm"
-          onClick={() => onBuildItem(type, item.slug)}
-          className="ml-4"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Build
-        </Button>
-      </div>
-    )
+  const getItemImage = (item: BuildableItem, type: string): string | undefined => {
+    switch (type) {
+      case 'facilities':
+        return getFacilityImage(item.slug)
+      case 'defences':
+        return getDefenseImage(item.slug)
+      case 'ships':
+        return getShipImage(item.slug)
+      default:
+        return undefined
+    }
   }
 
   const tabs = [
@@ -218,20 +177,50 @@ export function BuildableItems({
               )
             })}
           </TabsList>
-          {tabs.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="mt-4">
-              <div className="space-y-3">
+          {tabs.map((tab) => {
+            return (
+              <TabsContent key={tab.id} value={tab.id} className="mt-4">
                 {tab.items.length > 0 ? (
-                  tab.items.map((item) => renderItem(item, tab.id))
+                  <VisualItemGrid
+                    items={tab.items
+                      .filter((item) => item != null && typeof item === 'object' && item.slug) // Filter out null/undefined/invalid items
+                      .map((item) => {
+                        // Safely check for cost properties
+                        const costT = item != null && typeof item === 'object' && 'tellerium_cost' in item
+                          ? (item as any).tellerium_cost
+                          : (item?.base_tellerium_cost ?? 0)
+                        const costK = item != null && typeof item === 'object' && 'krypton_cost' in item
+                          ? (item as any).krypton_cost
+                          : (item?.base_krypton_cost ?? 0)
+                        
+                        return {
+                          id: item?.slug || 'unknown',
+                          name: item?.name || 'Unknown',
+                          image: getItemImage(item, tab.id),
+                          imageAlt: item?.name || 'Unknown',
+                          description: `${formatResource(costT)} T, ${formatResource(costK)} K`,
+                          badge: (
+                            <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Ready
+                            </Badge>
+                          ),
+                          onClick: () => item?.slug && onBuildItem(tab.id, item.slug),
+                        }
+                      })
+                    }
+                    columns={4}
+                  />
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <tab.icon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No {tab.label.toLowerCase()} available</p>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <tab.icon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No {tab.label.toLowerCase()} available</p>
+                    <p className="text-sm mt-2">Complete prerequisites to unlock more items</p>
                   </div>
                 )}
-              </div>
-            </TabsContent>
-          ))}
+              </TabsContent>
+            )
+          })}
         </Tabs>
       </CardContent>
     </Card>

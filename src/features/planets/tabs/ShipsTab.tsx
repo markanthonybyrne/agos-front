@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { BuildingPanel } from '@/components/planet/BuildingPanel'
 import { Planet } from '@/types/api.types'
 import { formatResource } from '@/lib/formatters'
 import { toast } from 'sonner'
@@ -359,22 +359,24 @@ export function ShipsTab({ planet }: ShipsTabProps) {
       </div>
 
       {/* Build Ships Button */}
-      <div className="flex justify-end">
-        <Dialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Build Ships
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="panel-glass border-blue/20">
-            <DialogHeader>
-              <DialogTitle>Build Ships</DialogTitle>
-              <DialogDescription>
-                Select a ship type and quantity to build on this planet
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={buildForm.handleSubmit(handleBuildShips)} className="space-y-4">
+      <div className="flex justify-end mb-6">
+        <Button onClick={() => setBuildDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Build Ships
+        </Button>
+      </div>
+
+      {/* Building Panel */}
+      <BuildingPanel
+        isOpen={buildDialogOpen}
+        onClose={() => {
+          setBuildDialogOpen(false)
+          buildForm.reset()
+        }}
+        title="Build Ships"
+        description="Select a ship type and quantity to build on this planet"
+      >
+        <form onSubmit={buildForm.handleSubmit(handleBuildShips)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="ship_slug">Ship Type</Label>
                 <Select
@@ -429,11 +431,23 @@ export function ShipsTab({ planet }: ShipsTabProps) {
 
               {selectedShipDef && (
                 <div className="space-y-4 p-4 bg-muted/20 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold mb-2">{selectedShipDef.name}</h4>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {selectedShipDef.description}
-                    </p>
+                  <div className="flex items-start gap-4">
+                    {getShipImage(selectedShipDef.slug) ? (
+                      <img
+                        src={getShipImage(selectedShipDef.slug)}
+                        alt={selectedShipDef.name}
+                        className="w-32 h-32 object-contain flex-shrink-0"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Ship className="w-32 h-32 text-blue-400 opacity-50 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold mb-2 text-lg">{selectedShipDef.name}</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {selectedShipDef.description}
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="space-y-2 pt-2 border-t border-border">
@@ -556,43 +570,43 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                 </div>
               )}
 
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setBuildDialogOpen(false)
-                    buildForm.reset()
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    isBuilding ||
-                    !selectedShipDef ||
-                    planet.tellerium_balance < ((selectedShipDef?.tellerium_cost || 0) * buildQuantity) ||
-                    planet.krypton_balance < ((selectedShipDef?.krypton_cost || 0) * buildQuantity)
-                  }
-                >
-                  {isBuilding ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Building...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Build Ships
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+          <div className="flex gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setBuildDialogOpen(false)
+                buildForm.reset()
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                isBuilding ||
+                !selectedShipDef ||
+                planet.tellerium_balance < ((selectedShipDef?.tellerium_cost || 0) * buildQuantity) ||
+                planet.krypton_balance < ((selectedShipDef?.krypton_cost || 0) * buildQuantity)
+              }
+              className="flex-1"
+            >
+              {isBuilding ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Building...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Build Ships
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </BuildingPanel>
 
       {/* Ship List */}
       {shipsList.length > 0 ? (

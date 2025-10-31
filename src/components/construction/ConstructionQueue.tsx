@@ -18,6 +18,10 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { getFacilityImage } from '@/lib/facilityImages'
+import { getDefenseImage } from '@/lib/defenseImages'
+import { getShipImage } from '@/lib/shipImages'
 import { toast } from 'sonner'
 import { apiSlice } from '@/api/apiSlice'
 import { useAppSelector } from '@/app/hooks'
@@ -84,6 +88,19 @@ export function ConstructionQueue({
         return 'text-green-400'
       default:
         return 'text-muted-foreground'
+    }
+  }
+
+  const getItemImage = (type: string, slug: string): string | undefined => {
+    switch (type) {
+      case 'facility':
+        return getFacilityImage(slug)
+      case 'defence':
+        return getDefenseImage(slug)
+      case 'ship':
+        return getShipImage(slug)
+      default:
+        return undefined
     }
   }
 
@@ -221,52 +238,82 @@ export function ConstructionQueue({
         {constructions.map((construction) => {
           const Icon = getItemIcon(construction.type)
           const isCancelling = cancellingId === construction.id
+          const itemImage = getItemImage(construction.type, construction.item_slug)
+          const total = (construction as any).build_time_ticks ?? (construction as any).build_time ?? 0
+          const remaining = (construction as any).ticks_remaining ?? 0
+          const done = Math.max(0, total - remaining)
+          const progressPercent = total > 0 ? Math.min(100, (done / total) * 100) : 0
 
           return (
-            <div
+            <Card
               key={construction.id}
-              className="flex items-center justify-between p-4 bg-muted/10 rounded-lg border border-border/50"
+              className="panel-glass border-border/50 hover:border-primary/30 transition-all"
             >
-              <div className="flex items-center gap-3 flex-1">
-                <Icon className={`w-5 h-5 ${getItemColor(construction.type)}`} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-medium">{construction.item_slug.replace(/_/g, ' ')}</h4>
-                    <Badge variant="outline" className="text-xs">
-                      {construction.type}
-                    </Badge>
-                    {construction.quantity > 1 && (
-                      <Badge variant="secondary" className="text-xs">
-                        x{construction.quantity}
-                      </Badge>
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  {/* Large Image */}
+                  <div className="flex-shrink-0">
+                    {itemImage ? (
+                      <img
+                        src={itemImage}
+                        alt={construction.item_slug.replace(/_/g, ' ')}
+                        className="w-32 h-32 object-contain large-image-display"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <div className="w-32 h-32 bg-muted/20 rounded-lg flex items-center justify-center">
+                        <Icon className={`w-16 h-16 ${getItemColor(construction.type)} opacity-50`} />
+                      </div>
                     )}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      <span>Completes: {formatDateTime(construction.completes_at)}</span>
+                  
+                  {/* Info and Progress */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="text-lg font-semibold">
+                            {construction.item_slug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </h4>
+                          <Badge variant="outline" className="text-xs">
+                            {construction.type}
+                          </Badge>
+                          {construction.quantity > 1 && (
+                            <Badge variant="secondary" className="text-xs">
+                              x{construction.quantity}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="w-4 h-4" />
+                          <span>Completes: {formatDateTime(construction.completes_at)}</span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCancel(construction)}
+                        disabled={isCancelling || construction.is_completed}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                      >
+                        <X className="w-5 h-5" />
+                      </Button>
                     </div>
-                    <div className="text-xs mt-1">
-                      {(() => {
-                        const total = (construction as any).build_time_ticks ?? (construction as any).build_time ?? 0
-                        const remaining = (construction as any).ticks_remaining ?? 0
-                        const done = Math.max(0, total - remaining)
-                        return <>Progress: {done}/{total} {total ? 'ticks' : ''}</>
-                      })()}
+                    
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-mono">
+                          {done}/{total} {total ? 'ticks' : ''} ({Math.round(progressPercent)}%)
+                        </span>
+                      </div>
+                      <Progress value={progressPercent} className="h-3" />
                     </div>
                   </div>
                 </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleCancel(construction)}
-                disabled={isCancelling || construction.is_completed}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+              </CardContent>
+            </Card>
           )
         })}
       </CardContent>

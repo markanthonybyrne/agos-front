@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, MapPin, Zap, Shield, Ship, Settings, FlaskConical, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { getPlanetImage } from '@/lib/planetImages'
@@ -19,24 +19,13 @@ import { ResearchTab } from './tabs/ResearchTab'
 import { ConstructionQueue } from '@/components/construction/ConstructionQueue'
 import { BuildableItems } from '@/components/construction/BuildableItems'
 import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
-
-type TabType = 'overview' | 'facilities' | 'resources' | 'fleets' | 'defenses' | 'ships' | 'research' | 'buildable'
-
-const tabs = [
-  { id: 'overview' as TabType, label: 'Overview', icon: MapPin },
-  { id: 'buildable' as TabType, label: 'Buildable', icon: Settings },
-  { id: 'facilities' as TabType, label: 'Facilities', icon: Settings },
-  { id: 'ships' as TabType, label: 'Ships', icon: Ship },
-  { id: 'defenses' as TabType, label: 'Defenses', icon: Shield },
-  { id: 'research' as TabType, label: 'Research', icon: FlaskConical },
-  { id: 'resources' as TabType, label: 'Resources', icon: Zap },
-  { id: 'fleets' as TabType, label: 'Fleets', icon: ArrowRight },
-]
+import { ModeSwitcher, ModeType } from '@/components/navigation/ModeSwitcher'
+import { PlanetBackground } from '@/components/planet/PlanetBackground'
 
 export function PlanetDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<TabType>('overview')
+  const [activeMode, setActiveMode] = useState<ModeType>('colony')
 
   const { data: planetData, isLoading, error, refetch: refetchPlanet } = useGetPlanetQuery(Number(id), {
     skip: !id,
@@ -93,31 +82,31 @@ export function PlanetDetail() {
     )
   }
 
-  const renderTabContent = () => {
+  const renderModeContent = () => {
     if (!planet) return null
     
-    switch (activeTab) {
-      case 'overview':
+    switch (activeMode) {
+      case 'system':
         return <OverviewTab planet={planet} />
-      case 'buildable':
+      case 'colony':
         return buildableItems ? (
           <BuildableItems 
             planetId={planet.id} 
             buildableItems={buildableItems}
             onBuildItem={(type, slug) => {
-              // Navigate to the appropriate tab based on type
+              // Navigate to the appropriate mode based on type
               switch (type) {
                 case 'facilities':
-                  setActiveTab('facilities')
+                  setActiveMode('infrastructure')
                   break
                 case 'defences':
-                  setActiveTab('defenses')
+                  setActiveMode('infrastructure')
                   break
                 case 'ships':
-                  setActiveTab('ships')
+                  setActiveMode('production')
                   break
                 case 'research':
-                  setActiveTab('research')
+                  setActiveMode('research')
                   break
                 default:
                   break
@@ -129,16 +118,12 @@ export function PlanetDetail() {
             <div className="text-muted-foreground">Loading buildable items...</div>
           </div>
         )
-      case 'facilities':
+      case 'infrastructure':
         return <FacilitiesTab planet={planet} />
-      case 'ships':
+      case 'production':
         return <ShipsTab planet={planet} />
-      case 'defenses':
-        return <DefensesTab planet={planet} />
       case 'research':
         return <ResearchTab planet={planet} />
-      case 'resources':
-        return <ResourcesTab planet={planet} />
       case 'fleets':
         return <FleetsTab planet={planet} />
       default:
@@ -262,44 +247,30 @@ export function PlanetDetail() {
         </Card>
       </div>
 
-            {/* Construction Queue */}
-            <ConstructionQueue 
-              planetId={planet.id} 
-              onConstructionComplete={() => {
-                // Refresh planet data when construction completes
-                window.location.reload()
-              }}
-            />
+      {/* Construction Queue */}
+      <ConstructionQueue 
+        planetId={planet.id} 
+        onConstructionComplete={() => {
+          // Refresh planet data when construction completes
+          window.location.reload()
+        }}
+      />
 
-            {/* Tabs */}
-            <div className="space-y-6">
-              <div className="flex space-x-1 bg-muted/20 p-1 rounded-lg">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon
-                  return (
-                    <Button
-                      key={tab.id}
-                      variant={activeTab === tab.id ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex-1 ${
-                        activeTab === tab.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 mr-2" />
-                      {tab.label}
-                    </Button>
-                  )
-                })}
-              </div>
+      {/* Mode Switcher */}
+      <ModeSwitcher 
+        activeMode={activeMode}
+        onModeChange={setActiveMode}
+      />
 
-              {/* Tab Content */}
-              <div className="min-h-[400px]">
-                {renderTabContent()}
-              </div>
-            </div>
+      {/* Mode Content with Planet Background */}
+      <PlanetBackground 
+        planetSlug={planet?.type?.slug}
+        className="p-6"
+      >
+        <div className="min-h-[600px]">
+          {renderModeContent()}
+        </div>
+      </PlanetBackground>
     </div>
   )
 }
