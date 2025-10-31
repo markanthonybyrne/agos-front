@@ -11,6 +11,7 @@ import {
 import { PanelSize, PanelType, PanelState } from '@/app/slices/panelSlice'
 import { SlidingPanel } from './SlidingPanel'
 import { useCallback } from 'react'
+import { X } from 'lucide-react'
 import { FacilityTechTree } from '@/components/tech-tree/FacilityTechTree'
 import { ShipTechTree } from '@/components/tech-tree/ShipTechTree'
 import { DefenseTechTree } from '@/components/tech-tree/DefenseTechTree'
@@ -115,28 +116,32 @@ export function PanelManager() {
   }, [dispatch])
 
   // Render panels from state
+  const minimizedPanels = panels.filter(p => p.state === PanelState.MINIMIZED)
+  const normalPanels = panels.filter(p => p.state !== PanelState.MINIMIZED)
+  
+  const titles: Record<PanelType, string> = {
+    [PanelType.TECH_TREE_FACILITIES]: 'Facility Tech Tree',
+    [PanelType.TECH_TREE_SHIPS]: 'Ship Tech Tree',
+    [PanelType.TECH_TREE_DEFENSES]: 'Defense Tech Tree',
+    [PanelType.TECH_TREE_RESEARCH]: 'Research Tech Tree',
+    [PanelType.BUILD_DETAIL]: 'Build Item',
+    [PanelType.FLEET_COMMAND]: 'Fleet Command',
+    [PanelType.VISUAL_COORDINATE]: 'Select Destination',
+    [PanelType.SHIP_SELECTOR]: 'Select Ships',
+    [PanelType.RESEARCH_DETAIL]: 'Research Details',
+    [PanelType.PLANET_VIEW]: 'Planet View',
+    [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
+    [PanelType.GALAXY_MAP]: 'Galaxy Map',
+    [PanelType.MESSAGING]: 'Messages',
+    [PanelType.NOTIFICATIONS]: 'Notifications',
+    [PanelType.RANKINGS]: 'Rankings',
+    [PanelType.SETTINGS]: 'Settings',
+  }
+
   return (
     <>
-      {panels.map((panel) => {
-        const titles: Record<PanelType, string> = {
-          [PanelType.TECH_TREE_FACILITIES]: 'Facility Tech Tree',
-          [PanelType.TECH_TREE_SHIPS]: 'Ship Tech Tree',
-          [PanelType.TECH_TREE_DEFENSES]: 'Defense Tech Tree',
-          [PanelType.TECH_TREE_RESEARCH]: 'Research Tech Tree',
-          [PanelType.BUILD_DETAIL]: 'Build Item',
-          [PanelType.FLEET_COMMAND]: 'Fleet Command',
-          [PanelType.VISUAL_COORDINATE]: 'Select Destination',
-          [PanelType.SHIP_SELECTOR]: 'Select Ships',
-          [PanelType.RESEARCH_DETAIL]: 'Research Details',
-          [PanelType.PLANET_VIEW]: 'Planet View',
-          [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
-          [PanelType.GALAXY_MAP]: 'Galaxy Map',
-          [PanelType.MESSAGING]: 'Messages',
-          [PanelType.NOTIFICATIONS]: 'Notifications',
-          [PanelType.RANKINGS]: 'Rankings',
-          [PanelType.SETTINGS]: 'Settings',
-        }
-
+      {/* Normal open panels */}
+      {normalPanels.map((panel) => {
         // Special handling for PLANET_VIEW with split layout
         if (panel.type === PanelType.PLANET_VIEW && panel.size === PanelSize.FULL_HEIGHT) {
           return (
@@ -184,6 +189,33 @@ export function PanelManager() {
           </SlidingPanel>
         )
       })}
+      
+      {/* Minimized panels as tabs at bottom */}
+      {minimizedPanels.length > 0 && (
+        <div className="fixed bottom-0 left-20 right-0 z-30 flex items-end gap-1 pl-4 pb-0 pointer-events-none">
+          {minimizedPanels.map((panel, index) => (
+            <div
+              key={panel.id}
+              className="relative pointer-events-auto cursor-pointer group"
+              style={{ zIndex: panel.zIndex }}
+            >
+              <button
+                onClick={() => handleMaximize(panel.id)}
+                className="panel-glass border-t border-l border-r rounded-t-lg px-4 py-2 text-sm font-semibold transition-all hover:bg-muted/20 hover:border-cyan/50 whitespace-nowrap"
+              >
+                {titles[panel.type] || 'Panel'}
+              </button>
+              <button
+                onClick={() => handleClose(panel.id)}
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-background/90 border border-border hover:bg-red-500/20 hover:border-red-500/50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-auto"
+                style={{ zIndex: panel.zIndex + 1 }}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   )
 }
