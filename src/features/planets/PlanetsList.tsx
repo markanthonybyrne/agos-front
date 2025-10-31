@@ -104,7 +104,8 @@ export function PlanetsList() {
           style={{ 
             left: '-75%',
             top: '-75%',
-            overflow: 'visible'
+            overflow: 'visible',
+            animation: 'planet-orbit 300s linear infinite',
           }}
         >
           {/* Draw orbital rings */}

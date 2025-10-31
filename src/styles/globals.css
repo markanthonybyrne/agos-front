@@ -983,5 +983,20 @@
   .holopad-exit {
     animation: holopad-exit 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
+  
+  /* Slow orbital animation for planets */
+  @keyframes planet-orbit {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .planet-orbit-container {
+    animation: planet-orbit 120s linear infinite;
+    transform-origin: center center;
+  }
 }
 
