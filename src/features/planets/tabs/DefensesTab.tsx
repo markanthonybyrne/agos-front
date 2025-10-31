@@ -18,6 +18,8 @@ import { formatResource, formatNumber } from '@/lib/formatters'
 import { toast } from 'sonner'
 import { Shield, Zap, AlertTriangle, Target, Bomb, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getDefenseImage } from '@/lib/defenseImages'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 interface DefensesTabProps {
   planet: Planet
@@ -327,30 +329,58 @@ export function DefensesTab({ planet }: DefensesTabProps) {
 
               {selectedDefenceDef && (
                 <div className="space-y-4 p-4 bg-muted/20 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold mb-2">{selectedDefenceDef.name}</h4>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {selectedDefenceDef.description}
-                    </p>
+                  <div className="flex items-start gap-4">
+                    {getDefenseImage(selectedDefenceDef.slug) ? (
+                      <img
+                        src={getDefenseImage(selectedDefenceDef.slug)}
+                        alt={selectedDefenceDef.name}
+                        className="w-20 h-20 object-contain flex-shrink-0"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Shield className="w-20 h-20 text-red-400 opacity-50 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold mb-2">{selectedDefenceDef.name}</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {selectedDefenceDef.description}
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="space-y-2 pt-2 border-t border-border">
                     <h5 className="text-sm font-semibold">Cost:</h5>
-                    <div className="flex justify-between text-sm">
-                      <span>Tellerium:</span>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={getTelleriumImage()}
+                          alt="T"
+                          className="w-4 h-4 object-contain"
+                          style={{ imageRendering: 'auto' }}
+                        />
+                        <span className="text-tellerium">Tellerium:</span>
+                      </div>
                       <span className={`font-mono ${
                         planet.tellerium_balance >= (selectedDefenceDef.tellerium_cost * buildQuantity)
-                          ? 'text-cyan-400'
+                          ? 'text-tellerium'
                           : 'text-destructive'
                       }`}>
                         {formatResource(selectedDefenceDef.tellerium_cost * buildQuantity)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Krypton:</span>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={getKryptonImage()}
+                          alt="K"
+                          className="w-4 h-4 object-contain"
+                          style={{ imageRendering: 'auto' }}
+                        />
+                        <span className="text-krypton">Krypton:</span>
+                      </div>
                       <span className={`font-mono ${
                         planet.krypton_balance >= (selectedDefenceDef.krypton_cost * buildQuantity)
-                          ? 'text-blue-400'
+                          ? 'text-krypton'
                           : 'text-destructive'
                       }`}>
                         {formatResource(selectedDefenceDef.krypton_cost * buildQuantity)}
@@ -462,65 +492,79 @@ export function DefensesTab({ planet }: DefensesTabProps) {
             const definition = definitions?.defences?.find(d => d.slug === dslug)
             const name = definition?.name || (dslug ? dslug.replace(/_/g, ' ') : 'Defence')
             const description = definition?.description || 'Defence system'
+            const defenseImage = getDefenseImage(dslug)
 
             return (
               <Card key={defence.id} className="panel-glass border-red/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-red-400" />
-                    {name}
-                  </CardTitle>
-                  <CardDescription>
-                    {description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Quantity</span>
-                    <Badge variant="outline" className="text-red-400">
-                      {defence.quantity}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2">
-                    {definition && (
-                      <>
-                    <div className="flex justify-between text-sm">
-                      <span>Total Attack Power:</span>
-                      <span className="text-red-400">
-                            {(definition.attack_power ?? 0) * defence.quantity}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Total Defense Power:</span>
-                      <span className="text-blue-400">
-                            {(definition.defence_power ?? 0) * defence.quantity}
-                      </span>
-                    </div>
-                        {(definition.energy_consumption ?? 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>Energy Consumption:</span>
-                        <span className="text-yellow-400">
-                              {(definition.energy_consumption ?? 0) * defence.quantity}/tick
-                        </span>
-                      </div>
-                        )}
-                      </>
+                <div className="flex gap-6 p-6">
+                  {/* Defense Image on Left */}
+                  <div className="flex-shrink-0">
+                    {defenseImage ? (
+                      <img
+                        src={defenseImage}
+                        alt={name}
+                        className="w-40 h-40 object-contain"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Shield className="w-40 h-40 text-red-400 opacity-50" />
                     )}
                   </div>
+                  
+                  {/* Info and Stats on Right */}
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-semibold mb-1">{name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {description}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                        <span className="text-sm font-medium">Quantity</span>
+                        <Badge variant="outline" className="text-red-400 text-base px-3">
+                          {defence.quantity}
+                        </Badge>
+                      </div>
 
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setDestroyDefenceId(defence.id)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Destroy
-                      </Button>
-                    </DialogTrigger>
+                      {definition && (
+                        <div className="space-y-2 p-3 bg-muted/20 rounded-lg">
+                          <div className="flex justify-between text-sm items-center">
+                            <span>Total Attack Power:</span>
+                            <span className="text-red-400 font-semibold">
+                              {(definition.attack_power ?? 0) * defence.quantity}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm items-center">
+                            <span>Total Defense Power:</span>
+                            <span className="text-blue-400 font-semibold">
+                              {(definition.defence_power ?? 0) * defence.quantity}
+                            </span>
+                          </div>
+                          {(definition.energy_consumption ?? 0) > 0 && (
+                            <div className="flex justify-between text-sm items-center">
+                              <span>Energy Consumption:</span>
+                              <span className="text-yellow-400 font-semibold">
+                                {(definition.energy_consumption ?? 0) * defence.quantity}/tick
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setDestroyDefenceId(defence.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Destroy
+                          </Button>
+                        </DialogTrigger>
                     <DialogContent className="panel-glass border-destructive/20">
                       <DialogHeader>
                         <DialogTitle>Destroy Defenses</DialogTitle>
@@ -572,7 +616,9 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                       </div>
                     </DialogContent>
                   </Dialog>
-                </CardContent>
+                    </div>
+                  </div>
+                </div>
               </Card>
             )
           })}
@@ -606,10 +652,20 @@ export function DefensesTab({ planet }: DefensesTabProps) {
               {definitions.defences.filter(defence => canBuildItem(defence.slug)).map((defence) => {
                 const currentDefence = defencesList.find(d => d.defence_slug === defence.slug)
                 const currentQuantity = currentDefence?.quantity || 0
+                const defenseImg = getDefenseImage(defence.slug)
                 
                 return (
                   <div key={defence.id} className="flex items-start gap-3 p-3 bg-muted/10 rounded-lg">
-                    <Shield className="w-5 h-5 text-red-400 mt-0.5" />
+                    {defenseImg ? (
+                      <img
+                        src={defenseImg}
+                        alt={defence.name}
+                        className="w-12 h-12 object-contain flex-shrink-0"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Shield className="w-12 h-12 text-red-400 mt-0.5 flex-shrink-0 opacity-50" />
+                    )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-medium">{defence.name}</h4>

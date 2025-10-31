@@ -20,6 +20,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
+import { getPlanetImage } from '@/lib/planetImages'
+import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 
 interface PlanetActionPanelProps {
   planet: Planet | null
@@ -90,7 +92,7 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
 
   const getPlanetTypeImage = () => {
     if (displayPlanet.type?.slug) {
-      return `/assets/images/${displayPlanet.type.slug}.jpg`
+      return getPlanetImage(displayPlanet.type.slug)
     }
     return null
   }
@@ -100,13 +102,15 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            {getPlanetTypeImage() && (
-              <img
-                src={getPlanetTypeImage()!}
-                alt={displayPlanet.type?.name || 'Planet'}
-                className="w-16 h-16 rounded-lg object-cover"
-              />
-            )}
+            <img
+              src={getPlanetTypeImage() || getPlanetImage('arid')}
+              alt={displayPlanet.type?.name || 'Planet'}
+              className="w-16 h-16 object-contain flex-shrink-0"
+              style={{ imageRendering: 'auto', display: 'block' }}
+              onError={(e) => {
+                console.error('Planet image failed to load in action panel:', displayPlanet.type?.slug)
+              }}
+            />
             <div>
               <DialogTitle className="flex items-center gap-2">
                 {displayPlanet.name || `Planet ${formatCoordinate(displayPlanet.coordinate)}`}
@@ -157,23 +161,55 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
               <div className="border-t border-border/50 my-4" />
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-muted-foreground">Tellerium</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <img
+                      src={getTelleriumImage()}
+                      alt="T"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <label className="text-sm text-muted-foreground">Tellerium</label>
+                  </div>
                   <div className="mt-1 font-mono font-semibold text-cyan-400">
                     {formatResource(displayPlanet.tellerium_balance)}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Krypton</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <img
+                      src={getKryptonImage()}
+                      alt="K"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <label className="text-sm text-muted-foreground">Krypton</label>
+                  </div>
                   <div className="mt-1 font-mono font-semibold text-blue-400">
                     {formatResource(displayPlanet.krypton_balance)}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Mines</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <img
+                      src={getMineImage()}
+                      alt="Mine"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <label className="text-sm text-muted-foreground">Mines</label>
+                  </div>
                   <div className="mt-1 font-semibold">{displayPlanet.mines}</div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Probes</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <img
+                      src={getProbeImage()}
+                      alt="Probe"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <label className="text-sm text-muted-foreground">Probes</label>
+                  </div>
                   <div className="mt-1 font-semibold">{displayPlanet.probes}</div>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import { Planet } from '@/types/api.types'
 import { formatResource, formatNumber } from '@/lib/formatters'
 import { Zap, Settings, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 
 const mineSchema = z.object({
   quantity: z.number().min(1, 'Must buy at least 1 mine').max(100, 'Cannot buy more than 100 mines at once'),
@@ -116,7 +117,12 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-cyan-400" />
+            <img
+              src={getMineImage()}
+              alt="Mine"
+              className="w-5 h-5 object-contain"
+              style={{ imageRendering: 'auto' }}
+            />
             Buy Mines
           </CardTitle>
           <CardDescription>
@@ -145,14 +151,14 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
               <h4 className="font-semibold">Cost Breakdown</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Tellerium Cost:</span>
-                  <span className={`font-mono ${canAffordMines ? 'text-cyan-400' : 'text-destructive'}`}>
+                  <span className="text-tellerium">Tellerium Cost:</span>
+                  <span className={`font-mono ${canAffordMines ? 'text-tellerium' : 'text-destructive'}`}>
                     {formatResource(mineCost.tellerium)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Krypton Cost:</span>
-                  <span className={`font-mono ${canAffordMines ? 'text-blue-400' : 'text-destructive'}`}>
+                  <span className="text-krypton">Krypton Cost:</span>
+                  <span className={`font-mono ${canAffordMines ? 'text-krypton' : 'text-destructive'}`}>
                     {formatResource(mineCost.krypton)}
                   </span>
                 </div>
@@ -189,7 +195,12 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
       <Card className="panel-glass border-blue/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-400" />
+            <img
+              src={getProbeImage()}
+              alt="Probe"
+              className="w-5 h-5 object-contain"
+              style={{ imageRendering: 'auto' }}
+            />
             Buy Probes
           </CardTitle>
           <CardDescription>
@@ -218,14 +229,14 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
               <h4 className="font-semibold">Cost Breakdown</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Tellerium Cost:</span>
-                  <span className={`font-mono ${canAffordProbes ? 'text-cyan-400' : 'text-destructive'}`}>
+                  <span className="text-tellerium">Tellerium Cost:</span>
+                  <span className={`font-mono ${canAffordProbes ? 'text-tellerium' : 'text-destructive'}`}>
                     {formatResource(probeCost.tellerium)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Krypton Cost:</span>
-                  <span className={`font-mono ${canAffordProbes ? 'text-blue-400' : 'text-destructive'}`}>
+                  <span className="text-krypton">Krypton Cost:</span>
+                  <span className={`font-mono ${canAffordProbes ? 'text-krypton' : 'text-destructive'}`}>
                     {formatResource(probeCost.krypton)}
                   </span>
                 </div>
@@ -274,32 +285,58 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-cyan-400" />
-                  <span className="font-semibold">Tellerium</span>
+                  <img
+                    src={getTelleriumImage()}
+                    alt="Tellerium"
+                    className="w-6 h-6 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="font-semibold text-tellerium">Tellerium</span>
                 </div>
-                <span className="text-2xl font-mono glow-cyan">
+                <span className="text-2xl font-mono text-tellerium glow-cyan">
                   {formatResource(planet.tellerium_balance)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-blue-400" />
-                  <span className="font-semibold">Krypton</span>
+                  <img
+                    src={getKryptonImage()}
+                    alt="Krypton"
+                    className="w-6 h-6 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="font-semibold text-krypton">Krypton</span>
                 </div>
-                <span className="text-2xl font-mono glow-blue">
+                <span className="text-2xl font-mono text-krypton glow-blue">
                   {formatResource(planet.krypton_balance)}
                 </span>
               </div>
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Current Mines</span>
+                <div className="flex items-center gap-1.5">
+                  <img
+                    src={getMineImage()}
+                    alt="Mine"
+                    className="w-4 h-4 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-sm text-muted-foreground">Current Mines</span>
+                </div>
                 <Badge variant="outline" className="text-cyan-400">
                   {planet.mines}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Current Probes</span>
+                <div className="flex items-center gap-1.5">
+                  <img
+                    src={getProbeImage()}
+                    alt="Probe"
+                    className="w-4 h-4 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-sm text-muted-foreground">Current Probes</span>
+                </div>
                 <Badge variant="outline" className="text-blue-400">
                   {planet.probes}
                 </Badge>

@@ -14,6 +14,9 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Rocket, Sparkles, Shield, Zap, ArrowRight, BookOpen, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+// Import background images so Vite bundles them
+import splashImage1 from '../../../assets/images/backgrounds/splash_image_1.jpg'
+import splashImage2 from '../../../assets/images/backgrounds/splash_image_2.jpg'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -42,7 +45,11 @@ export function LoginPage() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
   const token = useAppSelector((state) => state.auth.token)
 
-  const backgroundUrl = new URL('../../../assets/images/background.jpg', import.meta.url).href
+  // Randomly select background on mount
+  const [backgroundUrl] = useState(() => {
+    const backgrounds = [splashImage1, splashImage2]
+    return backgrounds[Math.floor(Math.random() * backgrounds.length)]
+  })
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),

@@ -15,6 +15,8 @@ import { formatNumber, formatResource } from '@/lib/formatters'
 import { calculateDistance } from '@/lib/coordinates'
 import { Ship, MapPin, Clock, Zap, AlertCircle, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { getShipImage } from '@/lib/shipImages'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 const fleetSchema = z.object({
   origin_planet_id: z.number().min(1, 'Select an origin planet'),
@@ -245,25 +247,39 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
                     const maxAvailable = ship.quantity
                     const selected = ships[ship.slug] || 0
                     
+                    const shipImage = ship.slug ? getShipImage(ship.slug) : null
+                    
                     return (
-                      <div key={ship.definition_id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h5 className="font-medium">{ship.name}</h5>
-                            {(telleriumCost > 0 || kryptonCost > 0) && (
-                              <Badge variant="outline">
-                                {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
-                              </Badge>
-                            )}
-                            <Badge variant="secondary">
-                              Available: {maxAvailable}
-                            </Badge>
-                          </div>
-                          {ship.description && (
-                            <p className="text-sm text-muted-foreground">{ship.description}</p>
+                      <div key={ship.definition_id} className="flex items-center justify-between p-4 bg-muted/20 rounded-lg gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {shipImage ? (
+                            <img
+                              src={shipImage}
+                              alt={ship.name}
+                              className="w-16 h-16 object-contain flex-shrink-0"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                          ) : (
+                            <Ship className="w-16 h-16 text-blue-400 flex-shrink-0 opacity-50" />
                           )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h5 className="font-medium truncate">{ship.name}</h5>
+                              {(telleriumCost > 0 || kryptonCost > 0) && (
+                                <Badge variant="outline">
+                                  {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
+                                </Badge>
+                              )}
+                              <Badge variant="secondary">
+                                Available: {maxAvailable}
+                              </Badge>
+                            </div>
+                            {ship.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2">{ship.description}</p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <Button
                             type="button"
                             variant="outline"
@@ -301,22 +317,36 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
                   const kryptonCost = shipDef.krypton_cost || shipDef.cost_krypton || 0
                   const slug = shipDef.slug || `ship_${shipDef.id}`
                   
+                  const shipImage = slug ? getShipImage(slug) : null
+                  
                   return (
-                    <div key={shipDef.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h5 className="font-medium">{shipDef.name}</h5>
-                          {(telleriumCost > 0 || kryptonCost > 0) && (
-                            <Badge variant="outline">
-                              {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
-                            </Badge>
+                    <div key={shipDef.id} className="flex items-center justify-between p-4 bg-muted/20 rounded-lg gap-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {shipImage ? (
+                          <img
+                            src={shipImage}
+                            alt={shipDef.name}
+                            className="w-16 h-16 object-contain flex-shrink-0"
+                            style={{ imageRendering: 'auto' }}
+                          />
+                        ) : (
+                          <Ship className="w-16 h-16 text-blue-400 flex-shrink-0 opacity-50" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h5 className="font-medium truncate">{shipDef.name}</h5>
+                            {(telleriumCost > 0 || kryptonCost > 0) && (
+                              <Badge variant="outline">
+                                {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
+                              </Badge>
+                            )}
+                          </div>
+                          {shipDef.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">{shipDef.description}</p>
                           )}
                         </div>
-                        {shipDef.description && (
-                          <p className="text-sm text-muted-foreground">{shipDef.description}</p>
-                        )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Button
                           type="button"
                           variant="outline"
@@ -370,15 +400,31 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Tellerium Cost:</span>
-                <span className={`font-mono ${canAfford ? 'text-cyan-400' : 'text-destructive'}`}>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <img
+                    src={getTelleriumImage()}
+                    alt="T"
+                    className="w-4 h-4 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-tellerium">Tellerium Cost:</span>
+                </div>
+                <span className={`font-mono ${canAfford ? 'text-tellerium' : 'text-destructive'}`}>
                   {formatResource(totalCost.tellerium)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span>Krypton Cost:</span>
-                <span className={`font-mono ${canAfford ? 'text-blue-400' : 'text-destructive'}`}>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <img
+                    src={getKryptonImage()}
+                    alt="K"
+                    className="w-4 h-4 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-krypton">Krypton Cost:</span>
+                </div>
+                <span className={`font-mono ${canAfford ? 'text-krypton' : 'text-destructive'}`}>
                   {formatResource(totalCost.krypton)}
                 </span>
               </div>
@@ -388,15 +434,31 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
               <div className="pt-4 border-t border-border">
                 <h4 className="font-semibold mb-2">Available Resources</h4>
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Tellerium:</span>
-                    <span className="font-mono text-cyan-400">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <img
+                        src={getTelleriumImage()}
+                        alt="T"
+                        className="w-3.5 h-3.5 object-contain"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                      <span className="text-tellerium">Tellerium:</span>
+                    </div>
+                    <span className="font-mono text-tellerium">
                       {formatResource(originPlanet.tellerium_balance)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Krypton:</span>
-                    <span className="font-mono text-blue-400">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <img
+                        src={getKryptonImage()}
+                        alt="K"
+                        className="w-3.5 h-3.5 object-contain"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                      <span className="text-krypton">Krypton:</span>
+                    </div>
+                    <span className="font-mono text-krypton">
                       {formatResource(originPlanet.krypton_balance)}
                     </span>
                   </div>

@@ -15,6 +15,8 @@ import { formatCoordinate } from '@/lib/coordinates'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { getPlanetImage } from '@/lib/planetImages'
 import { Avatar } from '@/components/common/Avatar'
 import { getUserAvatarUrl } from '@/lib/avatar'
 import { 
@@ -316,33 +318,49 @@ export function Holopad() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="p-4 bg-card rounded-lg border border-border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm text-muted-foreground">Tellerium</span>
-                    <Badge variant="outline" className="text-cyan border-cyan">
+                <div className="p-4 bg-card rounded-lg border border-border flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm text-tellerium">Tellerium</span>
+                      <Badge variant="outline" className="text-tellerium border-tellerium">
+                        {formatResource(totalResources.tellerium)}
+                      </Badge>
+                    </div>
+                    <p className="text-xl font-bold text-tellerium">
                       {formatResource(totalResources.tellerium)}
-                    </Badge>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      +{formatResource(totalProduction.tellerium)}/tick
+                    </p>
                   </div>
-                  <p className="text-xl font-bold text-cyan">
-                    {formatResource(totalResources.tellerium)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    +{formatResource(totalProduction.tellerium)}/tick
-                  </p>
+                  <img
+                    src={getTelleriumImage()}
+                    alt="Tellerium"
+                    className="w-16 h-16 object-contain flex-shrink-0"
+                    style={{ imageRendering: 'auto' }}
+                  />
                 </div>
-                <div className="p-4 bg-card rounded-lg border border-border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm text-muted-foreground">Krypton</span>
-                    <Badge variant="outline" className="text-blue border-blue">
+                <div className="p-4 bg-card rounded-lg border border-border flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm text-krypton">Krypton</span>
+                      <Badge variant="outline" className="text-krypton border-krypton">
+                        {formatResource(totalResources.krypton)}
+                      </Badge>
+                    </div>
+                    <p className="text-xl font-bold text-krypton">
                       {formatResource(totalResources.krypton)}
-                    </Badge>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      +{formatResource(totalProduction.krypton)}/tick
+                    </p>
                   </div>
-                  <p className="text-xl font-bold text-blue">
-                    {formatResource(totalResources.krypton)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    +{formatResource(totalProduction.krypton)}/tick
-                  </p>
+                  <img
+                    src={getKryptonImage()}
+                    alt="Krypton"
+                    className="w-16 h-16 object-contain flex-shrink-0"
+                    style={{ imageRendering: 'auto' }}
+                  />
                 </div>
               </div>
               <div className="pt-4 border-t border-border">
@@ -350,10 +368,34 @@ export function Holopad() {
                 <div className="space-y-2">
                   {planets.slice(0, 5).map((planet) => (
                     <div key={planet.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
-                      <span>{planet.name}</span>
-                      <div className="flex gap-4 font-mono text-xs">
-                        <span className="text-cyan">T: {formatResource(planet.tellerium_balance || 0)}</span>
-                        <span className="text-blue">K: {formatResource(planet.krypton_balance || 0)}</span>
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+                          alt={planet?.type?.name || 'Planet'}
+                          className="w-6 h-6 object-contain flex-shrink-0"
+                          style={{ imageRendering: 'auto', display: 'block' }}
+                        />
+                        <span>{planet.name}</span>
+                      </div>
+                      <div className="flex gap-4 font-mono text-xs items-center">
+                        <div className="flex items-center gap-1">
+                          <img
+                            src={getTelleriumImage()}
+                            alt="T"
+                            className="w-4 h-4 object-contain"
+                            style={{ imageRendering: 'auto' }}
+                          />
+                          <span className="text-tellerium">{formatResource(planet.tellerium_balance || 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <img
+                            src={getKryptonImage()}
+                            alt="K"
+                            className="w-4 h-4 object-contain"
+                            style={{ imageRendering: 'auto' }}
+                          />
+                          <span className="text-krypton">{formatResource(planet.krypton_balance || 0)}</span>
+                        </div>
                     </div>
                   </div>
                 ))}

@@ -99,8 +99,11 @@ export function UniverseStarMap({ className, planets = [], fleets = [] }: Univer
       world.eventMode = 'static'
       app.stage.addChild(world)
 
-      // Galaxy background
-      const bgUrl = new URL('../../../assets/images/galaxy-type-1.jpg', import.meta.url).href
+      // Galaxy background - randomly select from available types
+      const galaxyTypes = [1, 2, 3, 4]
+      const randomType = galaxyTypes[Math.floor(Math.random() * galaxyTypes.length)]
+      const { getGalaxyImage } = await import('@/lib/galaxyImages')
+      const bgUrl = getGalaxyImage(randomType)
       let texture: PIXI.Texture
       try {
         texture = await (PIXI.Assets as any).load(bgUrl)

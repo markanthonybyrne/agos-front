@@ -7,6 +7,8 @@ import { useGetPlanetResourcesQuery } from '@/api/endpoints/resourcesApi'
 import { useGetPlanetFacilitiesQuery } from '@/api/endpoints/facilitiesApi'
 import { MapPin, Clock, Zap, Shield, Settings } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getPlanetImage } from '@/lib/planetImages'
+import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 
 interface OverviewTabProps {
   planet: Planet
@@ -64,13 +66,26 @@ export function OverviewTab({ planet }: OverviewTabProps) {
       {/* Planet Information */}
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-cyan-400" />
-            Planet Information
-          </CardTitle>
-          <CardDescription>
-            Basic information about this planet
-          </CardDescription>
+          <div className="flex items-start gap-4">
+            <img
+              src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+              alt={planet?.type?.name || planet.type?.slug || 'Planet'}
+              className="w-32 h-32 object-contain flex-shrink-0"
+              style={{ imageRendering: 'auto', display: 'block' }}
+              onError={(e) => {
+                console.error('Planet image failed to load:', planet?.type?.slug)
+              }}
+            />
+            <div className="flex-1">
+              <CardTitle className="flex items-center gap-2 mb-2">
+                <MapPin className="w-5 h-5 text-cyan-400" />
+                Planet Information
+              </CardTitle>
+              <CardDescription>
+                Basic information about this planet
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -96,19 +111,29 @@ export function OverviewTab({ planet }: OverviewTabProps) {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-cyan-400" />
-                  <span className="text-sm">Tellerium</span>
+                  <img
+                    src={getTelleriumImage()}
+                    alt="Tellerium"
+                    className="w-5 h-5 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-sm text-tellerium">Tellerium</span>
                 </div>
-                <span className="font-mono glow-cyan">
+                <span className="font-mono text-tellerium glow-cyan">
                   {formatResource(planet.tellerium_balance)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm">Krypton</span>
+                  <img
+                    src={getKryptonImage()}
+                    alt="Krypton"
+                    className="w-5 h-5 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-sm text-krypton">Krypton</span>
                 </div>
-                <span className="font-mono glow-blue">
+                <span className="font-mono text-krypton glow-blue">
                   {formatResource(planet.krypton_balance)}
                 </span>
               </div>
@@ -132,19 +157,29 @@ export function OverviewTab({ planet }: OverviewTabProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm">Tellerium/Tick</span>
+                <img
+                  src={getTelleriumImage()}
+                  alt="T"
+                  className="w-4 h-4 object-contain"
+                  style={{ imageRendering: 'auto' }}
+                />
+                <span className="text-sm text-tellerium">Tellerium/Tick</span>
               </div>
-              <span className="font-mono text-lg glow-cyan">
+              <span className="font-mono text-lg text-tellerium glow-cyan">
                 +{formatNumber(production.tellerium_per_tick)}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-blue-400" />
-                <span className="text-sm">Krypton/Tick</span>
+                <img
+                  src={getKryptonImage()}
+                  alt="K"
+                  className="w-4 h-4 object-contain"
+                  style={{ imageRendering: 'auto' }}
+                />
+                <span className="text-sm text-krypton">Krypton/Tick</span>
               </div>
-              <span className="font-mono text-lg glow-blue">
+              <span className="font-mono text-lg text-krypton glow-blue">
                 +{formatNumber(production.krypton_per_tick)}
               </span>
             </div>
@@ -161,17 +196,33 @@ export function OverviewTab({ planet }: OverviewTabProps) {
             <h4 className="font-semibold mb-3">Production Sources</h4>
             <div className="space-y-2 text-sm">
               {minesProduction > 0 && (
-                <div className="flex justify-between">
-                  <span>Mines ({planet.mines})</span>
-                  <span className="text-cyan-400">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getMineImage()}
+                      alt="Mine"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span>Mines ({planet.mines})</span>
+                  </div>
+                  <span className="text-tellerium">
                     +{formatNumber(productionBonus > 1 ? minesProduction * productionBonus : minesProduction)} T/tick
                   </span>
                 </div>
               )}
               {probesProduction > 0 && (
-                <div className="flex justify-between">
-                  <span>Probes ({planet.probes})</span>
-                  <span className="text-blue-400">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getProbeImage()}
+                      alt="Probe"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span>Probes ({planet.probes})</span>
+                  </div>
+                  <span className="text-krypton">
                     +{formatNumber(productionBonus > 1 ? probesProduction * productionBonus : probesProduction)} K/tick
                   </span>
                 </div>
@@ -181,7 +232,7 @@ export function OverviewTab({ planet }: OverviewTabProps) {
                   {production.tellerium_per_tick > minesProduction && (
                     <div className="flex justify-between">
                       <span>Facilities</span>
-                      <span className="text-cyan-400">
+                      <span className="text-tellerium">
                         +{formatNumber(production.tellerium_per_tick - minesProduction)} T/tick
                       </span>
                     </div>
@@ -189,7 +240,7 @@ export function OverviewTab({ planet }: OverviewTabProps) {
                   {production.krypton_per_tick > probesProduction && (
                     <div className="flex justify-between">
                       <span>Facilities</span>
-                      <span className="text-blue-400">
+                      <span className="text-krypton">
                         +{formatNumber(production.krypton_per_tick - probesProduction)} K/tick
                       </span>
                     </div>

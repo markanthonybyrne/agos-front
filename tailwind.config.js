@@ -57,6 +57,9 @@ export default {
           blue: '#4a9eff',
           purple: '#9d4edd',
         },
+        // Resource colors matching their icons
+        tellerium: '#EB5E9C',
+        krypton: '#7A148C',
       },
       borderRadius: {
         lg: 'var(--radius)',

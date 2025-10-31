@@ -7,6 +7,7 @@ import { formatCoordinate } from '@/lib/coordinates'
 import { useNavigate } from 'react-router-dom'
 import { Building2 } from 'lucide-react'
 import { getPlanetImage } from '@/lib/planetImages'
+import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 
 export function PlanetsList() {
   const navigate = useNavigate()
@@ -62,21 +63,26 @@ export function PlanetsList() {
             onClick={() => navigate(`/planets/${planet.id}`)}
           >
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-3">
-                  {planet?.type?.slug && (
-                    <img
-                      src={getPlanetImage(planet.type.slug)}
-                      alt={planet?.type?.name || planet.type.slug}
-                      className="w-8 h-8 rounded object-cover"
-                    />
-                  )}
-                  {planet.name}
-                </span>
-                <span className="text-sm font-normal capitalize text-muted-foreground">
-                  {planet.state}
-                </span>
-              </CardTitle>
+              <div className="flex items-start gap-4">
+                <img
+                  src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+                  alt={planet?.type?.name || planet.type?.slug || 'Planet'}
+                  className="w-24 h-24 object-contain flex-shrink-0"
+                  style={{ imageRendering: 'auto', display: 'block' }}
+                  loading="lazy"
+                  onError={(e) => {
+                    console.error('Planet image failed to load:', planet?.type?.slug, getPlanetImage(planet?.type?.slug))
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="flex items-center justify-between mb-2">
+                    <span className="truncate">{planet.name}</span>
+                    <span className="text-sm font-normal capitalize text-muted-foreground ml-2 flex-shrink-0">
+                      {planet.state}
+                    </span>
+                  </CardTitle>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -84,20 +90,52 @@ export function PlanetsList() {
                   <span className="text-muted-foreground">Coordinate:</span>
                   <span className="font-mono">{formatCoordinate(planet.coordinate)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tellerium:</span>
-                  <span className="font-mono text-cyan">{formatResource(planet.tellerium_balance)}</span>
+                <div className="flex justify-between text-sm items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getTelleriumImage()}
+                      alt="T"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span className="text-tellerium">Tellerium:</span>
+                  </div>
+                  <span className="font-mono text-tellerium">{formatResource(planet.tellerium_balance)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Krypton:</span>
-                  <span className="font-mono text-blue">{formatResource(planet.krypton_balance)}</span>
+                <div className="flex justify-between text-sm items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getKryptonImage()}
+                      alt="K"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span className="text-krypton">Krypton:</span>
+                  </div>
+                  <span className="font-mono text-krypton">{formatResource(planet.krypton_balance)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Mines:</span>
+                <div className="flex justify-between text-sm items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getMineImage()}
+                      alt="Mine"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span className="text-muted-foreground">Mines:</span>
+                  </div>
                   <span className="font-mono">{planet.mines}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Probes:</span>
+                <div className="flex justify-between text-sm items-center">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src={getProbeImage()}
+                      alt="Probe"
+                      className="w-4 h-4 object-contain"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                    <span className="text-muted-foreground">Probes:</span>
+                  </div>
                   <span className="font-mono">{planet.probes}</span>
                 </div>
               </div>

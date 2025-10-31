@@ -2,6 +2,11 @@
 
 # EmpireQuest Frontend - Staging Deployment Script
 # This script builds the frontend with staging config and deploys to the server
+#
+# Usage:
+#   ./deploy-staging.sh                    # Fast build (no image compression)
+#   ./deploy-staging.sh --compress         # Build with image compression (slower)
+#   ./deploy-staging.sh --fast             # Fast build (explicit, default)
 
 set -e  # Exit on any error
 
@@ -17,6 +22,22 @@ SERVER_HOST="159.65.16.122"
 SERVER_USER="root"
 DEPLOY_PATH="/var/www/agos-app/current/dist"
 BUILD_DIR="dist"
+
+# Parse command line arguments
+ENABLE_COMPRESSION=false
+if [[ "$1" == "--compress" ]] || [[ "$1" == "-c" ]]; then
+    ENABLE_COMPRESSION=true
+    echo -e "${YELLOW}📦 Image compression enabled (build will be slower)${NC}"
+elif [[ "$1" == "--fast" ]] || [[ "$1" == "-f" ]]; then
+    ENABLE_COMPRESSION=false
+    echo -e "${GREEN}⚡ Fast build enabled (no image compression)${NC}"
+elif [[ "$1" != "" ]]; then
+    echo -e "${YELLOW}Usage: ./deploy-staging.sh [--compress|--fast]${NC}"
+    echo -e "  --compress, -c    Enable image compression (slower build)"
+    echo -e "  --fast, -f        Fast build without compression (default)"
+    exit 1
+fi
+echo ""
 
 echo -e "${BLUE}════════════════════════════════════════${NC}"
 echo -e "${GREEN}🚀 EmpireQuest Frontend - Staging Deployment${NC}"
@@ -63,19 +84,29 @@ if ! command -v npm &> /dev/null; then
 fi
 
 # Build with staging configuration
-echo -e "${GREEN}📦 Building frontend with staging configuration...${NC}"
+if [ "$ENABLE_COMPRESSION" = true ]; then
+    echo -e "${GREEN}📦 Building frontend with staging configuration (with image compression)...${NC}"
+    echo -e "${YELLOW}⚠️  Note: Image compression may take a long time due to large image assets${NC}"
+    export ENABLE_IMAGE_COMPRESSION=true
+    BUILD_CMD="npm run build:staging"
+    BUILD_CMD_SKIP="npm run build:staging:skip-check"
+else
+    echo -e "${GREEN}📦 Building frontend with staging configuration (fast build, no compression)...${NC}"
+    export SKIP_IMAGE_COMPRESSION=true
+    BUILD_CMD="npm run build:fast:staging"
+    BUILD_CMD_SKIP="npm run build:fast:staging"
+fi
 
 # Try building with type checking first
-echo -e "${BLUE}Running: npm run build:staging${NC}"
+echo -e "${BLUE}Running: ${BUILD_CMD}${NC}"
 echo ""
-if npm run build:staging 2>&1 | tee /tmp/build.log; then
+if eval "$BUILD_CMD" 2>&1 | tee /tmp/build.log; then
     echo -e "${GREEN}✅ Build completed successfully with type checking${NC}"
 else
     echo -e "${YELLOW}⚠️  Build failed with type checking, trying without type check...${NC}"
-    echo -e "${BLUE}Running: npm run build:staging:skip-check${NC}"
+    echo -e "${BLUE}Running: ${BUILD_CMD_SKIP}${NC}"
     echo ""
-    npm run build:staging:skip-check
-    if [ $? -eq 0 ]; then
+    if eval "$BUILD_CMD_SKIP"; then
         echo -e "${GREEN}✅ Build completed successfully (type checking skipped)${NC}"
     else
         echo -e "${RED}❌ Build failed even without type checking!${NC}"

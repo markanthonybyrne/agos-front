@@ -8,6 +8,7 @@ import { ArrowLeft, MapPin, Zap, Shield, Ship, Settings, FlaskConical, ArrowRigh
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { getPlanetImage } from '@/lib/planetImages'
+import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 import { OverviewTab } from './tabs/OverviewTab'
 import { FacilitiesTab } from './tabs/FacilitiesTab'
 import { ResourcesTab } from './tabs/ResourcesTab'
@@ -158,14 +159,16 @@ export function PlanetDetail() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
-        <div className="flex items-center gap-3">
-          {planet?.type?.slug && (
-            <img
-              src={getPlanetImage(planet.type.slug)}
-              alt={planet?.type?.name || planet.type.slug}
-              className="w-10 h-10 rounded object-cover"
-            />
-          )}
+        <div className="flex items-center gap-4">
+          <img
+            src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+            alt={planet?.type?.name || planet.type?.slug || 'Planet'}
+            className="w-20 h-20 object-contain flex-shrink-0"
+            style={{ imageRendering: 'auto', display: 'block' }}
+            onError={(e) => {
+              console.error('Planet image failed to load:', planet?.type?.slug)
+            }}
+          />
         <div>
           <h1 className="text-3xl font-heading glow-cyan">{planet.name}</h1>
           <p className="text-muted-foreground">
@@ -186,12 +189,17 @@ export function PlanetDetail() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Tellerium</p>
-                <p className="text-2xl font-mono glow-cyan">
+                <p className="text-sm text-tellerium">Tellerium</p>
+                <p className="text-2xl font-mono text-tellerium glow-cyan">
                   {formatResource(planet.tellerium_balance)}
                 </p>
               </div>
-              <Zap className="w-8 h-8 text-cyan-400" />
+              <img
+                src={getTelleriumImage()}
+                alt="Tellerium"
+                className="w-10 h-10 object-contain flex-shrink-0"
+                style={{ imageRendering: 'auto' }}
+              />
             </div>
           </CardContent>
         </Card>
@@ -200,12 +208,17 @@ export function PlanetDetail() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Krypton</p>
-                <p className="text-2xl font-mono glow-blue">
+                <p className="text-sm text-krypton">Krypton</p>
+                <p className="text-2xl font-mono text-krypton glow-blue">
                   {formatResource(planet.krypton_balance)}
                 </p>
               </div>
-              <Zap className="w-8 h-8 text-blue-400" />
+              <img
+                src={getKryptonImage()}
+                alt="Krypton"
+                className="w-10 h-10 object-contain flex-shrink-0"
+                style={{ imageRendering: 'auto' }}
+              />
             </div>
           </CardContent>
         </Card>
@@ -219,7 +232,12 @@ export function PlanetDetail() {
                   {formatNumber(planet.mines)}
                 </p>
               </div>
-              <Settings className="w-8 h-8 text-green-400" />
+              <img
+                src={getMineImage()}
+                alt="Mine"
+                className="w-10 h-10 object-contain flex-shrink-0"
+                style={{ imageRendering: 'auto' }}
+              />
             </div>
           </CardContent>
         </Card>
@@ -233,7 +251,12 @@ export function PlanetDetail() {
                   {formatNumber(planet.probes)}
                 </p>
               </div>
-              <Shield className="w-8 h-8 text-purple-400" />
+              <img
+                src={getProbeImage()}
+                alt="Probe"
+                className="w-10 h-10 object-contain flex-shrink-0"
+                style={{ imageRendering: 'auto' }}
+              />
             </div>
           </CardContent>
         </Card>

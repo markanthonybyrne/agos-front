@@ -18,6 +18,8 @@ import { formatResource, formatNumber } from '@/lib/formatters'
 import { toast } from 'sonner'
 import { Settings, Zap, Shield, Building, AlertCircle, CheckCircle, Plus, TrendingUp, Trash2, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getFacilityImage } from '@/lib/facilityImages'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 interface FacilitiesTabProps {
   planet: Planet
@@ -338,11 +340,23 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
 
               {selectedFacilityDef && (
                 <div className="space-y-4 p-4 bg-muted/20 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold mb-2">{selectedFacilityDef.name}</h4>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {selectedFacilityDef.description}
-                    </p>
+                  <div className="flex items-start gap-4">
+                    {getFacilityImage(selectedFacilityDef.slug) ? (
+                      <img
+                        src={getFacilityImage(selectedFacilityDef.slug)}
+                        alt={selectedFacilityDef.name}
+                        className="w-20 h-20 object-contain flex-shrink-0"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Building className="w-20 h-20 text-purple-400 opacity-50 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold mb-2">{selectedFacilityDef.name}</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {selectedFacilityDef.description}
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -361,21 +375,37 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
 
                   <div className="space-y-2 pt-2 border-t border-border">
                     <h5 className="text-sm font-semibold">Cost:</h5>
-                    <div className="flex justify-between text-sm">
-                      <span>Tellerium:</span>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={getTelleriumImage()}
+                          alt="T"
+                          className="w-4 h-4 object-contain"
+                          style={{ imageRendering: 'auto' }}
+                        />
+                        <span className="text-tellerium">Tellerium:</span>
+                      </div>
                       <span className={`font-mono ${
                         planet.tellerium_balance >= selectedFacilityDef.base_tellerium_cost
-                          ? 'text-cyan-400'
+                          ? 'text-tellerium'
                           : 'text-destructive'
                       }`}>
                         {formatResource(selectedFacilityDef.base_tellerium_cost)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Krypton:</span>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={getKryptonImage()}
+                          alt="K"
+                          className="w-4 h-4 object-contain"
+                          style={{ imageRendering: 'auto' }}
+                        />
+                        <span className="text-krypton">Krypton:</span>
+                      </div>
                       <span className={`font-mono ${
                         planet.krypton_balance >= selectedFacilityDef.base_krypton_cost
-                          ? 'text-blue-400'
+                          ? 'text-krypton'
                           : 'text-destructive'
                       }`}>
                         {formatResource(selectedFacilityDef.base_krypton_cost)}
@@ -393,17 +423,33 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                     <div className="space-y-2 pt-2 border-t border-border">
                       <h5 className="text-sm font-semibold">Production:</h5>
                       {selectedFacilityDef.production_tellerium && (
-                        <div className="flex justify-between text-sm">
-                          <span>Tellerium:</span>
-                          <span className="text-cyan-400">
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-1.5">
+                            <img
+                              src={getTelleriumImage()}
+                              alt="T"
+                              className="w-4 h-4 object-contain"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            <span className="text-tellerium">Tellerium:</span>
+                          </div>
+                          <span className="text-tellerium">
                             +{formatNumber(selectedFacilityDef.production_tellerium)}/tick
                           </span>
                         </div>
                       )}
                       {selectedFacilityDef.production_krypton && (
-                        <div className="flex justify-between text-sm">
-                          <span>Krypton:</span>
-                          <span className="text-blue-400">
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-1.5">
+                            <img
+                              src={getKryptonImage()}
+                              alt="K"
+                              className="w-4 h-4 object-contain"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            <span className="text-krypton">Krypton:</span>
+                          </div>
+                          <span className="text-krypton">
                             +{formatNumber(selectedFacilityDef.production_krypton)}/tick
                           </span>
                         </div>
@@ -482,78 +528,111 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
             const energyUse = definition?.energy_consumption || 0
             const canAffordUpgrade = true
             
+            const facilityImage = getFacilityImage(slug)
+
             return (
               <Card key={`${(facility as any)?.id || slug}-${slug}`} className="panel-glass border-purple/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building className="w-5 h-5 text-purple-400" />
-                    {name}
-                  </CardTitle>
-                  <CardDescription>
-                    {description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Level</span>
-                    <Badge variant="outline" className="text-purple-400">
-                      {facility.level}
-                    </Badge>
+                <div className="flex gap-6 p-6">
+                  {/* Facility Image on Left */}
+                  <div className="flex-shrink-0">
+                    {facilityImage ? (
+                      <img
+                        src={facilityImage}
+                        alt={name}
+                        className="w-40 h-40 object-contain"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Building className="w-40 h-40 text-purple-400 opacity-50" />
+                    )}
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Status</span>
-                    <Badge variant={(facility as any)?.is_active ? 'default' : 'outline'}>
-                      {(facility as any)?.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-
-                  {(productionT > 0 || productionK > 0) && (
-                    <div className="p-3 bg-muted/20 rounded-lg">
-                      <p className="text-sm font-medium mb-1">Production</p>
-                      <div className="space-y-1 text-sm">
-                        {productionT > 0 && (
-                          <div className="flex justify-between">
-                            <span>Tellerium:</span>
-                            <span className="text-cyan-400">
-                              +{formatNumber(productionT * facility.level)}/tick
-                              {productionBonus > 1 && (
-                                <span className="text-green-400 ml-2">
-                                  (+{Math.round((productionBonus - 1) * 100)}%)
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        )}
-                        {productionK > 0 && (
-                          <div className="flex justify-between">
-                            <span>Krypton:</span>
-                            <span className="text-blue-400">
-                              +{formatNumber(productionK * facility.level)}/tick
-                              {productionBonus > 1 && (
-                                <span className="text-green-400 ml-2">
-                                  (+{Math.round((productionBonus - 1) * 100)}%)
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        )}
+                  
+                  {/* Info and Stats on Right */}
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-semibold mb-1">{name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {description}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                        <span className="text-sm font-medium">Level</span>
+                        <Badge variant="outline" className="text-purple-400 text-base px-3">
+                          {facility.level}
+                        </Badge>
                       </div>
-                    </div>
-                  )}
 
-                  {energyUse > 0 && (
-                    <div className="p-3 bg-yellow/10 rounded-lg">
-                      <p className="text-sm font-medium text-yellow-400 mb-1">
-                        Energy Consumption
-                      </p>
-                      <p className="text-sm">
-                        {formatNumber(energyUse * facility.level)} energy/tick
-                      </p>
-                    </div>
-                  )}
+                      <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                        <span className="text-sm font-medium">Status</span>
+                        <Badge variant={(facility as any)?.is_active ? 'default' : 'outline'}>
+                          {(facility as any)?.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
 
-                  <div className="flex gap-2">
+                      {(productionT > 0 || productionK > 0) && (
+                        <div className="p-3 bg-muted/20 rounded-lg">
+                          <p className="text-sm font-medium mb-2">Production</p>
+                          <div className="space-y-2 text-sm">
+                            {productionT > 0 && (
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <img
+                                    src={getTelleriumImage()}
+                                    alt="T"
+                                    className="w-4 h-4 object-contain"
+                                    style={{ imageRendering: 'auto' }}
+                                  />
+                                  <span className="text-tellerium">Tellerium:</span>
+                                </div>
+                                <span className="text-tellerium font-semibold">
+                                  +{formatNumber(productionT * facility.level)}/tick
+                                  {productionBonus > 1 && (
+                                    <span className="text-green-400 ml-2">
+                                      (+{Math.round((productionBonus - 1) * 100)}%)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {productionK > 0 && (
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <img
+                                    src={getKryptonImage()}
+                                    alt="K"
+                                    className="w-4 h-4 object-contain"
+                                    style={{ imageRendering: 'auto' }}
+                                  />
+                                  <span className="text-krypton">Krypton:</span>
+                                </div>
+                                <span className="text-krypton font-semibold">
+                                  +{formatNumber(productionK * facility.level)}/tick
+                                  {productionBonus > 1 && (
+                                    <span className="text-green-400 ml-2">
+                                      (+{Math.round((productionBonus - 1) * 100)}%)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {energyUse > 0 && (
+                        <div className="p-3 bg-yellow/10 rounded-lg">
+                          <p className="text-sm font-medium text-yellow-400 mb-1">
+                            Energy Consumption
+                          </p>
+                          <p className="text-sm font-semibold">
+                            {formatNumber(energyUse * facility.level)} energy/tick
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -623,8 +702,10 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             )
           })}
@@ -657,9 +738,19 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {definitions.facilities.filter(facility => canBuildItem(facility.slug)).map((facility) => {
                 const currentLevel = getFacilityLevel(facility.slug)
+                const facilityImg = getFacilityImage(facility.slug)
                 return (
                   <div key={facility.id} className="flex items-start gap-3 p-3 bg-muted/10 rounded-lg">
-                    <Building className="w-5 h-5 text-purple-400 mt-0.5" />
+                    {facilityImg ? (
+                      <img
+                        src={facilityImg}
+                        alt={facility.name}
+                        className="w-12 h-12 object-contain flex-shrink-0"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Building className="w-12 h-12 text-purple-400 mt-0.5 flex-shrink-0 opacity-50" />
+                    )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-medium">{facility.name}</h4>

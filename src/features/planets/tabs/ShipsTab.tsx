@@ -17,6 +17,8 @@ import { formatResource } from '@/lib/formatters'
 import { toast } from 'sonner'
 import { Ship, Zap, Shield, Target, Plus, AlertCircle, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getShipImage } from '@/lib/shipImages'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 interface ShipsTabProps {
   planet: Planet
@@ -436,23 +438,39 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                   
                   <div className="space-y-2 pt-2 border-t border-border">
                     <h5 className="text-sm font-semibold">Cost:</h5>
-                    <div className="flex justify-between text-sm">
-                      <span>Tellerium:</span>
-                      <span className={`font-mono ${
-                        planet.tellerium_balance >= (selectedShipDef.tellerium_cost * buildQuantity)
-                          ? 'text-cyan-400'
-                          : 'text-destructive'
-                      }`}>
-                        {formatResource(selectedShipDef.tellerium_cost * buildQuantity)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Krypton:</span>
-                      <span className={`font-mono ${
-                        planet.krypton_balance >= (selectedShipDef.krypton_cost * buildQuantity)
-                          ? 'text-blue-400'
-                          : 'text-destructive'
-                      }`}>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={getTelleriumImage()}
+                          alt="T"
+                          className="w-4 h-4 object-contain"
+                          style={{ imageRendering: 'auto' }}
+                        />
+                  <span className="text-tellerium">Tellerium:</span>
+                </div>
+                <span className={`font-mono ${
+                  planet.tellerium_balance >= (selectedShipDef.tellerium_cost * buildQuantity)
+                    ? 'text-tellerium'
+                    : 'text-destructive'
+                }`}>
+                  {formatResource(selectedShipDef.tellerium_cost * buildQuantity)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm items-center">
+                <div className="flex items-center gap-1.5">
+                  <img
+                    src={getKryptonImage()}
+                    alt="K"
+                    className="w-4 h-4 object-contain"
+                    style={{ imageRendering: 'auto' }}
+                  />
+                  <span className="text-krypton">Krypton:</span>
+                      </div>
+                      <span                     className={`font-mono ${
+                      planet.krypton_balance >= (selectedShipDef.krypton_cost * buildQuantity)
+                        ? 'text-krypton'
+                        : 'text-destructive'
+                    }`}>
                         {formatResource(selectedShipDef.krypton_cost * buildQuantity)}
                       </span>
                     </div>
@@ -591,64 +609,84 @@ export function ShipsTab({ planet }: ShipsTabProps) {
             const attackPower = def.attack_power || def.gun_power || defFromResponse.attack_power || 0
             const defensePower = def.defence_power || def.armour || def.armor || 0
 
+            const shipSlug = def.slug || defFromResponse.slug
+            const shipImage = shipSlug ? getShipImage(shipSlug) : null
+
             return (
               <Card key={ship.definition_id} className="panel-glass border-blue/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Ship className="w-5 h-5 text-blue-400" />
-                    {displayName}
-                  </CardTitle>
-                  <CardDescription>
-                    {displayClass}{def.description || defFromResponse.description ? ` • ${def.description || defFromResponse.description}` : ''}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Quantity</span>
-                    <Badge variant="outline" className="text-blue-400">
-                      {ship.quantity}
-                    </Badge>
+                <div className="flex gap-6 p-6">
+                  {/* Ship Image on Left */}
+                  <div className="flex-shrink-0">
+                    {shipImage ? (
+                      <img
+                        src={shipImage}
+                        alt={displayName}
+                        className="w-40 h-40 object-contain"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Ship className="w-40 h-40 text-blue-400 opacity-50" />
+                    )}
                   </div>
+                  
+                  {/* Info and Stats on Right */}
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-semibold mb-1">{displayName}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {displayClass}{def.description || defFromResponse.description ? ` • ${def.description || defFromResponse.description}` : ''}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                        <span className="text-sm font-medium">Quantity</span>
+                        <Badge variant="outline" className="text-blue-400 text-base px-3">
+                          {ship.quantity}
+                        </Badge>
+                      </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Attack Power:</span>
-                      <span className="text-red-400">
-                        {attackPower} per ship ({attackPower * ship.quantity} total)
-                      </span>
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="flex justify-between text-sm p-2 bg-muted/20 rounded">
+                          <span>Attack Power:</span>
+                          <span className="text-red-400 font-semibold">
+                            {attackPower} per ship <span className="text-muted-foreground">({attackPower * ship.quantity} total)</span>
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm p-2 bg-muted/20 rounded">
+                          <span>Defense Power:</span>
+                          <span className="text-blue-400 font-semibold">
+                            {defensePower} per ship <span className="text-muted-foreground">({defensePower * ship.quantity} total)</span>
+                          </span>
+                        </div>
+                        {(def.speed || 0) > 0 && (
+                          <div className="flex justify-between text-sm p-2 bg-muted/20 rounded">
+                            <span>Speed:</span>
+                            <span className="text-green-400 font-semibold">
+                              {def.speed || 0}
+                            </span>
+                          </div>
+                        )}
+                        {(def.cargo_capacity || 0) > 0 && (
+                          <div className="flex justify-between text-sm p-2 bg-muted/20 rounded">
+                            <span>Cargo Capacity:</span>
+                            <span className="text-yellow-400 font-semibold">
+                              {(def.cargo_capacity || 0)} per ship <span className="text-muted-foreground">({(def.cargo_capacity || 0) * ship.quantity} total)</span>
+                            </span>
+                          </div>
+                        )}
+                        {(def.energy_consumption || 0) > 0 && (
+                          <div className="flex justify-between text-sm p-2 bg-muted/20 rounded">
+                            <span>Energy Consumption:</span>
+                            <span className="text-purple-400 font-semibold">
+                              {(def.energy_consumption || 0) * ship.quantity}/tick
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Defense Power:</span>
-                      <span className="text-blue-400">
-                        {defensePower} per ship ({defensePower * ship.quantity} total)
-                      </span>
-                    </div>
-                    {(def.speed || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>Speed:</span>
-                        <span className="text-green-400">
-                          {def.speed || 0}
-                        </span>
-                      </div>
-                    )}
-                    {(def.cargo_capacity || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>Cargo Capacity:</span>
-                        <span className="text-yellow-400">
-                          {(def.cargo_capacity || 0)} per ship ({(def.cargo_capacity || 0) * ship.quantity} total)
-                        </span>
-                      </div>
-                    )}
-                    {(def.energy_consumption || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>Energy Consumption:</span>
-                        <span className="text-purple-400">
-                          {(def.energy_consumption || 0) * ship.quantity}/tick
-                        </span>
-                      </div>
-                    )}
                   </div>
-                </CardContent>
+                </div>
               </Card>
             )
           })}
@@ -683,10 +721,21 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                 const currentShip = shipsList.find(s => s.definition_id === ship.id)
                 const currentQuantity = currentShip?.quantity || 0
                 
+                const shipImage = ship.slug ? getShipImage(ship.slug) : null
+                
                 return (
-                  <div key={ship.id} className="flex items-start gap-3 p-3 bg-muted/10 rounded-lg">
-                    <Ship className="w-5 h-5 text-blue-400 mt-0.5" />
-                    <div className="flex-1">
+                  <div key={ship.id} className="flex items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                    {shipImage ? (
+                      <img
+                        src={shipImage}
+                        alt={ship.name}
+                        className="w-20 h-20 object-contain flex-shrink-0"
+                        style={{ imageRendering: 'auto' }}
+                      />
+                    ) : (
+                      <Ship className="w-20 h-20 text-blue-400 flex-shrink-0 opacity-50" />
+                    )}
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-medium">{ship.name}</h4>
                         <Badge variant="outline" className="text-xs">

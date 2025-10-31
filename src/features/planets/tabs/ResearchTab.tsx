@@ -9,6 +9,7 @@ import { formatResource } from '@/lib/formatters'
 import { toast } from 'sonner'
 import { FlaskConical, CheckCircle, Lock, Loader2, AlertCircle, Building2, Zap } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 interface ResearchTabProps {
   planet: Planet
@@ -79,19 +80,29 @@ export function ResearchTab({ planet }: ResearchTabProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-cyan-400" />
-                <span className="font-semibold">Tellerium</span>
+                <img
+                  src={getTelleriumImage()}
+                  alt="Tellerium"
+                  className="w-5 h-5 object-contain"
+                  style={{ imageRendering: 'auto' }}
+                />
+                <span className="font-semibold text-tellerium">Tellerium</span>
               </div>
-              <span className="text-2xl font-mono glow-cyan">
+              <span className="text-2xl font-mono text-tellerium glow-cyan">
                 {formatResource(planet.tellerium_balance)}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-blue-400" />
-                <span className="font-semibold">Krypton</span>
+                <img
+                  src={getKryptonImage()}
+                  alt="Krypton"
+                  className="w-5 h-5 object-contain"
+                  style={{ imageRendering: 'auto' }}
+                />
+                <span className="font-semibold text-krypton">Krypton</span>
               </div>
-              <span className="text-2xl font-mono glow-blue">
+              <span className="text-2xl font-mono text-krypton glow-blue">
                 {formatResource(planet.krypton_balance)}
               </span>
             </div>
@@ -201,19 +212,29 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Zap className="w-4 h-4 text-cyan-400" />
-                              <span className="text-sm">Tellerium</span>
+                              <img
+                                src={getTelleriumImage()}
+                                alt="T"
+                                className="w-4 h-4 object-contain"
+                                style={{ imageRendering: 'auto' }}
+                              />
+                              <span className="text-sm text-tellerium">Tellerium</span>
                             </div>
-                            <Badge variant="outline" className={canAffordTellerium ? 'text-cyan-400' : 'text-destructive'}>
+                            <Badge variant="outline" className={canAffordTellerium ? 'text-tellerium' : 'text-destructive'}>
                               {formatResource(research.cost_tellerium)}
                             </Badge>
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Zap className="w-4 h-4 text-blue-400" />
-                              <span className="text-sm">Krypton</span>
+                              <img
+                                src={getKryptonImage()}
+                                alt="K"
+                                className="w-4 h-4 object-contain"
+                                style={{ imageRendering: 'auto' }}
+                              />
+                              <span className="text-sm text-krypton">Krypton</span>
                             </div>
-                            <Badge variant="outline" className={canAffordKrypton ? 'text-blue-400' : 'text-destructive'}>
+                            <Badge variant="outline" className={canAffordKrypton ? 'text-krypton' : 'text-destructive'}>
                               {formatResource(research.cost_krypton)}
                             </Badge>
                           </div>
@@ -357,34 +378,66 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                             <div className="space-y-4">
                               <div className="p-4 bg-muted/20 rounded-lg">
                                 <div className="space-y-2 text-sm">
-                                  <div className="flex justify-between">
-                                    <span>Tellerium Cost:</span>
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getTelleriumImage()}
+                                        alt="T"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-tellerium">Tellerium Cost:</span>
+                                    </div>
                                     <span className={`font-mono ${
-                                      canAffordTellerium ? 'text-cyan-400' : 'text-destructive'
+                                      canAffordTellerium ? 'text-tellerium' : 'text-destructive'
                                     }`}>
                                       {formatResource(research.cost_tellerium)}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>Available Tellerium:</span>
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getTelleriumImage()}
+                                        alt="T"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-tellerium">Available Tellerium:</span>
+                                    </div>
                                     <span className={`font-mono ${
-                                      canAffordTellerium ? 'text-green-400' : 'text-destructive'
+                                      canAffordTellerium ? 'text-tellerium' : 'text-destructive'
                                     }`}>
                                       {formatResource(planet.tellerium_balance)}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>Krypton Cost:</span>
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getKryptonImage()}
+                                        alt="K"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-krypton">Krypton Cost:</span>
+                                    </div>
                                     <span className={`font-mono ${
-                                      canAffordKrypton ? 'text-blue-400' : 'text-destructive'
+                                      canAffordKrypton ? 'text-krypton' : 'text-destructive'
                                     }`}>
                                       {formatResource(research.cost_krypton)}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>Available Krypton:</span>
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getKryptonImage()}
+                                        alt="K"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-krypton">Available Krypton:</span>
+                                    </div>
                                     <span className={`font-mono ${
-                                      canAffordKrypton ? 'text-green-400' : 'text-destructive'
+                                      canAffordKrypton ? 'text-krypton' : 'text-destructive'
                                     }`}>
                                       {formatResource(planet.krypton_balance)}
                                     </span>

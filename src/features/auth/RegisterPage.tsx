@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRegisterMutation } from '@/api/endpoints/authApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setCredentials } from '@/app/slices/authSlice'
@@ -11,6 +11,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+// Import background images so Vite bundles them
+import splashImage1 from '../../../assets/images/backgrounds/splash_image_1.jpg'
+import splashImage2 from '../../../assets/images/backgrounds/splash_image_2.jpg'
 
 const registerSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -30,7 +33,11 @@ export function RegisterPage() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
   const token = useAppSelector((state) => state.auth.token)
 
-  const backgroundUrl = new URL('../../../assets/images/background.jpg', import.meta.url).href
+  // Randomly select background on mount
+  const [backgroundUrl] = useState(() => {
+    const backgrounds = [splashImage1, splashImage2]
+    return backgrounds[Math.floor(Math.random() * backgrounds.length)]
+  })
 
   const {
     register: registerForm,
@@ -82,7 +89,7 @@ export function RegisterPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat"
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat bg-fixed"
       style={{ backgroundImage: `url(${backgroundUrl})` }}
     >
       <Card className="w-full max-w-md">
