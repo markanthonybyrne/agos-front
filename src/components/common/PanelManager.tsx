@@ -27,6 +27,7 @@ import { FleetsPage } from '@/features/fleets/FleetsPage'
 import { MessagingPage } from '@/features/messaging/MessagingPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { PoliticsPage } from '@/features/politics/PoliticsPage'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -94,6 +95,9 @@ function PanelContent({ panel }: { panel: any }) {
     case PanelType.SETTINGS:
       return <SettingsPage />
     
+    case PanelType.POLITICS:
+      return <PoliticsPage />
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -136,6 +140,7 @@ export function PanelManager() {
     [PanelType.NOTIFICATIONS]: 'Notifications',
     [PanelType.RANKINGS]: 'Rankings',
     [PanelType.SETTINGS]: 'Settings',
+    [PanelType.POLITICS]: 'Politics & Alliances',
   }
 
   return (

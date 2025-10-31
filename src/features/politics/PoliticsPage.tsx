@@ -77,24 +77,15 @@ export function PoliticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading glow-cyan">Politics</h1>
-          <p className="text-muted-foreground">
-            {isInAlliance 
-              ? 'Manage your alliance and coordinate with members'
-              : 'Form alliances or join existing ones'
-            }
-          </p>
-        </div>
-        {!isInAlliance && (
+      {/* Header actions */}
+      {!isInAlliance && (
+        <div className="flex justify-end mb-4">
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Submit Creation Request
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {!isInAlliance ? (
         // Not in Alliance - Show creation request, alliance list, and join requests

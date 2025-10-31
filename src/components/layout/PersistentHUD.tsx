@@ -8,7 +8,8 @@ import {
   Mail,
   Trophy,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Shield
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +79,14 @@ const HUD_BUTTONS: HUDButton[] = [
     panelType: PanelType.RANKINGS,
     panelSize: PanelSize.XLARGE,
     color: 'text-amber-400',
+  },
+  {
+    id: 'politics',
+    icon: Shield,
+    label: 'Politics',
+    panelType: PanelType.POLITICS,
+    panelSize: PanelSize.XLARGE,
+    color: 'text-purple-400',
   },
 ]
 

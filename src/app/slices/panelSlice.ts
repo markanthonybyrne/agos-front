@@ -17,6 +17,7 @@ export enum PanelType {
   NOTIFICATIONS = 'NOTIFICATIONS',
   RANKINGS = 'RANKINGS',
   SETTINGS = 'SETTINGS',
+  POLITICS = 'POLITICS',
 }
 
 export enum PanelSize {
