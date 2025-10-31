@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { User, Save, AlertCircle, Upload, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/common/Avatar'
+import { getUserAvatarUrl } from '@/lib/avatar'
 import {
   useUploadAvatarMutation,
   useDeleteAvatarMutation,
@@ -185,7 +186,7 @@ export function ProfileSettings({ user, empire, onUpdate, isLoading }: ProfileSe
             <Label className="text-sm font-medium mb-3 block">Avatar</Label>
             <div className="flex items-center gap-4">
               <Avatar
-                src={avatarPreview ? null : currentUser?.avatar_path}
+                src={avatarPreview ? null : getUserAvatarUrl(currentUser)}
                 name={currentUser?.username}
                 size="lg"
                 className="border-2 border-primary/30"
@@ -235,7 +236,7 @@ export function ProfileSettings({ user, empire, onUpdate, isLoading }: ProfileSe
                       </span>
                     </Button>
                   </label>
-                  {currentUser?.avatar_path && (
+                  {(currentUser?.avatar_url || currentUser?.avatar_path) && (
                     <Button
                       type="button"
                       variant="outline"

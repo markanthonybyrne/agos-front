@@ -24,7 +24,8 @@ export interface User {
   api_token?: string
   role?: string
   token_expires_at?: string
-  avatar_path?: string
+  avatar_path?: string // Deprecated - use avatar_url instead
+  avatar_url?: string
 }
 
 export interface TickTiming {

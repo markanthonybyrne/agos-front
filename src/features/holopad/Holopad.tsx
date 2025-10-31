@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/common/Avatar'
+import { getUserAvatarUrl } from '@/lib/avatar'
 import { 
   AlertCircle, 
   Rocket, 
@@ -167,7 +168,7 @@ export function Holopad() {
           <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Avatar
-              src={data?.user?.avatar_path}
+              src={getUserAvatarUrl(data?.user)}
               name={empireData?.name}
               size="xl"
               className="border-2 border-cyan/50 shadow-lg shadow-cyan/20"

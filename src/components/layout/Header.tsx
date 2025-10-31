@@ -10,6 +10,7 @@ import { NotificationCenter } from '@/features/notifications/NotificationCenter'
 import { setNotificationCenterOpen } from '@/app/slices/notificationSlice'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { Avatar } from '@/components/common/Avatar'
+import { getUserAvatarUrl } from '@/lib/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -101,7 +102,7 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2 px-2">
                     <Avatar
-                      src={meData?.user?.avatar_path}
+                      src={getUserAvatarUrl(meData?.user)}
                       name={meData?.user?.username || empire.name}
                       size="sm"
                     />
