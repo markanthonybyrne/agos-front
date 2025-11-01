@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useGetMapQuery, useGetUniverseStructureQuery } from '@/api/endpoints/universeApi'
 import { useSearchPlanetsQuery, useFindNearbyPlanetsQuery, useDiscoverGalaxyMutation } from '@/api/endpoints/planetsApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +66,7 @@ interface SearchFilters {
 }
 
 export function UniverseMap() {
+  const [searchParams] = useSearchParams()
   const [mapState, setMapState] = useState<MapState>({ level: 'quadrant' })
   const [viewMode, setViewMode] = useState<ViewMode>('explore')
   const [searchQuery, setSearchQuery] = useState('')
@@ -76,6 +78,14 @@ export function UniverseMap() {
   const [discoveryCost, setDiscoveryCost] = useState<{ tellerium: number; krypton: number } | null>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<number | null>(null)
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  
+  // Reset drag offset when changing map levels
+  useEffect(() => {
+    setDragOffset({ x: 0, y: 0 })
+  }, [mapState.level])
 
   const { data: mapData, isLoading, error } = useGetMapQuery({
     quadrant: mapState.selectedQuadrant,
@@ -106,6 +116,24 @@ export function UniverseMap() {
 
   const [discoverGalaxy, { isLoading: isDiscovering }] = useDiscoverGalaxyMutation()
   
+  // Handle URL params for deep linking to specific galaxy
+  useEffect(() => {
+    const quadrant = searchParams.get('quadrant')
+    const sector = searchParams.get('sector')
+    const galaxy = searchParams.get('galaxy')
+    
+    if (quadrant && sector && galaxy) {
+      setMapState({
+        level: 'planet',
+        selectedQuadrant: parseInt(quadrant),
+        selectedSector: parseInt(sector),
+        selectedGalaxy: parseInt(galaxy),
+      })
+      // Clear URL params after using them
+      window.history.replaceState({}, '', '/map')
+    }
+  }, [searchParams])
+
   // Debug logging
   useEffect(() => {
     console.log('Map API response:', mapData)
@@ -228,6 +256,37 @@ export function UniverseMap() {
     })
   }
 
+  // Drag handlers for panning the map
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return
+      const deltaX = e.clientX - dragStart.x
+      const deltaY = e.clientY - dragStart.y
+      setDragOffset(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
+      setDragStart({ x: e.clientX, y: e.clientY })
+    }
+    
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false)
+    }
+    
+    if (isDragging) {
+      document.addEventListener('mousemove', handleGlobalMouseMove)
+      document.addEventListener('mouseup', handleGlobalMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleGlobalMouseMove)
+        document.removeEventListener('mouseup', handleGlobalMouseUp)
+      }
+    }
+  }, [isDragging, dragStart])
+  
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only start dragging if clicking on the background/empty space
+    if ((e.target as HTMLElement).closest('.group')) return
+    e.preventDefault()
+    setIsDragging(true)
+    setDragStart({ x: e.clientX, y: e.clientY })
+  }
 
   const renderQuadrantView = () => {
     // Try to get quadrants from mapData first, then from universeStructure
@@ -879,11 +938,23 @@ export function UniverseMap() {
                         )}
                         style={{ imageRendering: 'auto' }}
                       />
-                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full text-center mt-2">
-                        <h3 className="text-2xl font-heading glow-cyan">Quadrant {quadrant.id}</h3>
-                        <p className="text-sm text-muted-foreground font-mono mt-1">
-                          {quadrant.sectors?.length || 0} Sectors • {totalGalaxies} Galaxies
-                        </p>
+                      {/* Info Popover - Styled like parallelogram box */}
+                      <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2 w-80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                        <div className="parallelogram-box bg-background/95 backdrop-blur-lg">
+                          <div className="max-w-[200px] ml-auto mr-[30px]">
+                            <h3 className="text-xl font-heading glow-cyan mb-2">Quadrant {quadrant.id}</h3>
+                            <div className="space-y-1 text-sm text-muted-foreground font-mono">
+                              <div className="flex justify-between">
+                                <span>Sectors:</span>
+                                <span className="text-cyan-400">{quadrant.sectors?.length || 0}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Galaxies:</span>
+                                <span className="text-cyan-400">{totalGalaxies}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )

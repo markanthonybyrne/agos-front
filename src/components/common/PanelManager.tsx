@@ -28,12 +28,13 @@ import { MessagingPage } from '@/features/messaging/MessagingPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { PoliticsPage } from '@/features/politics/PoliticsPage'
+import { CreateAllianceRequestForm } from '@/features/politics/components/CreateAllianceRequestForm'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 
 // Render panel content based on type
-function PanelContent({ panel }: { panel: any }) {
+function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
   // Get planet ID from route params if available, otherwise use first planet or fallback
   const params = useParams()
   const { data: meData } = useGetMeQuery()
@@ -98,6 +99,9 @@ function PanelContent({ panel }: { panel: any }) {
     case PanelType.POLITICS:
       return <PoliticsPage />
     
+    case PanelType.CREATE_ALLIANCE_REQUEST:
+      return <CreateAllianceRequestForm onSuccess={onClose} onCancel={onClose} />
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -141,6 +145,8 @@ export function PanelManager() {
     [PanelType.RANKINGS]: 'Rankings',
     [PanelType.SETTINGS]: 'Settings',
     [PanelType.POLITICS]: 'Politics & Alliances',
+    [PanelType.CREATE_ALLIANCE_REQUEST]: 'Create Alliance Request',
+    [PanelType.MAP_PLANET_INFO]: 'Planet Information',
   }
 
   return (
@@ -171,7 +177,7 @@ export function PanelManager() {
                   className="pointer-events-auto"
                   hideBackdrop={true}
                 >
-                  <PanelContent panel={panel} />
+                  <PanelContent panel={panel} onClose={() => handleClose(panel.id)} />
                 </SlidingPanel>
               </div>
             </div>
@@ -190,7 +196,7 @@ export function PanelManager() {
             panelState={panel.state}
             zIndex={panel.zIndex}
           >
-            <PanelContent panel={panel} />
+            <PanelContent panel={panel} onClose={() => handleClose(panel.id)} />
           </SlidingPanel>
         )
       })}

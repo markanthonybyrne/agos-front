@@ -22,7 +22,6 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
-import { CreateAllianceRequestDialog } from './components/CreateAllianceRequestDialog'
 import { CreationRequestStatus } from './components/CreationRequestStatus'
 import { CreationRequestApproval } from './components/CreationRequestApproval'
 import { AllianceList } from '@/features/alliances/components/AllianceList'
@@ -38,11 +37,13 @@ import { AllianceFund } from './components/AllianceFund'
 import { LeaveAlliance } from './components/LeaveAlliance'
 import { JoinRequestForm } from './components/JoinRequestForm'
 import { useAuth } from '@/hooks/useAuth'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 
 export function PoliticsPage() {
   const navigate = useNavigate()
   const { empire } = useAuth()
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const { openPanel } = usePanel()
   const [selectedAlliance, setSelectedAlliance] = useState<number | null>(null)
   const [joinRequestOpen, setJoinRequestOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -80,7 +81,7 @@ export function PoliticsPage() {
       {/* Header actions */}
       {!isInAlliance && (
         <div className="flex justify-end mb-4">
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button onClick={() => openPanel(PanelType.CREATE_ALLIANCE_REQUEST, PanelSize.LARGE)}>
             <Plus className="w-4 h-4 mr-2" />
             Submit Creation Request
           </Button>
@@ -114,7 +115,7 @@ export function PoliticsPage() {
                     Alliances require 5 supporters to be created. Submit a creation request with 5 planet coordinates,
                     and the empires at those locations will be asked to support your alliance.
                   </p>
-                  <Button onClick={() => setCreateDialogOpen(true)}>
+                  <Button onClick={() => openPanel(PanelType.CREATE_ALLIANCE_REQUEST, PanelSize.LARGE)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Submit Creation Request
                   </Button>
@@ -218,11 +219,6 @@ export function PoliticsPage() {
       )}
 
       {/* Dialogs */}
-      <CreateAllianceRequestDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-      />
-
       {selectedAlliance && (
         <JoinRequestForm
           allianceId={selectedAlliance}

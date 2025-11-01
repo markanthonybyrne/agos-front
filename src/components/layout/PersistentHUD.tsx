@@ -123,14 +123,14 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
       backdropVisible && "bg-background/80 backdrop-blur-md border-b border-border/50",
       className
     )}>
-      <div className="container mx-auto px-4 py-2">
+      <div className="w-full px-4 py-2">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex-shrink-0 mr-4">
             <img 
               src="/assets/images/logo.png" 
               alt="War For Galaxy" 
-              className="h-8 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
           </div>
 

@@ -12,10 +12,13 @@ import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { formatResource } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Planet } from '@/types/api.types'
+import { useAuth } from '@/hooks/useAuth'
+import { parseCoordinate } from '@/lib/coordinates'
 
 export function PlanetsList() {
   const navigate = useNavigate()
   const { openPanel } = usePanel()
+  const { empire } = useAuth()
   const [clickedPlanetId, setClickedPlanetId] = useState<number | null>(null)
   const { data, isLoading, error } = useGetPlanetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -66,6 +69,23 @@ export function PlanetsList() {
     }, 300)
   }
 
+  const handleGalaxyMapClick = () => {
+    // Find homeworld planet
+    const homeworld = planets.find(p => p.id === empire?.homeworld_planet_id)
+    
+    if (homeworld) {
+      const coord = parseCoordinate(homeworld.coordinate)
+      if (coord) {
+        // Navigate to map with homeworld galaxy coordinates
+        navigate(`/map?quadrant=${coord.quadrant}&sector=${coord.sector}&galaxy=${coord.galaxy}`)
+        return
+      }
+    }
+    
+    // Fallback to default map view
+    navigate('/map')
+  }
+
   const getPlanetGlowColor = (slug?: string) => {
     switch (slug) {
       case 'arid':
@@ -91,7 +111,7 @@ export function PlanetsList() {
           <h1 className="text-5xl font-heading glow-cyan mb-2">Planet Command</h1>
           <p className="text-lg text-muted-foreground">Select a planet to access its console</p>
         </div>
-        <Button onClick={() => navigate('/map')} variant="outline" size="lg">
+        <Button onClick={handleGalaxyMapClick} variant="outline" size="lg">
           <Map className="w-5 h-5 mr-2" />
           Galaxy Map
         </Button>
