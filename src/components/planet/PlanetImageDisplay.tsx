@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatResource, formatNumber } from '@/lib/formatters'
 import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
-import { HexagonalGrid } from './HexagonalGrid'
+import { GeodesicGrid } from './GeodesicGrid'
+import { useState, useEffect, useRef } from 'react'
 
 interface PlanetImageDisplayProps {
   planetId: number
@@ -19,9 +20,32 @@ export function PlanetImageDisplay({
   className,
   size = 'xxlarge' 
 }: PlanetImageDisplayProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [planetSize, setPlanetSize] = useState(800)
+  
   const { data: planetData, isLoading } = useGetPlanetQuery(planetId, {
     skip: !planetId,
   })
+
+  // Calculate responsive planet size based on viewport
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        const container = containerRef.current.parentElement
+        if (container) {
+          const containerWidth = container.clientWidth
+          const containerHeight = container.clientHeight
+          // Use 90% of the smaller dimension to ensure planet fits
+          const maxSize = Math.min(containerWidth, containerHeight) * 0.9
+          setPlanetSize(Math.max(400, maxSize)) // Minimum 400px
+        }
+      }
+    }
+    
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    return () => window.removeEventListener('resize', updateSize)
+  }, [])
 
   if (isLoading || !planetData?.planet) {
     return (
@@ -34,13 +58,6 @@ export function PlanetImageDisplay({
   const planet = planetData.planet
   const planetSlug = planet?.type?.slug || 'arid'
   const planetName = planet?.name || 'Planet'
-  const sizeClasses = {
-    small: 'w-32 h-32',
-    medium: 'w-48 h-48',
-    large: 'w-64 h-64',
-    xlarge: 'w-96 h-96',
-    xxlarge: 'w-[800px] h-[800px]',
-  }
 
   const getPlanetGlowColor = (slug?: string) => {
     switch (slug) {
@@ -60,19 +77,27 @@ export function PlanetImageDisplay({
   }
 
   return (
-    <div className={cn("relative flex flex-col items-center justify-center h-full", className)}>
+    <div 
+      ref={containerRef}
+      className={cn("relative flex flex-col items-center justify-center h-full w-full", className)}
+    >
       {/* Planet image */}
-      <div className="relative flex items-center justify-center flex-1">
+      <div className="relative flex items-center justify-center flex-1 w-full h-full">
         <img
           src={getPlanetImage(planetSlug) || getPlanetImage('arid')}
           alt={planetName}
           className={cn(
             "object-contain filter drop-shadow-2xl transition-all duration-300",
-            sizeClasses[size],
             getPlanetGlowColor(planetSlug),
             "planet-glow-animate"
           )}
-          style={{ imageRendering: 'auto' }}
+          style={{ 
+            imageRendering: 'auto',
+            width: `${planetSize}px`,
+            height: `${planetSize}px`,
+            maxWidth: '100%',
+            maxHeight: '100%',
+          }}
           onError={(e) => {
             console.error('Planet image failed to load:', planetSlug)
           }}
@@ -81,9 +106,15 @@ export function PlanetImageDisplay({
         <div className={cn(
           "absolute inset-0 blur-2xl rounded-full -z-10 pointer-events-none",
           getPlanetGlowColor(planetSlug).replace('shadow-', 'bg-').replace('/50', '/20')
-        )} />
-        {/* Hexagonal grid overlay */}
-        <HexagonalGrid planetId={planetId} size={size} />
+        )} style={{
+          width: `${planetSize}px`,
+          height: `${planetSize}px`,
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+        }} />
+        {/* Geodesic grid overlay */}
+        <GeodesicGrid planetId={planetId} planetSize={planetSize} />
       </div>
 
       {/* Planet info overlay */}

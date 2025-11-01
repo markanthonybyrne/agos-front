@@ -15,6 +15,8 @@ import { getShipImage } from '@/lib/shipImages'
 import { getDefenseImage } from '@/lib/defenseImages'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 import { Skeleton } from '@/components/ui/skeleton'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType } from '@/app/slices/panelSlice'
 
 interface BuildDetailPanelProps {
   type: 'facility' | 'ship' | 'defense' | 'research'
@@ -25,6 +27,7 @@ interface BuildDetailPanelProps {
 export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps) {
   const [level, setLevel] = useState(1)
   const [quantity, setQuantity] = useState(1)
+  const { closePanelsByType } = usePanel()
 
   // Get planet data for resources
   const { data: planetData } = useGetPlanetQuery(planetId)
@@ -113,6 +116,8 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
           },
         }).unwrap()
         toast.success('Facility queued for construction!')
+        // Auto-close panel after successful queue
+        closePanelsByType(PanelType.BUILD_DETAIL)
       } else if (type === 'defense') {
         await buildDefense({
           planetId,
@@ -121,13 +126,17 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
             quantity,
           },
         }).unwrap()
-        toast.success('Defense queued for construction!')
+        toast.success('Defense built successfully!')
+        // Auto-close panel after successful build
+        closePanelsByType(PanelType.BUILD_DETAIL)
       } else if (type === 'research') {
         await startResearch({
           planet_id: planetId,
           research_slug: slug,
         }).unwrap()
         toast.success('Research queued successfully!')
+        // Auto-close panel after successful queue
+        closePanelsByType(PanelType.BUILD_DETAIL)
       }
       // Ships are built from fleet builder, not here
     } catch (error: any) {
