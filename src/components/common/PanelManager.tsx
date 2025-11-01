@@ -203,7 +203,7 @@ export function PanelManager() {
       
       {/* Minimized panels as tabs at bottom */}
       {minimizedPanels.length > 0 && (
-        <div className="fixed bottom-0 left-20 right-0 z-30 flex items-end gap-1 pl-4 pb-0 pointer-events-none">
+        <div className="fixed bottom-0 left-16 right-0 z-30 flex items-end gap-1 pl-4 pb-0 pointer-events-none">
           {minimizedPanels.map((panel, index) => (
             <div
               key={panel.id}

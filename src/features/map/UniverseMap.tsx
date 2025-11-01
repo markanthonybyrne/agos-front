@@ -77,7 +77,7 @@ export function UniverseMap() {
   })
   const [discoveryCost, setDiscoveryCost] = useState<{ tellerium: number; krypton: number } | null>(null)
   const [hoveredSectorId, setHoveredSectorId] = useState<number | null>(null)
-  const [zoomLevel, setZoomLevel] = useState(1)
+  const [zoomLevel, setZoomLevel] = useState(0.5)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -910,7 +910,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div>
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">Universe Map</h1>
                 <p className="text-lg text-muted-foreground">Select a quadrant to explore</p>
               </div>
@@ -998,7 +998,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div>
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">Quadrant {mapState.selectedQuadrant}</h1>
                 <p className="text-lg text-muted-foreground">Select a sector to explore</p>
               </div>
@@ -1134,7 +1134,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div>
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">
                   Quadrant {mapState.selectedQuadrant}: Sector {mapState.selectedSector}
                 </h1>
@@ -1290,7 +1290,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div>
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">
                   Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
                 </h1>

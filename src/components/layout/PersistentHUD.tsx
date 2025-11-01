@@ -119,7 +119,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
 
   return (
     <div className={cn(
-      "fixed top-0 left-20 right-0 z-30 transition-all duration-300",
+      "fixed top-0 left-16 right-0 z-30 transition-all duration-300",
       backdropVisible && "bg-background/80 backdrop-blur-md border-b border-border/50",
       className
     )}>

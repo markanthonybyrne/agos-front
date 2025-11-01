@@ -40,7 +40,18 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
           backgroundRepeat: 'no-repeat',
         }}
       />
+      
+      {/* Cosmic overlay effects */}
       <div className="fixed inset-0 bg-space-dark/60 pointer-events-none" />
+      
+      {/* Animated stars layer */}
+      <div className="fixed inset-0 pointer-events-none cosmic-stars" />
+      
+      {/* Particle field layer */}
+      <div className="fixed inset-0 pointer-events-none cosmic-particles" />
+      
+      {/* Nebula glow effect */}
+      <div className="fixed inset-0 pointer-events-none cosmic-nebula" />
       
       {/* Main content area - immersive */}
       <div className="relative min-h-screen">
@@ -54,7 +65,7 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
         <PanelManager />
         
         {/* Main content in center - planets, map, etc */}
-        <main className="relative z-0 pt-16 pl-20">
+        <main className="relative z-0 pt-16 pl-16">
           {children}
         </main>
       </div>
