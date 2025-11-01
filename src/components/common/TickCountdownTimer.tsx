@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useAppSelector } from '@/app/hooks'
 import { cn } from '@/lib/utils'
 
@@ -6,17 +7,23 @@ export function TickCountdownTimer() {
   const nextTickETA = useAppSelector((state) => state.game.nextTickETA)
   const tickIntervalSeconds = useAppSelector((state) => state.game.tickIntervalSeconds)
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [totalSecondsRemaining, setTotalSecondsRemaining] = useState<number | null>(null)
   const [millisecondsRemaining, setMillisecondsRemaining] = useState<number>(0)
   const [isInCountdown, setIsInCountdown] = useState(false) // Last 10 seconds
-  const [minutesRemaining, setMinutesRemaining] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure we only render portal after mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Listen for tick countdown events from tick service
   useEffect(() => {
     const handleCountdown = (e: CustomEvent) => {
-      setTimeRemaining(e.detail.seconds)
+      const seconds = e.detail.seconds
+      setTotalSecondsRemaining(seconds)
       setMillisecondsRemaining(e.detail.milliseconds || 0)
-      setIsInCountdown(true)
+      setIsInCountdown(seconds <= 10)
     }
 
     const handleAlert = (e: CustomEvent) => {
@@ -38,9 +45,8 @@ export function TickCountdownTimer() {
   // Calculate time remaining until tick (fallback if tick service events not received)
   useEffect(() => {
     if (!nextTickETA) {
-      setTimeRemaining(null)
+      setTotalSecondsRemaining(null)
       setIsInCountdown(false)
-      setMinutesRemaining(null)
       return
     }
 
@@ -61,44 +67,31 @@ export function TickCountdownTimer() {
           tickDate = new Date(Date.now() + etaSeconds * 1000)
         } else {
           // Can't calculate without interval
-          setTimeRemaining(null)
+          setTotalSecondsRemaining(null)
           setIsInCountdown(false)
-          setMinutesRemaining(null)
           return
         }
       } else {
-        setTimeRemaining(null)
+        setTotalSecondsRemaining(null)
         setIsInCountdown(false)
-        setMinutesRemaining(null)
         return
       }
 
       const now = new Date()
       const diff = tickDate.getTime() - now.getTime()
-      const secondsRemaining = Math.floor(diff / 1000)
-      const msRemaining = diff % 1000
       const totalSeconds = Math.floor(diff / 1000)
+      const msRemaining = diff % 1000
 
       if (totalSeconds < 0) {
         // Tick has passed, show 0 until next tick data arrives
-        setTimeRemaining(0)
+        setTotalSecondsRemaining(0)
         setMillisecondsRemaining(0)
         setIsInCountdown(false)
-        setMinutesRemaining(null)
-      } else if (totalSeconds <= 10) {
-        // Last 10 seconds - show detailed countdown
-        setTimeRemaining(secondsRemaining)
-        setMillisecondsRemaining(msRemaining)
-        setIsInCountdown(true)
-        setMinutesRemaining(null)
       } else {
-        // More than 10 seconds - show minutes/seconds
-        const mins = Math.floor(totalSeconds / 60)
-        const secs = totalSeconds % 60
-        setMinutesRemaining(mins)
-        setTimeRemaining(secs)
-        setMillisecondsRemaining(0)
-        setIsInCountdown(false)
+        // Always show total time remaining
+        setTotalSecondsRemaining(totalSeconds)
+        setMillisecondsRemaining(msRemaining)
+        setIsInCountdown(totalSeconds <= 10)
       }
     }
 
@@ -111,11 +104,17 @@ export function TickCountdownTimer() {
     return () => clearInterval(interval)
   }, [nextTickETA, tickIntervalSeconds])
 
-  // Calculate progress (0-1) for the circle (only show progress in last 10 seconds)
+  // Calculate progress (0-1) for the circle based on total time remaining
   const progress = useMemo(() => {
-    if (!isInCountdown || timeRemaining === null || timeRemaining < 0) return 0
-    return Math.min((10 - timeRemaining) / 10, 1)
-  }, [isInCountdown, timeRemaining])
+    if (totalSecondsRemaining === null || totalSecondsRemaining < 0) return 0
+    
+    // Calculate progress based on tick interval
+    // Use tickIntervalSeconds if available, otherwise estimate from current remaining time
+    const tickInterval = tickIntervalSeconds || 300 // Default to 5 minutes if not available
+    const progressValue = Math.max(0, Math.min(1, (tickInterval - totalSecondsRemaining) / tickInterval))
+    
+    return progressValue
+  }, [totalSecondsRemaining, tickIntervalSeconds])
 
   // Calculate stroke-dasharray for the circle
   const circumference = useMemo(() => 2 * Math.PI * 45, []) // radius = 45
@@ -123,18 +122,41 @@ export function TickCountdownTimer() {
     return circumference * (1 - progress)
   }, [circumference, progress])
 
-  // Don't show if not authenticated, no tick data, or not in countdown (last 10 seconds)
-  if (!isAuthenticated || !nextTickETA || timeRemaining === null || !isInCountdown) {
+  // Format time display based on remaining time
+  const displayTime = useMemo(() => {
+    if (totalSecondsRemaining === null) return '0'
+    
+    if (isInCountdown) {
+      // Last 10 seconds - show detailed countdown with milliseconds
+      return `${totalSecondsRemaining}.${Math.floor(millisecondsRemaining / 100)}`
+    } else {
+      // More than 10 seconds - show minutes:seconds format
+      const mins = Math.floor(totalSecondsRemaining / 60)
+      const secs = totalSecondsRemaining % 60
+      if (mins > 0) {
+        return `${mins}:${secs.toString().padStart(2, '0')}`
+      } else {
+        return secs.toString()
+      }
+    }
+  }, [totalSecondsRemaining, millisecondsRemaining, isInCountdown])
+
+  // Don't show if not authenticated or no tick data
+  if (!isAuthenticated || !nextTickETA || totalSecondsRemaining === null || !mounted) {
     return null
   }
 
-  return (
+  const timerContent = (
     <div 
       className="fixed bottom-6 right-6 pointer-events-none"
-      style={{ zIndex: 999999 }}
+      style={{ 
+        zIndex: 9999999,
+        position: 'fixed',
+        isolation: 'isolate',
+      }}
     >
-      <div className="relative">
-        {/* Pulsing glow effect */}
+      <div className="relative" style={{ isolation: 'isolate' }}>
+        {/* Pulsing glow effect - always visible */}
         <div className="absolute inset-0 rounded-full bg-cyan-400/20 animate-ping" />
         <div className="absolute inset-0 rounded-full bg-cyan-400/10 animate-pulse" />
         
@@ -156,7 +178,7 @@ export function TickCountdownTimer() {
               className="text-border/30"
             />
             
-            {/* Progress circle */}
+            {/* Progress circle - always visible */}
             <circle
               cx="50"
               cy="50"
@@ -173,13 +195,13 @@ export function TickCountdownTimer() {
               }}
             />
             
-            {/* Second markers (10 markers for 10 seconds) */}
-            {Array.from({ length: 10 }).map((_, i) => {
+            {/* Second markers - only show in last 10 seconds */}
+            {isInCountdown && Array.from({ length: 10 }).map((_, i) => {
               const angle = (i * 360) / 10 - 90 // Start from top, rotate clockwise
               const radian = (angle * Math.PI) / 180
               const markerX = 50 + 45 * Math.cos(radian)
               const markerY = 50 + 45 * Math.sin(radian)
-              const isActive = i < 10 - (timeRemaining || 0)
+              const isActive = i < 10 - (totalSecondsRemaining || 0)
               
               return (
                 <circle
@@ -202,10 +224,11 @@ export function TickCountdownTimer() {
           
           {/* Time display */}
           <div className="relative z-10 flex flex-col items-center justify-center">
-            <span className="text-2xl font-mono font-bold text-cyan-400 glow-cyan">
-              {timeRemaining !== null
-                ? `${timeRemaining}.${Math.floor(millisecondsRemaining / 100)}`
-                : '0'}
+            <span className={cn(
+              "font-mono font-bold text-cyan-400 glow-cyan",
+              isInCountdown ? "text-2xl" : "text-xl"
+            )}>
+              {displayTime}
             </span>
             <span className="text-[8px] uppercase tracking-wider text-muted-foreground mt-0.5">
               TICK
@@ -215,4 +238,7 @@ export function TickCountdownTimer() {
       </div>
     </div>
   )
+
+  // Render to document.body via portal to ensure it's always on top
+  return createPortal(timerContent, document.body)
 }
