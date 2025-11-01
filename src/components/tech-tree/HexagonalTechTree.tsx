@@ -63,14 +63,18 @@ function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<str
   })
 
   // Position items tier by tier with proper spacing
+  // Use a more compact vertical layout by limiting items per row
+  const itemsPerRow = 6
+  
   tierGroups.forEach((tierItems, tier) => {
     tierItems.forEach((item, index) => {
       const row = tier
-      // Spread items evenly horizontally within their tier
-      const col = index
+      // Spread items evenly horizontally within their tier, wrapping to multiple rows if needed
+      const col = index % itemsPerRow
+      const subRow = Math.floor(index / itemsPerRow)
       // Staggered hexagonal grid with proper spacing
-      const x = col * (hexagonSize * 1.75) // Increased spacing from 1.2 to 1.75
-      const y = row * (hexagonSize * 1.5) // Increased vertical spacing from 1.1 to 1.5
+      const x = col * (hexagonSize * 1.75)
+      const y = (row + subRow) * (hexagonSize * 1.5) // Increased vertical spacing from 1.1 to 1.5
       positions.set(item.id, { x, y })
     })
   })
@@ -138,7 +142,7 @@ export function HexagonalTechTree({
   }, [items, hexagonSize])
 
   return (
-    <div className={cn('relative w-full h-full min-h-[600px] overflow-auto', className)}>
+    <div className={cn('relative w-full h-full min-h-[600px] max-h-[800px] overflow-auto', className)}>
       <svg
         width={bounds.width}
         height={bounds.height}
