@@ -6,6 +6,7 @@ import { useAppSelector } from '@/app/hooks'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useWebSocketNotifications } from '@/hooks/useWebSocketNotifications'
 import { useAutoRefetchOnInvalidation } from '@/hooks/useAutoRefetchOnInvalidation'
+import { BACKGROUNDS } from '@/lib/backgroundImages'
 
 interface ImmersiveLayoutProps {
   children: ReactNode
@@ -34,7 +35,7 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
       <div 
         className="fixed inset-0 pointer-events-none"
         style={{
-          backgroundImage: 'url(/assets/images/backgrounds/console.jpg)',
+          backgroundImage: `url(${BACKGROUNDS.console})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

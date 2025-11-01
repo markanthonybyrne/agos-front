@@ -20,6 +20,7 @@ import { ResourcesWidget } from '@/components/holopad/ResourcesWidget'
 import { PlanetsWidget } from '@/components/holopad/PlanetsWidget'
 import { EmpireStatusWidget } from '@/components/holopad/EmpireStatusWidget'
 import { ActiveOperationsWidget } from '@/components/holopad/ActiveOperationsWidget'
+import { AnnouncementsWidget } from '@/components/holopad/AnnouncementsWidget'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -121,6 +122,7 @@ export function Holopad() {
       { i: 'resources', x: 6, y: 3, w: 6, h: 4 },
       { i: 'planets', x: 0, y: 7, w: 6, h: 5 },
       { i: 'status', x: 6, y: 7, w: 6, h: 5 },
+      { i: 'announcements', x: 0, y: 12, w: 6, h: 6 },
     ]
   })
 
@@ -262,7 +264,16 @@ export function Holopad() {
             onClose={() => handleCloseWidget('status')}
             isMinimized={minimizedWidgets.has('status')}
           />
-                </div>
+        </div>
+
+        {/* Announcements Widget */}
+        <div key="announcements">
+          <AnnouncementsWidget
+            onMinimize={() => handleMinimizeWidget('announcements')}
+            onClose={() => handleCloseWidget('announcements')}
+            isMinimized={minimizedWidgets.has('announcements')}
+          />
+        </div>
       </GridLayout>
 
       {/* Active Operations Widget - Conditional */}

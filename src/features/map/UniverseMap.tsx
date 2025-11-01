@@ -910,7 +910,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">Universe Map</h1>
                 <p className="text-lg text-muted-foreground">Select a quadrant to explore</p>
               </div>
@@ -998,7 +998,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">Quadrant {mapState.selectedQuadrant}</h1>
                 <p className="text-lg text-muted-foreground">Select a sector to explore</p>
               </div>
@@ -1134,7 +1134,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">
                   Quadrant {mapState.selectedQuadrant}: Sector {mapState.selectedSector}
                 </h1>
@@ -1312,7 +1312,7 @@ export function UniverseMap() {
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 rounded-lg backdrop-blur-md">
+              <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
                 <h1 className="text-5xl font-heading glow-cyan mb-2">
                   Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
                 </h1>
@@ -1429,7 +1429,7 @@ export function UniverseMap() {
               </div>
               
               {/* Asteroid clusters - rendered outside scaled container to maintain size */}
-              <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-0 pointer-events-none z-10">
                 {asteroids.map((cluster, clusterIdx) => (
                   <div
                     key={`asteroid-cluster-${clusterIdx}`}
@@ -1445,13 +1445,16 @@ export function UniverseMap() {
                         key={`asteroid-${clusterIdx}-${asteroidIdx}`}
                         src="/assets/images/planets/asteroid.png"
                         alt="Asteroid"
-                        className="absolute opacity-60"
+                        className="absolute opacity-80"
                         style={{
-                          width: `${asteroid.size}px`,
-                          height: `${asteroid.size}px`,
-                          left: `${asteroid.x}px`,
-                          top: `${asteroid.y}px`,
+                          width: `${asteroid.size * 2}px`,
+                          height: `${asteroid.size * 2}px`,
+                          left: `${asteroid.x * 2}px`,
+                          top: `${asteroid.y * 2}px`,
                           transform: `rotate(${asteroid.rotation}deg)`,
+                        }}
+                        onError={(e) => {
+                          console.error('Asteroid image failed to load')
                         }}
                       />
                     ))}

@@ -28,6 +28,7 @@ import { logout } from '@/app/slices/authSlice'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Avatar } from '@/components/common/Avatar'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
+import { BRAND } from '@/lib/brandImages'
 import { getUserAvatarUrl } from '@/lib/avatar'
 
 interface HUDButton {
@@ -124,7 +125,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
         {/* Logo */}
         <div className="flex-shrink-0">
           <img 
-            src="/assets/images/logo.png" 
+            src={BRAND.logo} 
             alt="War For Galaxy" 
             className="h-12 w-auto object-contain"
           />

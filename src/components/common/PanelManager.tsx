@@ -212,7 +212,7 @@ export function PanelManager() {
             >
               <button
                 onClick={() => handleMaximize(panel.id)}
-                className="panel-glass border-t border-l border-r rounded-t-lg px-4 py-2 text-sm font-semibold transition-all hover:bg-muted/20 hover:border-cyan/50 whitespace-nowrap"
+                className="panel-glass border-t border-l border-r px-4 py-2 text-sm font-semibold transition-all hover:bg-muted/20 hover:border-cyan/50 whitespace-nowrap rounded-t-lg"
               >
                 {titles[panel.type] || 'Panel'}
               </button>

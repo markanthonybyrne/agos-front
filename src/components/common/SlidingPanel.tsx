@@ -94,7 +94,7 @@ export function SlidingPanel({
         )}
         style={{ zIndex }}
       >
-        <Card className="h-full rounded-none border-0 panel-glass">
+        <Card className="h-full rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
           {/* Sleek header with minimize/maximize */}
           <CardHeader className={cn(
             "sticky top-0 bg-muted/20 backdrop-blur-sm z-10 border-b border-border/50 transition-all duration-200",

@@ -210,7 +210,7 @@ export function ResearchTab({ planet }: ResearchTabProps) {
 
       {/* Detailed Research List (Optional - can be hidden with a toggle) */}
       {availableResearch.length > 0 && (
-        <details className="panel-glass border-cyan/20 rounded-lg p-4">
+        <details className="panel-glass border-cyan/20 p-4 rounded-lg">
           <summary className="cursor-pointer font-semibold mb-4">View Detailed List</summary>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {availableResearch.map((research) => {
