@@ -800,6 +800,10 @@
     filter: drop-shadow(0 0 20px hsl(142 76% 36% / 0.8));
   }
   
+  .glow-purple {
+    text-shadow: 0 0 10px hsl(270 70% 60% / 0.8), 0 0 20px hsl(270 70% 60% / 0.6);
+  }
+  
   .glow-yellow {
     filter: drop-shadow(0 0 20px hsl(38 92% 50% / 0.8));
   }

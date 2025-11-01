@@ -154,10 +154,9 @@ export function AnnouncementManagement() {
 
       {/* Table */}
       <DataTable
-        data={data?.data || []}
+        data={data?.announcements || []}
         columns={columns}
         loading={isLoading}
-        meta={data?.meta}
         onPageChange={setPage}
         emptyMessage="No announcements found"
         rowActions={(announcement) => (

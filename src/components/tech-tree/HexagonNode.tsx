@@ -19,6 +19,7 @@ interface HexagonNodeProps {
   imageUrl?: string
   name?: string
   className?: string
+  quantity?: number // Quantity of built items (for items that allow multiples)
 }
 
 const STATUS_CONFIG: Record<HexagonStatus, {
@@ -54,9 +55,9 @@ const STATUS_CONFIG: Record<HexagonStatus, {
     pulse: true,
   },
   [HexagonStatus.COMPLETED]: {
-    borderColor: 'border-green-500/50',
-    bgColor: 'bg-green-500/20',
-    glowColor: 'glow-green',
+    borderColor: 'border-cyan-400/70',
+    bgColor: 'bg-cyan-400/20',
+    glowColor: 'glow-cyan',
     icon: CheckCircle,
   },
   [HexagonStatus.PREREQUISITE_NOT_MET]: {
@@ -75,6 +76,7 @@ export function HexagonNode({
   imageUrl,
   name,
   className,
+  quantity,
 }: HexagonNodeProps) {
   const config = STATUS_CONFIG[status]
   const Icon = config.icon
@@ -105,7 +107,21 @@ export function HexagonNode({
           'absolute inset-0 transition-all duration-300',
           config.pulse && 'animate-pulse',
           isInteractive && 'cursor-pointer hover:scale-110',
-          `drop-shadow-[0_0_20px_theme(colors.${config.glowColor.replace('glow-', '')})]`
+          status === HexagonStatus.COMPLETED 
+            ? 'drop-shadow-[0_0_20px_rgba(6,182,212,0.8)]'
+            : config.glowColor === 'glow-cyan'
+            ? 'drop-shadow-[0_0_20px_rgba(6,182,212,0.6)]'
+            : config.glowColor === 'glow-primary'
+            ? 'drop-shadow-[0_0_20px_rgba(25,234,253,0.6)]'
+            : config.glowColor === 'glow-yellow'
+            ? 'drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]'
+            : config.glowColor === 'glow-green'
+            ? 'drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+            : config.glowColor === 'glow-destructive'
+            ? 'drop-shadow-[0_0_20px_rgba(239,68,68,0.6)]'
+            : config.glowColor === 'glow-muted'
+            ? 'drop-shadow-[0_0_20px_rgba(156,163,175,0.4)]'
+            : ''
         )}
         onClick={onClick}
       >
@@ -153,6 +169,30 @@ export function HexagonNode({
           </div>
         )}
       </div>
+
+      {/* Completed check overlay - always visible for completed items */}
+      {status === HexagonStatus.COMPLETED && Icon && (
+        <div className="absolute top-1 right-1 pointer-events-none z-10">
+          <div className="rounded-full bg-cyan-400/90 p-1">
+            <Icon className="w-4 h-4 text-cyan-950" />
+          </div>
+        </div>
+      )}
+      {/* Debug: Log when COMPLETED status is received */}
+      {status === HexagonStatus.COMPLETED && (
+        <div style={{ display: 'none' }}>
+          {console.log('🔵 HexagonNode rendering COMPLETED status for:', name || 'unknown', 'Icon:', Icon?.name)}
+        </div>
+      )}
+
+      {/* Quantity badge - shown on opposite side for items with multiples */}
+      {quantity !== undefined && quantity > 0 && (
+        <div className="absolute top-1 left-1 pointer-events-none z-10">
+          <div className="rounded-full bg-cyan-400/90 px-2 py-1 min-w-[24px] flex items-center justify-center">
+            <span className="text-xs font-bold text-cyan-950">{quantity}</span>
+          </div>
+        </div>
+      )}
 
       {/* Lock overlay for locked items */}
       {status === HexagonStatus.LOCKED && (

@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { getPlanetImage } from '@/lib/planetImages'
-import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 import { 
   Settings, Shield, Ship, FlaskConical, Send, 
   ArrowLeft, ArrowRight, Building2 
@@ -118,86 +118,6 @@ export function PlanetConsolePanel({ planetId }: PlanetConsolePanelProps) {
 
   return (
     <div className="space-y-6">
-
-      {/* Resource stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="panel-glass border-tellerium/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-tellerium mb-1">Tellerium</p>
-                <p className="text-2xl font-mono text-tellerium glow-cyan">
-                  {formatResource(planet.tellerium_balance)}
-                </p>
-              </div>
-              <img
-                src={getTelleriumImage()}
-                alt="Tellerium"
-                className="w-12 h-12 object-contain"
-                style={{ imageRendering: 'auto' }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="panel-glass border-krypton/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-krypton mb-1">Krypton</p>
-                <p className="text-2xl font-mono text-krypton glow-blue">
-                  {formatResource(planet.krypton_balance)}
-                </p>
-              </div>
-              <img
-                src={getKryptonImage()}
-                alt="Krypton"
-                className="w-12 h-12 object-contain"
-                style={{ imageRendering: 'auto' }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="panel-glass border-green/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Mines</p>
-                <p className="text-2xl font-mono glow-green">
-                  {formatNumber(planet.mines)}
-                </p>
-              </div>
-              <img
-                src={getMineImage()}
-                alt="Mine"
-                className="w-12 h-12 object-contain"
-                style={{ imageRendering: 'auto' }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="panel-glass border-purple/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Probes</p>
-                <p className="text-2xl font-mono glow-purple">
-                  {formatNumber(planet.probes)}
-                </p>
-              </div>
-              <img
-                src={getProbeImage()}
-                alt="Probe"
-                className="w-12 h-12 object-contain"
-                style={{ imageRendering: 'auto' }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Construction Queue */}
       <div className="space-y-2">
         <h3 className="text-xl font-heading flex items-center gap-2">

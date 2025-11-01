@@ -4,8 +4,8 @@ import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { formatCoordinate } from '@/lib/coordinates'
-import { formatResource } from '@/lib/formatters'
-import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { formatResource, formatNumber } from '@/lib/formatters'
+import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 import { HexagonalGrid } from './HexagonalGrid'
 
 interface PlanetImageDisplayProps {
@@ -107,23 +107,41 @@ export function PlanetImageDisplay({
         </div>
 
         {/* Resources */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="panel-glass border-tellerium/30 p-3 vignette rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <img src={getTelleriumImage()} alt="T" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
-              <span className="text-xs text-tellerium font-semibold">Tellerium</span>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="panel-glass border-tellerium/30 p-2 vignette rounded-lg">
+            <div className="flex items-center gap-1.5 mb-1">
+              <img src={getTelleriumImage()} alt="T" className="w-3 h-3" style={{ imageRendering: 'auto' }} />
+              <span className="text-[10px] text-tellerium font-semibold">Tellerium</span>
             </div>
-            <p className="text-2xl font-mono text-tellerium glow-cyan">
+            <p className="text-lg font-mono text-tellerium glow-cyan">
               {formatResource(planet.tellerium_balance)}
             </p>
           </div>
-          <div className="panel-glass border-krypton/30 p-3 vignette rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <img src={getKryptonImage()} alt="K" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
-              <span className="text-xs text-krypton font-semibold">Krypton</span>
+          <div className="panel-glass border-krypton/30 p-2 vignette rounded-lg">
+            <div className="flex items-center gap-1.5 mb-1">
+              <img src={getKryptonImage()} alt="K" className="w-3 h-3" style={{ imageRendering: 'auto' }} />
+              <span className="text-[10px] text-krypton font-semibold">Krypton</span>
             </div>
-            <p className="text-2xl font-mono text-krypton glow-blue">
+            <p className="text-lg font-mono text-krypton glow-blue">
               {formatResource(planet.krypton_balance)}
+            </p>
+          </div>
+          <div className="panel-glass border-green/20 p-2 vignette rounded-lg">
+            <div className="flex items-center gap-1.5 mb-1">
+              <img src={getMineImage()} alt="Mines" className="w-3 h-3" style={{ imageRendering: 'auto' }} />
+              <span className="text-[10px] text-green-400 font-semibold">Mines</span>
+            </div>
+            <p className="text-lg font-mono text-green-400 glow-green">
+              {formatNumber(planet.mines || 0)}
+            </p>
+          </div>
+          <div className="panel-glass border-purple/20 p-2 vignette rounded-lg">
+            <div className="flex items-center gap-1.5 mb-1">
+              <img src={getProbeImage()} alt="Probes" className="w-3 h-3" style={{ imageRendering: 'auto' }} />
+              <span className="text-[10px] text-purple-400 font-semibold">Probes</span>
+            </div>
+            <p className="text-lg font-mono text-purple-400 glow-purple">
+              {formatNumber(planet.probes || 0)}
             </p>
           </div>
         </div>

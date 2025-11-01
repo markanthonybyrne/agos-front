@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useGetPlanetFacilitiesQuery } from '@/api/endpoints/facilitiesApi'
 import { useGetPlanetDefencesQuery } from '@/api/endpoints/defencesApi'
 import { useGetBuildableItemsQuery, useGetPlanetQuery } from '@/api/endpoints/planetsApi'
+import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { Facility, Defence } from '@/types/api.types'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
@@ -29,34 +30,13 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
   const { data: facilitiesData } = useGetPlanetFacilitiesQuery(planetId)
   const { data: defencesData } = useGetPlanetDefencesQuery(planetId)
   const { data: buildableItemsData } = useGetBuildableItemsQuery(planetId)
+  const { data: meData } = useGetMeQuery() // Get facilities from auth/me for nice names
   
   console.log('🔍 Raw planetData:', planetData)
   console.log('🔍 Raw facilitiesData:', facilitiesData)
   console.log('🔍 Raw defencesData:', defencesData)
-
-  // Calculate planet era from buildable items
-  const planetEra = useMemo(() => {
-    if (!buildableItemsData) return 1
-    
-    // Safely spread only arrays
-    const facilities = Array.isArray(buildableItemsData.facilities) ? buildableItemsData.facilities : []
-    const research = Array.isArray(buildableItemsData.research) ? buildableItemsData.research : []
-    const ships = Array.isArray(buildableItemsData.ships) ? buildableItemsData.ships : []
-    const defences = Array.isArray(buildableItemsData.defences) ? buildableItemsData.defences : []
-    
-    const allItems = [
-      ...facilities,
-      ...research,
-      ...ships,
-      ...defences,
-    ]
-    
-    const eras = allItems
-      .map(item => item.era)
-      .filter((era): era is number => era !== undefined)
-    
-    return eras.length > 0 ? Math.max(...eras) : 1
-  }, [buildableItemsData])
+  console.log('🔍 meData:', meData)
+  console.log('🔍 meData facilities:', meData?.facilities)
 
   // Calculate hexagon count for round shape over planet
   const hexagonCount = useMemo(() => {
@@ -87,12 +67,76 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
     }
   }, [size])
 
+  // Store facilities data in a ref to persist even if meData becomes undefined
+  const meFacilitiesRef = useRef<Array<{ slug: string; name: string; level: number; is_active: boolean; built_on?: string | null; description?: string }> | null>(null)
+  
+  // Update ref when meData has facilities (persist data even if meData becomes undefined)
+  useEffect(() => {
+    if (meData?.facilities && Array.isArray(meData.facilities) && meData.facilities.length > 0) {
+      console.log('💾 Storing', meData.facilities.length, 'facilities in ref for persistence')
+      meFacilitiesRef.current = meData.facilities
+    }
+  }, [meData?.facilities])
+
+  // Create a lookup map for facility definitions from buildable items and auth/me
+  const facilityDefinitionsMap = useMemo(() => {
+    const map = new Map<string, { name: string; description: string }>()
+    
+    console.log('🔍 Building facilityDefinitionsMap')
+    console.log('  - meData?.facilities:', meData?.facilities)
+    console.log('  - meFacilitiesRef.current:', meFacilitiesRef.current)
+    
+    // Use ref value (persisted) or current meData value
+    const meFacilities = meFacilitiesRef.current || meData?.facilities
+    if (meFacilities && Array.isArray(meFacilities)) {
+      console.log('✅ Found', meFacilities.length, 'facilities from auth/me')
+      meFacilities.forEach((fac) => {
+        const slug = fac.slug
+        if (slug) {
+          map.set(slug, {
+            name: fac.name || slug,
+            description: fac.description || ''
+          })
+          console.log(`  - Added: ${slug} -> "${fac.name || slug}"`)
+        }
+      })
+    } else {
+      console.log('⚠️ No facilities found. meFacilities:', meFacilities)
+    }
+    
+    // Then, add from buildable items as fallback (might have more complete data)
+    const facilities = Array.isArray(buildableItemsData?.facilities) ? buildableItemsData.facilities : []
+    facilities.forEach((fac) => {
+      if (fac?.slug) {
+        // Only add if not already in map (auth/me takes precedence for names)
+        if (!map.has(fac.slug)) {
+          map.set(fac.slug, {
+            name: fac.name || fac.slug,
+            description: fac.description || ''
+          })
+        } else {
+          // Update description if buildable items has a better one
+          const existing = map.get(fac.slug)!
+          map.set(fac.slug, {
+            name: existing.name, // Keep the nice name from auth/me
+            description: fac.description || existing.description
+          })
+        }
+      }
+    })
+    
+    console.log('🔍 Facility definitions map (total entries):', map.size)
+    console.log('🔍 Facility definitions map entries:', Array.from(map.entries()))
+    console.log('🔍 Auth/me facilities count:', meFacilities?.length || 0)
+    console.log('🔍 Buildable facilities count:', facilities.length)
+    return map
+  }, [buildableItemsData, meData])
+
   // Generate hexagon positions in honeycomb pattern
   const hexagonPositions = useMemo<HexagonPosition[]>(() => {
     const positions: HexagonPosition[] = []
     const hexRadius = sizeMapping.hexRadius
     const hexWidth = Math.sqrt(3) * hexRadius
-    const hexHeight = hexRadius * 1.5 // Vertical spacing between hexagons
     
     // Center hexagon
     positions.push({
@@ -118,34 +162,76 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
         hexId++
       }
     }
-    
+
     // Distribute facilities and defenses across hexagons
     // Try planet data first (includes facilities inline), fallback to dedicated endpoint
     const planetFacilities = planetData?.planet?.facilities
     const facilitiesFromPlanet = Array.isArray(planetFacilities) 
-      ? planetFacilities.map((fac: any) => ({
-          facility_slug: fac.slug || fac.facility_slug,
-          level: fac.level,
-          is_active: fac.is_active !== false,
-          definition: { 
-            name: fac.name || fac.slug || fac.facility_slug || 'Facility', 
+      ? planetFacilities.map((fac) => {
+          const slug = fac.slug || fac.facility_slug
+          const definition = facilityDefinitionsMap.get(slug) || { 
+            name: fac.name || slug || 'Facility', 
             description: fac.description || '' 
           }
-        } as Facility))
-      : typeof planetFacilities === 'object' && planetFacilities !== null
-        ? Object.entries(planetFacilities).map(([slug, level]) => ({
+          return {
             facility_slug: slug,
-            level: level as number,
-            is_active: true,
-            definition: { name: slug, description: '' }
-          } as Facility))
+            level: fac.level,
+            is_active: fac.is_active !== false,
+            definition
+          } as Facility
+        })
+      : typeof planetFacilities === 'object' && planetFacilities !== null
+        ? Object.entries(planetFacilities).map(([slug, level]) => {
+            const definition = facilityDefinitionsMap.get(slug) || { 
+              name: slug, 
+              description: '' 
+            }
+            return {
+              facility_slug: slug,
+              level: level as number,
+              is_active: true,
+              definition
+            } as Facility
+          })
         : []
     
     const facilitiesRaw = facilitiesData?.facilities
     const facilitiesFromEndpoint: Facility[] = Array.isArray(facilitiesRaw) 
-      ? facilitiesRaw 
+      ? facilitiesRaw.map((fac: Facility) => {
+          // Always use lookup map first (has correct names from auth/me and buildable items)
+          const lookupDef = facilityDefinitionsMap.get(fac.facility_slug)
+          const existingDef = fac.definition
+          
+          // Priority: lookup map > existing definition > slug fallback
+          const definition = lookupDef || existingDef || {
+            name: fac.facility_slug,
+            description: (existingDef as { description?: string })?.description || ''
+          }
+          
+          if (!lookupDef) {
+            console.log('⚠️ No lookup found for facility slug:', fac.facility_slug, 'Available slugs:', Array.from(facilityDefinitionsMap.keys()))
+          } else {
+            console.log('✅ Using nice name from lookup for:', fac.facility_slug, '->', definition.name)
+          }
+          
+          return {
+            ...fac,
+            definition
+          } as Facility
+        })
       : typeof facilitiesRaw === 'object' && facilitiesRaw !== null
-        ? (Object.values(facilitiesRaw) as Facility[])
+        ? (Object.values(facilitiesRaw) as Facility[]).map((fac: Facility) => {
+            const lookupDef = facilityDefinitionsMap.get(fac.facility_slug)
+            const existingDef = fac.definition
+            const definition = lookupDef || existingDef || {
+              name: fac.facility_slug,
+              description: (existingDef as { description?: string })?.description || ''
+            }
+            return {
+              ...fac,
+              definition
+            } as Facility
+          })
         : []
     
     // Use planet data if endpoint is empty
@@ -161,6 +247,10 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
     console.log('🔍 Grid debug - Planet facilities:', facilitiesFromPlanet.length, facilitiesFromPlanet)
     console.log('🔍 Grid debug - Endpoint facilities:', facilitiesFromEndpoint.length, facilitiesFromEndpoint)
     console.log('🔍 Grid debug - Final facilities:', facilities.length, facilities)
+    console.log('🔍 Grid debug - Facility names check:')
+    facilities.forEach((fac) => {
+      console.log(`  - ${fac.facility_slug}: definition.name = "${fac.definition?.name}"`)
+    })
     console.log('🔍 Grid debug - Defences:', defences.length, defences)
     
     // Fill hexagons with built items - mix facilities and defences together
@@ -188,7 +278,7 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
     })
     
     return positions
-  }, [planetEra, hexagonCount, sizeMapping, facilitiesData, defencesData])
+  }, [hexagonCount, sizeMapping, facilitiesData, defencesData, planetData, facilityDefinitionsMap])
 
   const hexPath = useMemo(() => {
     const radius = sizeMapping.hexRadius
@@ -222,7 +312,6 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
         {/* Render hexagons */}
         {hexagonPositions.map((hex) => {
           const isOccupied = hex.facility || hex.defence
-          const isHovered = hoveredHexId === hex.id
           
           return (
             <g key={hex.id}>

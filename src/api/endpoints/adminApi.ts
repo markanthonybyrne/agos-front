@@ -441,6 +441,10 @@ export const adminApi = apiSlice.injectEndpoints({
         params,
       }),
       providesTags: ['Announcement'],
+      transformResponse: (response: AnnouncementListResponse) => {
+        // API returns { announcements: [...] } directly
+        return response
+      },
     }),
     getAnnouncement: builder.query<{ data: Announcement }, number>({
       query: (id) => `/admin/announcements/${id}`,

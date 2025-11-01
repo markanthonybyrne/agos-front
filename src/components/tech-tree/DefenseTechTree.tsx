@@ -63,6 +63,8 @@ export function DefenseTechTree({ planetId, className }: DefenseTechTreeProps) {
       // No prerequisites for defences in the API
       const prerequisites: string[] = []
 
+      const quantity = isBuilt ? (builtDefences.get(slug) || 0) : undefined
+
       return {
         id: defence.id.toString(),
         slug: defence.slug,
@@ -75,6 +77,7 @@ export function DefenseTechTree({ planetId, className }: DefenseTechTreeProps) {
         costTellerium: defence.tellerium_cost,
         costKrypton: defence.krypton_cost,
         buildTime: defence.build_time_ticks,
+        quantity, // Pass quantity for items that allow multiples
       }
     })
   }, [definitions, buildableItems, defencesList])

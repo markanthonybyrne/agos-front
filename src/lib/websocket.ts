@@ -5,17 +5,19 @@ let echo: Echo | null = null
 
 function getWebSocketConfig() {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'
-  const wsHost = import.meta.env.VITE_WS_HOST
-  const wsPort = import.meta.env.VITE_WS_PORT
+  const wsHost = import.meta.env.VITE_WS_HOST || import.meta.env.REVERB_HOST
+  const wsPort = import.meta.env.VITE_WS_PORT || import.meta.env.REVERB_PORT
+  const wsScheme = import.meta.env.VITE_WS_SCHEME || import.meta.env.REVERB_SCHEME
   
-  // If VITE_WS_HOST is explicitly set, use it
+  // If VITE_WS_HOST or REVERB_HOST is explicitly set, use it
   if (wsHost) {
     const host = wsHost.replace(/^wss?:\/\//, '').replace(/^https?:\/\//, '').replace(/\/$/, '') // Remove protocol and trailing slash
-    const isSecure = wsHost.includes('wss://') || wsHost.includes('https://')
+    // Check scheme (REVERB_SCHEME or VITE_WS_SCHEME) first, then check if host includes secure protocol
+    const isSecure = wsScheme === 'https' || wsScheme === 'wss' || wsHost.includes('wss://') || wsHost.includes('https://')
     
     return {
       host: host,
-      port: wsPort ? parseInt(wsPort) : 8080, // Default to local Reverb port
+      port: wsPort ? parseInt(wsPort.toString()) : 8081, // Use REVERB_PORT if set, default to 8081
       forceTLS: isSecure && !host.includes('localhost') && !host.includes('127.0.0.1'),
     }
   }
@@ -87,7 +89,7 @@ export function initializeEcho(token: string): Echo {
                     import.meta.env.VITE_PUSHER_KEY !== undefined ||
                     (wsConfig.forceTLS && !wsConfig.host.includes('localhost') && !wsConfig.host.includes('127.0.0.1'))
   
-  const wsKey = import.meta.env.VITE_WS_KEY || import.meta.env.VITE_PUSHER_KEY || 'o714i1l2lrdflpgv7mwg'
+  const wsKey = import.meta.env.VITE_WS_KEY || import.meta.env.REVERB_APP_KEY || import.meta.env.VITE_PUSHER_KEY || 'o714i1l2lrdflpgv7mwg'
   const pusherKey = import.meta.env.VITE_PUSHER_KEY || '33d7245f0190d9d32296'
   const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER || 'eu'
   

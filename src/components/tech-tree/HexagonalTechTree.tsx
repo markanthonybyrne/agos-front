@@ -12,6 +12,7 @@ export interface TechTreeItem {
   prerequisites?: string[] // IDs of prerequisite items
   era?: number // Era this item belongs to
   position?: { row: number; col: number } // Optional manual positioning
+  quantity?: number // Quantity of built items (for items that allow multiples)
   // Additional info for tooltips
   description?: string
   costTellerium?: number
@@ -290,6 +291,7 @@ export function HexagonalTechTree({
                   onClick={() => onItemClick?.(item)}
                   imageUrl={item.imageUrl}
                   name={item.name}
+                  quantity={item.quantity}
                 >
                   <span className="text-[10px] font-semibold text-center leading-tight px-1 line-clamp-2 tracking-tight">
                     {item.name}

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useGetFacilityDefinitionsQuery, useGetPlanetFacilitiesQuery } from '@/api/endpoints/facilitiesApi'
 import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
+import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { HexagonalTechTree, TechTreeItem } from './HexagonalTechTree'
 import { HexagonStatus } from './HexagonNode'
 import { getFacilityImage } from '@/lib/facilityImages'
@@ -20,13 +21,46 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
   const { data: definitions, isLoading: isLoadingDefinitions } = useGetFacilityDefinitionsQuery()
   const { data: planetFacilities } = useGetPlanetFacilitiesQuery(planetId)
   const { data: buildableItems } = useGetBuildableItemsQuery(planetId)
+  const { data: meData } = useGetMeQuery() // Get facilities from auth/me endpoint
   
+  // Get facilities from planet endpoint first, fallback to auth/me
   const facilitiesList = useMemo(() => {
-    if (!planetFacilities || !planetFacilities.facilities) return []
+    // Try planet-specific facilities first
+    if (planetFacilities) {
+      const pf: any = planetFacilities
+      const facilitiesRaw = pf.facilities || pf.data?.facilities
+      
+      // Handle both array and object formats
+      if (Array.isArray(facilitiesRaw)) {
+        return facilitiesRaw
+      } else if (facilitiesRaw && typeof facilitiesRaw === 'object') {
+        // If it's an object, convert to array format
+        return Object.entries(facilitiesRaw).map(([slug, level]) => ({
+          facility_slug: slug,
+          slug: slug,
+          level: level as number,
+          is_active: true,
+        }))
+      }
+    }
     
-    const pf: any = planetFacilities
-    return pf.facilities || pf.data?.facilities || []
-  }, [planetFacilities])
+    // Fallback to auth/me facilities (empire-wide)
+    // Facilities are at root level of the response: { facilities: [...] }
+    const meFacilities = (meData as any)?.facilities
+    if (meFacilities && Array.isArray(meFacilities)) {
+      console.log('✅ Using facilities from auth/me endpoint:', meFacilities.length, 'facilities')
+      return meFacilities.map((fac: any) => ({
+        facility_slug: fac.slug || fac.facility_slug,
+        slug: fac.slug || fac.facility_slug,
+        level: fac.level || 1,
+        is_active: fac.is_active !== false,
+        built_on: fac.built_on, // Planet-specific if available
+        name: fac.name, // Include name for debugging
+      }))
+    }
+    
+    return []
+  }, [planetFacilities, meData])
 
   const techTreeItems: TechTreeItem[] = useMemo(() => {
     if (!definitions?.facilities || !buildableItems?.facilities) return []
@@ -38,14 +72,24 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
         : Object.values(buildableItems.facilities || {}).map((f: any) => f.slug)
     )
 
-    // Get built facility levels
+    // Get built facility levels - handle both array and object formats
+    // Use slug field (from auth/me) or facility_slug field (from planet endpoint)
     const builtFacilities = new Map<string, number>()
     facilitiesList.forEach((fac: any) => {
-      const slug = fac.facility_slug || fac.slug
+      // Try both slug and facility_slug fields
+      const slug = fac.slug || fac.facility_slug
       if (slug) {
         builtFacilities.set(slug, fac.level || 1)
       }
     })
+    
+    console.log('🔍 FacilityTechTree - planetFacilities:', planetFacilities)
+    console.log('🔍 FacilityTechTree - meData:', meData)
+    console.log('🔍 FacilityTechTree - meData facilities (root):', (meData as any)?.facilities)
+    console.log('🔍 FacilityTechTree - meData facilities (empire):', (meData as any)?.empire?.facilities)
+    console.log('🔍 FacilityTechTree - facilitiesList:', facilitiesList)
+    console.log('🔍 FacilityTechTree - builtFacilities map:', Array.from(builtFacilities.entries()))
+    console.log('🔍 FacilityTechTree - All facility slugs from definitions:', definitions.facilities.map(f => f.slug))
 
     return definitions.facilities.map((facility) => {
       const slug = facility.slug
@@ -55,11 +99,16 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
       let status: HexagonStatus
       if (isBuilt) {
         status = HexagonStatus.COMPLETED
+        console.log('✅ Facility marked as COMPLETED:', slug, 'Level:', builtFacilities.get(slug))
       } else if (isBuildable) {
         status = HexagonStatus.AVAILABLE
+        console.log('⚠️ Facility is AVAILABLE (buildable but not built):', slug)
       } else {
         status = HexagonStatus.PREREQUISITE_NOT_MET
+        console.log('❌ Facility prerequisites not met:', slug)
       }
+      
+      console.log(`📊 Final status for ${slug}:`, status, 'isBuilt:', isBuilt, 'isBuildable:', isBuildable)
 
       // Determine prerequisites from facility definition
       const prerequisites: string[] = []

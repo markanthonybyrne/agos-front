@@ -64,16 +64,40 @@ export const authApi = apiSlice.injectEndpoints({
         planets?: Planet[]
         current_tick?: number
         next_tick_eta?: string
+        facilities?: Array<{ slug: string; name: string; level: number; is_active: boolean; built_on?: string | null; description?: string }>
+        defence_grid?: Array<{ slug: string; name: string; quantity: number; active: boolean; built_on?: string | null }>
       },
       void
     >({
       query: () => '/auth/me',
-      transformResponse: (response: { status: string; data?: { user: User; empire: Empire; planets?: Planet[]; current_tick?: number; next_tick_eta?: string } }) => {
+      transformResponse: (response: { 
+        status: string
+        data?: { 
+          user: User
+          empire: Empire
+          planets?: Planet[]
+          current_tick?: number
+          next_tick_eta?: string
+          facilities?: Array<{ slug: string; name: string; level: number; is_active: boolean; built_on?: string | null; description?: string }>
+          defence_grid?: Array<{ slug: string; name: string; quantity: number; active: boolean; built_on?: string | null }>
+        }
+        facilities?: Array<{ slug: string; name: string; level: number; is_active: boolean; built_on?: string | null; description?: string }>
+        defence_grid?: Array<{ slug: string; name: string; quantity: number; active: boolean; built_on?: string | null }>
+      }) => {
         // Handle the wrapped API response structure
         if (response.status === 'ok' && response.data) {
-          return response.data
+          return {
+            ...response.data,
+            // Include facilities and defence_grid from root level or data level
+            facilities: response.data.facilities || response.facilities,
+            defence_grid: response.data.defence_grid || response.defence_grid,
+          }
         }
-        return response as unknown as { user: User; empire: Empire; planets?: Planet[]; current_tick?: number; next_tick_eta?: string }
+        return {
+          ...(response as unknown as { user: User; empire: Empire; planets?: Planet[]; current_tick?: number; next_tick_eta?: string }),
+          facilities: (response as any).facilities,
+          defence_grid: (response as any).defence_grid,
+        }
       },
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {

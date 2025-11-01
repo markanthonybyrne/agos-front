@@ -1664,7 +1664,7 @@ export interface Announcement {
   is_active: boolean
   starts_at: string | null
   expires_at: string | null
-  created_by: number
+  created_by: string // Username string, not number
   created_at: string
   updated_at: string
   creator?: {
@@ -1695,6 +1695,10 @@ export interface UpdateAnnouncementRequest {
 }
 
 export interface AnnouncementListResponse {
+  announcements: Announcement[]
+}
+
+export interface AnnouncementListPaginatedResponse {
   data: Announcement[]
   meta: {
     page: number

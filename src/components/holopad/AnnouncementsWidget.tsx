@@ -1,29 +1,74 @@
 import { Megaphone } from 'lucide-react'
 import { WidgetWindow } from './WidgetWindow'
-
-interface Announcement {
-  id: number
-  title: string
-  content: string
-  published_at: string
-  is_important?: boolean
-}
+import { useGetAnnouncementsQuery } from '@/api/endpoints/announcementsApi'
+import { Announcement } from '@/types/api.types'
 
 interface AnnouncementsWidgetProps {
-  announcements?: Announcement[]
-  isLoading?: boolean
   onMinimize?: () => void
   onClose?: () => void
   isMinimized?: boolean
 }
 
 export function AnnouncementsWidget({ 
-  announcements = [],
-  isLoading = false,
   onMinimize,
   onClose,
   isMinimized 
 }: AnnouncementsWidgetProps) {
+  const { data, isLoading, error } = useGetAnnouncementsQuery(undefined, {
+    pollingInterval: 60000, // Poll every minute to catch new announcements
+  })
+  
+  // Debug logging
+  console.log('[AnnouncementsWidget] Data:', data)
+  console.log('[AnnouncementsWidget] Loading:', isLoading)
+  console.log('[AnnouncementsWidget] Error:', error)
+  console.log('[AnnouncementsWidget] Raw announcements:', data?.announcements)
+  
+  // Map API announcement to widget format
+  const rawAnnouncements = data?.announcements || []
+  console.log('[AnnouncementsWidget] Raw announcements array:', rawAnnouncements)
+  
+  const filtered = rawAnnouncements.filter((a: Announcement) => {
+    // If is_active is not provided in the response, default to true (show the announcement)
+    const isActive = a.is_active !== false // Default to true if undefined/null
+    console.log(`[AnnouncementsWidget] Announcement ${a.id} (${a.title}): is_active=${a.is_active} (treated as ${isActive}), will ${isActive ? 'show' : 'filter out'}`)
+    return isActive
+  })
+  console.log('[AnnouncementsWidget] After filtering (active only):', filtered.length, 'announcements')
+  
+  const announcements: Array<{
+    id: number
+    title: string
+    content: string
+    published_at: string
+    is_important?: boolean
+    priority?: string
+  }> = filtered
+    .map((a: Announcement) => {
+      console.log(`[AnnouncementsWidget] Mapping announcement ${a.id}:`, {
+        title: a.title,
+        message: a.message,
+        is_active: a.is_active,
+        is_pinned: a.is_pinned ?? false,
+        priority: a.priority,
+      })
+      return {
+        id: a.id,
+        title: a.title,
+        content: a.message,
+        published_at: a.created_at,
+        is_important: (a.is_pinned ?? false) || a.priority === 'alert' || a.priority === 'warning',
+        priority: a.priority,
+      }
+    })
+    .sort((a, b) => {
+      // Sort by pinned first, then by priority (alert > warning > success > info), then by date
+      if (a.is_important && !b.is_important) return -1
+      if (!a.is_important && b.is_important) return 1
+      return new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+    })
+  
+  console.log('[AnnouncementsWidget] Final announcements array:', announcements)
   
   const formatDate = (dateString: string) => {
     try {
@@ -82,9 +127,17 @@ export function AnnouncementsWidget({
                 <p className="text-xs text-muted-foreground whitespace-pre-wrap mb-2">
                   {announcement.content}
                 </p>
-                <p className="text-xs text-muted-foreground/70">
-                  {formatDate(announcement.published_at)}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground/70">
+                    {formatDate(announcement.published_at)}
+                  </p>
+                  {/* Show priority badge if not info */}
+                  {announcement.priority && announcement.priority !== 'info' && (
+                    <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-400/50 rounded-full capitalize">
+                      {announcement.priority}
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

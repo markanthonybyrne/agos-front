@@ -412,6 +412,14 @@ export function useWebSocket() {
               console.log('[WebSocket] 🎯 Manually triggering combat.resolved handler')
               handleCombatResolvedEvent(eventData)
             }
+            if (eventName === 'announcement.created' || eventName.includes('announcement') && eventName.includes('created')) {
+              console.log('[WebSocket] 🎯 Manually triggering announcement.created handler')
+              handleAnnouncementCreated(eventData)
+            }
+            if (eventName === 'announcement.published' || eventName.includes('announcement') && eventName.includes('published')) {
+              console.log('[WebSocket] 🎯 Manually triggering announcement.published handler')
+              handleAnnouncementCreated(eventData)
+            }
           } else {
             console.log('[WebSocket] 🚫 Event is for a different channel, ignoring')
           }
@@ -628,6 +636,74 @@ export function useWebSocket() {
       // Invalidate Signal tags when tick processes (signals are processed during ticks)
       dispatch(apiSlice.util.invalidateTags(['Signal']))
     })
+
+    // Subscribe to public announcements channel for real-time announcements
+    const announcementsChannel = echo.channel('announcements')
+    console.log('[WebSocket] Subscribing to announcements channel')
+    
+    const handleAnnouncementCreated = (data: any) => {
+      console.log('[WebSocket] ✅ Received announcement.created event:', data)
+      const announcement = data.announcement || data
+      const title = announcement.title || 'New announcement'
+      const priority = announcement.priority || 'info'
+      
+      // Show toast notification
+      toast.success(`New announcement: ${title}`, {
+        duration: 10000,
+        description: announcement.message || announcement.content || '',
+      })
+      
+      // Add notification to notification tray
+      dispatch(addNotification({
+        type: priority === 'alert' ? 'error' : priority === 'warning' ? 'warning' : priority === 'success' ? 'success' : 'info',
+        title: `New Announcement: ${title}`,
+        message: announcement.message || announcement.content || 'A new announcement has been published',
+        category: 'announcement',
+        data: {
+          announcement_id: announcement.id,
+        },
+      }))
+      
+      // Invalidate announcement cache to refresh the list
+      dispatch(apiSlice.util.invalidateTags(['Announcement']))
+    }
+    
+    // Listen for various announcement event names
+    announcementsChannel.listen('announcement.created', handleAnnouncementCreated)
+    announcementsChannel.listen('.announcement.created', handleAnnouncementCreated)
+    announcementsChannel.listen('AnnouncementCreated', handleAnnouncementCreated)
+    announcementsChannel.listen('announcement.published', handleAnnouncementCreated)
+    announcementsChannel.listen('.announcement.published', handleAnnouncementCreated)
+    announcementsChannel.listen('AnnouncementPublished', handleAnnouncementCreated)
+    
+    // Also intercept at connection level for announcements channel
+    const echoWithConnector = echo as any
+    if (echoWithConnector.connector?.pusher) {
+      const pusher = echoWithConnector.connector.pusher
+      
+      pusher.connection.bind('message', (event: any) => {
+        // Check if this is for the announcements channel
+        if (event.channel && (event.channel === 'public-announcements' || event.channel.includes('announcements'))) {
+          console.log('[WebSocket] 🔔 Announcement event received:', {
+            channel: event.channel,
+            event: event.event,
+            data: event.data
+          })
+          
+          const eventName = event.event
+          const eventData = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+          
+          if (eventName === 'announcement.created' || eventName.includes('announcement') && eventName.includes('created')) {
+            console.log('[WebSocket] 🎯 Manually triggering announcement.created handler')
+            handleAnnouncementCreated(eventData)
+          }
+          if (eventName === 'announcement.published' || eventName.includes('announcement') && eventName.includes('published')) {
+            console.log('[WebSocket] 🎯 Manually triggering announcement.published handler')
+            handleAnnouncementCreated(eventData)
+          }
+        }
+      })
+    }
 
           // Subscribe to galaxy channels for map updates
           // Echo may auto-add 'public-' prefix, so use 'galaxy.{q}.{s}.{g}' format
