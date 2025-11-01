@@ -32,6 +32,8 @@ import { CreateAllianceRequestForm } from '@/features/politics/components/Create
 import { QuantumCreditsPanel } from '@/components/premium/QuantumCreditsPanel'
 import { BoostersPanel } from '@/components/premium/BoostersPanel'
 import { AchievementsPanel } from '@/components/premium/AchievementsPanel'
+import { SignalsPage } from '@/features/signals/SignalsPage'
+import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -114,6 +116,12 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     case PanelType.ACHIEVEMENTS:
       return <AchievementsPanel />
     
+    case PanelType.SIGNALS:
+      return <SignalsPage />
+    
+    case PanelType.COMBAT_LOGS:
+      return <CombatLogsPage />
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -162,6 +170,8 @@ export function PanelManager() {
     [PanelType.QUANTUM_CREDITS]: 'Quantum Credits',
     [PanelType.BOOSTERS]: 'Boosters',
     [PanelType.ACHIEVEMENTS]: 'Achievements',
+    [PanelType.SIGNALS]: 'Tachyon Signals',
+    [PanelType.COMBAT_LOGS]: 'Battle Reports',
   }
 
   return (

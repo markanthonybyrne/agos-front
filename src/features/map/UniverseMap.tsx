@@ -1440,6 +1440,15 @@ export function UniverseMap() {
         <PlanetView
           planets={visiblePlanets}
           onPlanetClick={handlePlanetClick}
+          currentGalaxy={
+            mapState.selectedQuadrant && mapState.selectedSector && mapState.selectedGalaxy
+              ? {
+                  quadrant: mapState.selectedQuadrant,
+                  sector: mapState.selectedSector,
+                  galaxy: mapState.selectedGalaxy,
+                }
+              : undefined
+          }
         />
       </div>
     )
@@ -1504,6 +1513,15 @@ export function UniverseMap() {
         <PlanetView
           planets={planets as Planet[]}
           onPlanetClick={handlePlanetClick}
+          currentGalaxy={
+            mapState.selectedQuadrant && mapState.selectedSector && mapState.selectedGalaxy
+              ? {
+                  quadrant: mapState.selectedQuadrant,
+                  sector: mapState.selectedSector,
+                  galaxy: mapState.selectedGalaxy,
+                }
+              : undefined
+          }
         />
       </div>
     )
@@ -1550,6 +1568,15 @@ export function UniverseMap() {
         <PlanetView
           planets={planets as Planet[]}
           onPlanetClick={handlePlanetClick}
+          currentGalaxy={
+            mapState.selectedQuadrant && mapState.selectedSector && mapState.selectedGalaxy
+              ? {
+                  quadrant: mapState.selectedQuadrant,
+                  sector: mapState.selectedSector,
+                  galaxy: mapState.selectedGalaxy,
+                }
+              : undefined
+          }
         />
       </div>
     )
@@ -1673,7 +1700,7 @@ export function UniverseMap() {
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
               <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
-                <h1 className="text-5xl font-heading glow-cyan mb-2">Universe Map</h1>
+                <h1 className="text-2xl font-heading glow-cyan mb-2">Universe Map</h1>
                 <p className="text-lg text-muted-foreground">Select a quadrant to explore</p>
               </div>
             </div>
@@ -1761,7 +1788,7 @@ export function UniverseMap() {
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
               <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
-                <h1 className="text-5xl font-heading glow-cyan mb-2">Quadrant {mapState.selectedQuadrant}</h1>
+                <h1 className="text-2xl font-heading glow-cyan mb-2">Quadrant {mapState.selectedQuadrant}</h1>
                 <p className="text-lg text-muted-foreground">Select a sector to explore</p>
               </div>
               {!(visibilityData && visibilityData.visibility_level === 'galaxy') && (
@@ -1899,7 +1926,7 @@ export function UniverseMap() {
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
               <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
-                <h1 className="text-5xl font-heading glow-cyan mb-2">
+                <h1 className="text-2xl font-heading glow-cyan mb-2">
                   Quadrant {mapState.selectedQuadrant}: Sector {mapState.selectedSector}
                 </h1>
                 <p className="text-lg text-muted-foreground">Select a galaxy to explore</p>
@@ -2077,7 +2104,7 @@ export function UniverseMap() {
             {/* Header */}
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
               <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
-                <h1 className="text-5xl font-heading glow-cyan mb-2">
+                <h1 className="text-2xl font-heading glow-cyan mb-2">
                   Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
                 </h1>
                 <p className="text-lg text-muted-foreground">Select a planet to view details</p>
@@ -2274,7 +2301,7 @@ export function UniverseMap() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-heading glow-cyan">Universe Map</h1>
+          <h1 className="text-xl font-heading glow-cyan">Universe Map</h1>
         </div>
         <div className="flex gap-2">
           <div className="relative">

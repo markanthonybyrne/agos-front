@@ -64,7 +64,7 @@ export function CombatLogsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-heading glow-cyan">Battle Reports</h1>
+        <h1 className="text-xl font-heading glow-cyan">Battle Reports</h1>
         <p className="text-muted-foreground">Combat logs from your empire's battles</p>
       </div>
 

@@ -573,7 +573,7 @@ export function MessagingPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading glow-cyan">Messaging</h1>
+          <h1 className="text-xl font-heading glow-cyan">Messaging</h1>
           <p className="text-muted-foreground">Communicate with other empires</p>
         </div>
         <Dialog open={composeOpen} onOpenChange={setComposeOpen}>

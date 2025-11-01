@@ -139,7 +139,7 @@ export function FleetsPage() {
           >
             ← Back to Fleet List
           </Button>
-          <h1 className="text-3xl font-heading glow-cyan">Fleet Builder</h1>
+          <h1 className="text-xl font-heading glow-cyan">Fleet Builder</h1>
         </div>
         <FleetBuilder />
       </div>
@@ -150,7 +150,7 @@ export function FleetsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-heading glow-cyan">Fleet Command</h1>
+        <h1 className="text-xl font-heading glow-cyan">Fleet Command</h1>
         <Button onClick={() => setActiveView('builder')}>
           <Plus className="w-4 h-4 mr-2" />
           Build Fleet

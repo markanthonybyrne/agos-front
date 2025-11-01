@@ -129,7 +129,7 @@ export function PlanetsList() {
       {/* Header */}
       <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
         <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
-          <h1 className="text-5xl font-heading glow-cyan mb-2">Planet Command</h1>
+          <h1 className="text-2xl font-heading glow-cyan mb-2">Planet Command</h1>
           <p className="text-lg text-muted-foreground">Select a planet to access its console</p>
         </div>
         <Button onClick={handleGalaxyMapClick} variant="outline" size="lg">

@@ -155,7 +155,7 @@ export function PlanetDetail() {
             }}
           />
         <div>
-          <h1 className="text-3xl font-heading glow-cyan">{planet.name}</h1>
+          <h1 className="text-xl font-heading glow-cyan">{planet.name}</h1>
           <p className="text-muted-foreground">
             {formatCoordinate(planet.coordinate)} • {planet.state}
               {planet?.type?.name && (

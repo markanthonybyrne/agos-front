@@ -9,7 +9,9 @@ import {
   Trophy,
   LogOut,
   ChevronDown,
-  Shield
+  Shield,
+  Scan,
+  Sword
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -74,6 +76,22 @@ const HUD_BUTTONS: HUDButton[] = [
     panelType: PanelType.MESSAGING,
     panelSize: PanelSize.XLARGE,
     color: 'text-yellow-400',
+  },
+  {
+    id: 'signals',
+    icon: Scan,
+    label: 'Signals',
+    panelType: PanelType.SIGNALS,
+    panelSize: PanelSize.XLARGE,
+    color: 'text-cyan-400',
+  },
+  {
+    id: 'combat',
+    icon: Sword,
+    label: 'Battle Reports',
+    panelType: PanelType.COMBAT_LOGS,
+    panelSize: PanelSize.XLARGE,
+    color: 'text-red-400',
   },
   {
     id: 'rankings',

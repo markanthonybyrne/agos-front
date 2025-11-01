@@ -23,6 +23,8 @@ export enum PanelType {
   QUANTUM_CREDITS = 'QUANTUM_CREDITS',
   BOOSTERS = 'BOOSTERS',
   ACHIEVEMENTS = 'ACHIEVEMENTS',
+  SIGNALS = 'SIGNALS',
+  COMBAT_LOGS = 'COMBAT_LOGS',
 }
 
 export enum PanelSize {

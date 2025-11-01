@@ -81,7 +81,7 @@ export function AlliancesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading glow-cyan">Alliances</h1>
+          <h1 className="text-xl font-heading glow-cyan">Alliances</h1>
           <p className="text-muted-foreground">Join forces with other empires</p>
         </div>
         <div className="flex items-center gap-2">

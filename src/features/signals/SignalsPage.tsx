@@ -106,7 +106,7 @@ export function SignalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading glow-cyan">Tachyon Signals</h1>
+          <h1 className="text-xl font-heading glow-cyan">Tachyon Signals</h1>
           <p className="text-muted-foreground">Launch intelligence gathering missions</p>
         </div>
         <div className="flex items-center gap-2">

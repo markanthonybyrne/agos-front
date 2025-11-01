@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Planet } from '@/types/api.types'
-import { formatCoordinate } from '@/lib/coordinates'
+import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
 import { formatResource } from '@/lib/formatters'
 import { useAuth } from '@/hooks/useAuth'
+import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { cn } from '@/lib/utils'
 import { 
   Home, 
@@ -22,12 +23,88 @@ interface PlanetViewProps {
   planets: Planet[]
   onPlanetClick: (planet: Planet) => void
   className?: string
+  currentGalaxy?: {
+    quadrant: number
+    sector: number
+    galaxy: number
+  }
 }
 
-export function PlanetView({ planets, onPlanetClick, className = '' }: PlanetViewProps) {
+export function PlanetView({ planets, onPlanetClick, className = '', currentGalaxy }: PlanetViewProps) {
   const { empire } = useAuth()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [expandedPlanet, setExpandedPlanet] = useState<Planet | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [planetPositions, setPlanetPositions] = useState<Map<number, { x: number; y: number }>>(new Map())
+  
+  // Fetch fleets to get travel routes
+  const { data: fleetsData } = useGetFleetsQuery()
+  
+  // Filter in-transit fleets within the current galaxy
+  const relevantFleets = useMemo(() => {
+    if (!currentGalaxy || !fleetsData?.fleets) return []
+    
+    return fleetsData.fleets.filter((fleet) => {
+      if (fleet.status !== 'in_transit') return false
+      
+      const origin = fleet.origin_coordinate
+      const dest = fleet.destination_coordinate
+      
+      // Check if both origin and destination are in the current galaxy
+      const originInGalaxy = 
+        origin.quadrant === currentGalaxy.quadrant &&
+        origin.sector === currentGalaxy.sector &&
+        origin.galaxy === currentGalaxy.galaxy
+      
+      const destInGalaxy =
+        dest.quadrant === currentGalaxy.quadrant &&
+        dest.sector === currentGalaxy.sector &&
+        dest.galaxy === currentGalaxy.galaxy
+      
+      return originInGalaxy && destInGalaxy
+    })
+  }, [fleetsData, currentGalaxy])
+  
+  // Calculate planet positions when grid layout changes
+  useEffect(() => {
+    if (!gridRef.current) return
+    
+    const updatePositions = () => {
+      const newPositions = new Map<number, { x: number; y: number }>()
+      const gridElement = gridRef.current
+      if (!gridElement) return
+      
+      const cards = gridElement.querySelectorAll('[data-planet-id]')
+      cards.forEach((card) => {
+        const planetId = parseInt(card.getAttribute('data-planet-id') || '0')
+        if (planetId && card instanceof HTMLElement) {
+          const rect = card.getBoundingClientRect()
+          const gridRect = gridElement.getBoundingClientRect()
+          
+          // Calculate center of card relative to grid
+          const x = rect.left - gridRect.left + rect.width / 2
+          const y = rect.top - gridRect.top + rect.height / 2
+          
+          newPositions.set(planetId, { x, y })
+        }
+      })
+      
+      setPlanetPositions(newPositions)
+    }
+    
+    // Update positions initially and on resize
+    updatePositions()
+    window.addEventListener('resize', updatePositions)
+    const observer = new ResizeObserver(updatePositions)
+    if (gridRef.current) {
+      observer.observe(gridRef.current)
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updatePositions)
+      observer.disconnect()
+    }
+  }, [planets])
 
   // Get planet image based on type
   const getPlanetImage = (planet: Planet): string | null => {
@@ -88,9 +165,78 @@ export function PlanetView({ planets, onPlanetClick, className = '' }: PlanetVie
     return { facilitiesCount, defensesCount }
   }
 
+  // Helper to find planet ID from coordinate
+  const getPlanetIdFromCoordinate = (coord: { quadrant: number; sector: number; galaxy: number; planet: number }): number | null => {
+    const planet = planets.find((p) => {
+      const parsed = parseCoordinate(p.coordinate)
+      return parsed &&
+        parsed.quadrant === coord.quadrant &&
+        parsed.sector === coord.sector &&
+        parsed.galaxy === coord.galaxy &&
+        parsed.planet === coord.planet
+    })
+    return planet?.id || null
+  }
+
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${className}`}>
-      {planets.map((planet) => {
+    <div className={`relative ${className}`}>
+      {/* SVG overlay for travel lines */}
+      {relevantFleets.length > 0 && planetPositions.size > 0 && (
+        <svg
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{ width: '100%', height: '100%' }}
+        >
+          {relevantFleets.map((fleet) => {
+            const originPlanetId = getPlanetIdFromCoordinate(fleet.origin_coordinate)
+            const destPlanetId = getPlanetIdFromCoordinate(fleet.destination_coordinate)
+            
+            if (!originPlanetId || !destPlanetId) return null
+            
+            const originPos = planetPositions.get(originPlanetId)
+            const destPos = planetPositions.get(destPlanetId)
+            
+            if (!originPos || !destPos) return null
+            
+            // Determine line color based on order type
+            const getLineColor = () => {
+              switch (fleet.order_type) {
+                case 'attack':
+                  return '#ef4444' // red-500
+                case 'defend':
+                  return '#3b82f6' // blue-500
+                case 'station':
+                  return '#10b981' // green-500
+                case 'return':
+                  return '#f59e0b' // amber-500
+                default:
+                  return '#6366f1' // indigo-500
+              }
+            }
+            
+            return (
+              <line
+                key={fleet.id}
+                x1={originPos.x}
+                y1={originPos.y}
+                x2={destPos.x}
+                y2={destPos.y}
+                stroke={getLineColor()}
+                strokeWidth="2"
+                strokeOpacity="0.6"
+                strokeDasharray="5,5"
+                className="animate-pulse"
+              />
+            )
+          })}
+        </svg>
+      )}
+      
+      {/* Planet grid */}
+      <div
+        ref={gridRef}
+        className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 relative z-10`}
+      >
+        {planets.map((planet) => {
         const isOwned = planet.owner_empire_id === empire?.id
         const isHovered = hoveredPlanet?.id === planet.id
         const isExpanded = expandedPlanet?.id === planet.id
@@ -102,6 +248,7 @@ export function PlanetView({ planets, onPlanetClick, className = '' }: PlanetVie
         return (
           <Card
             key={planet.id}
+            data-planet-id={planet.id}
             className={cn(
               "relative aspect-square cursor-pointer overflow-hidden",
               "planet-interactive orbit-float transition-all duration-300",
@@ -298,6 +445,7 @@ export function PlanetView({ planets, onPlanetClick, className = '' }: PlanetVie
           </Card>
         )
       })}
+      </div>
     </div>
   )
 }

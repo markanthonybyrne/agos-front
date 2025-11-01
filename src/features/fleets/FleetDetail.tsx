@@ -105,7 +105,7 @@ export function FleetDetail() {
           Back
         </Button>
         <div>
-          <h1 className="text-3xl font-heading glow-cyan">
+          <h1 className="text-xl font-heading glow-cyan">
             {fleet.name || `Fleet #${fleet.id}`}
           </h1>
           <div className="flex items-center gap-2 mt-2">
