@@ -10,6 +10,7 @@ export interface TechTreeItem {
   imageUrl?: string
   status: HexagonStatus
   prerequisites?: string[] // IDs of prerequisite items
+  era?: number // Era this item belongs to
   position?: { row: number; col: number } // Optional manual positioning
   // Additional info for tooltips
   description?: string
@@ -32,9 +33,9 @@ interface HexagonalTechTreeProps {
   hexagonSize?: number
 }
 
-// Calculate hexagonal grid positions
-function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<string, { x: number; y: number }> {
-  const positions = new Map<string, { x: number; y: number }>()
+// Calculate hexagonal grid positions grouped by era
+function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<string, { x: number; y: number; era?: number }> {
+  const positions = new Map<string, { x: number; y: number; era?: number }>()
   
   // If items have manual positions, use those
   const hasManualPositions = items.some(item => item.position)
@@ -51,31 +52,30 @@ function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<str
     return positions
   }
 
-  // Otherwise, auto-layout based on prerequisites
-  // Group by tier (number of prerequisites)
-  const tierGroups: Map<number, TechTreeItem[]> = new Map()
+  // Group by era first
+  const eraGroups: Map<number, TechTreeItem[]> = new Map()
   items.forEach(item => {
-    const tier = item.prerequisites?.length || 0
-    if (!tierGroups.has(tier)) {
-      tierGroups.set(tier, [])
+    const era = item.era || 1 // Default to era 1 if not specified
+    if (!eraGroups.has(era)) {
+      eraGroups.set(era, [])
     }
-    tierGroups.get(tier)!.push(item)
+    eraGroups.get(era)!.push(item)
   })
 
-  // Position items tier by tier with proper spacing
-  // Use a compact vertical layout by limiting items per row
-  const itemsPerRow = 3
+  // Position items era by era
+  const eras = Array.from(eraGroups.keys()).sort((a, b) => a - b)
+  const itemsPerRow = 4 // Slightly wider for era-based layout
   
-  tierGroups.forEach((tierItems, tier) => {
-    tierItems.forEach((item, index) => {
-      const row = tier
-      // Spread items evenly horizontally within their tier, wrapping to multiple rows if needed
+  eras.forEach((era, eraIndex) => {
+    const eraItems = eraGroups.get(era) || []
+    const offsetY = eraIndex * (hexagonSize * 8) // Large gap between eras
+    
+    eraItems.forEach((item, index) => {
       const col = index % itemsPerRow
-      const subRow = Math.floor(index / itemsPerRow)
-      // Compact hexagonal grid with proper spacing
-      const x = col * (hexagonSize * 1.4)
-      const y = (row + subRow) * (hexagonSize * 1.6) // More vertical spacing
-      positions.set(item.id, { x, y })
+      const row = Math.floor(index / itemsPerRow)
+      const x = col * (hexagonSize * 1.5) // Horizontal spacing
+      const y = row * (hexagonSize * 1.6) + offsetY // Vertical spacing with era offset
+      positions.set(item.id, { x, y, era })
     })
   })
 
@@ -112,11 +112,43 @@ export function HexagonalTechTree({
   className,
   hexagonSize = 120,
 }: HexagonalTechTreeProps) {
-  const { positions, connections, bounds } = useMemo(() => {
+  const { positions, connections, bounds, eraHeaders } = useMemo(() => {
     const pos = calculatePositions(items, hexagonSize)
     const conn = calculateConnections(items, pos, hexagonSize)
     
-    // Calculate bounding box
+    // Group items by era for headers
+    const eraGroups: Map<number, TechTreeItem[]> = new Map()
+    items.forEach(item => {
+      const era = item.era || 1
+      if (!eraGroups.has(era)) {
+        eraGroups.set(era, [])
+      }
+      eraGroups.get(era)!.push(item)
+    })
+    
+    // Create era headers
+    const eraHeaders = Array.from(eraGroups.entries()).map(([era, eraItems]) => {
+      // Find the average X position for this era
+      let sumX = 0
+      let count = 0
+      eraItems.forEach(item => {
+        const posInfo = pos.get(item.id)
+        if (posInfo) {
+          sumX += posInfo.x
+          count++
+        }
+      })
+      const avgX = count > 0 ? sumX / count : 0
+      
+      // Find the Y position (first item of this era)
+      const firstItem = eraItems[0]
+      const firstPos = pos.get(firstItem.id)
+      const y = firstPos ? firstPos.y - (hexagonSize * 3) : 0
+      
+      return { era, x: avgX, y }
+    })
+    
+    // Calculate bounding box including era headers
     let minX = Infinity
     let maxX = -Infinity
     let minY = Infinity
@@ -129,6 +161,11 @@ export function HexagonalTechTree({
       maxY = Math.max(maxY, y)
     })
     
+    // Include era headers in bounds
+    eraHeaders.forEach(({ y: headerY }) => {
+      minY = Math.min(minY, headerY)
+    })
+    
     // Add padding
     const padding = hexagonSize
     const bounds = {
@@ -138,7 +175,7 @@ export function HexagonalTechTree({
       offsetY: minY - padding,
     }
     
-    return { positions: pos, connections: conn, bounds }
+    return { positions: pos, connections: conn, bounds, eraHeaders }
   }, [items, hexagonSize])
 
   return (
@@ -168,6 +205,30 @@ export function HexagonalTechTree({
               className="text-primary/30"
               markerEnd="url(#arrowhead)"
             />
+          ))}
+          
+          {/* Era headers */}
+          {eraHeaders.map(({ era, x, y }) => (
+            <g key={era}>
+              <text
+                x={x}
+                y={y}
+                textAnchor="middle"
+                className="text-4xl font-heading fill-cyan-400/80"
+                style={{ pointerEvents: 'none' }}
+              >
+                ERA {era}
+              </text>
+              <line
+                x1={x - hexagonSize * 10}
+                y1={y + 20}
+                x2={x + hexagonSize * 10}
+                y2={y + 20}
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-cyan-500/30"
+              />
+            </g>
           ))}
           
           {/* Arrow marker */}

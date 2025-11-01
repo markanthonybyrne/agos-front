@@ -80,6 +80,7 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
         imageUrl: getFacilityImage(facility.slug),
         status,
         prerequisites,
+        era: facility.era,
         description: facility.description,
         costTellerium: facility.base_tellerium_cost,
         costKrypton: facility.base_krypton_cost,

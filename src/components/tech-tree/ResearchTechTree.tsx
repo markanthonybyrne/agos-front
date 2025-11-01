@@ -55,6 +55,7 @@ export function ResearchTechTree({ planetId, className }: ResearchTechTreeProps)
         imageUrl: undefined, // Research doesn't have images yet
         status,
         prerequisites,
+        era: research.era,
         description: research.description,
         costTellerium: research.cost_tellerium,
         costKrypton: research.cost_krypton,

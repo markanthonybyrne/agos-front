@@ -11,6 +11,7 @@ import {
   Coins,
   Sword,
   Shield,
+  Megaphone,
 } from 'lucide-react'
 
 const adminNavItems = [
@@ -21,6 +22,7 @@ const adminNavItems = [
   { path: '/admin/fleets', label: 'Fleets', icon: Rocket },
   { path: '/admin/alliances', label: 'Alliances', icon: UsersIcon },
   { path: '/admin/mail', label: 'Mail', icon: Mail },
+  { path: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   { path: '/admin/ticks', label: 'Ticks', icon: Clock },
   { path: '/admin/resources', label: 'Resources', icon: Coins },
   { path: '/admin/combats', label: 'Combats', icon: Sword },

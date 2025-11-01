@@ -484,6 +484,7 @@ export interface DefenceDefinition {
   target_class: string
   init: number
   build_time_ticks: number
+  era?: number // Era required for this defence
   // Note: Attack/defence power and energy consumption fields may not be in the API response
   attack_power?: number
   defence_power?: number
@@ -510,6 +511,7 @@ export interface FacilityDefinition {
   base_krypton_cost: number
   build_time_ticks: number
   prerequisites: string[]
+  era?: number // Era required for this facility
   // Note: Production and energy consumption fields may not be in the API response
   production_tellerium?: number
   production_krypton?: number
@@ -535,6 +537,7 @@ export interface ResearchDefinition {
   description: string
   cost_research_points: number
   prerequisites: string[]
+  era?: number // Era required for this research
   effects: Record<string, number>
 }
 
@@ -564,6 +567,7 @@ export interface PlanetResearchItem {
   missing_prerequisites: string[] // Combined list of missing items
   prerequisite_facilities: string[] // Required facilities (checked on planet)
   prerequisite_research: string[] // Required research (checked empire-wide)
+  era?: number // Era required for this research
   effects?: Record<string, number>
 }
 
@@ -584,6 +588,7 @@ export interface ShipDefinition {
   travel_ticks: number
   build_time_ticks: number
   prerequisites: string[] | null
+  era?: number // Era required for this ship
   abilities: string[]
 }
 
@@ -1412,6 +1417,56 @@ export interface AdminCombat {
 
 export interface AdminCombatListResponse {
   data: AdminCombat[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+// Announcement Types
+export interface Announcement {
+  id: number
+  title: string
+  message: string
+  priority: 'info' | 'warning' | 'alert' | 'success'
+  is_pinned: boolean
+  is_active: boolean
+  starts_at: string | null
+  expires_at: string | null
+  created_by: number
+  created_at: string
+  updated_at: string
+  creator?: {
+    id: number
+    username: string
+    email: string
+  }
+}
+
+export interface CreateAnnouncementRequest {
+  title: string
+  message: string
+  priority: 'info' | 'warning' | 'alert' | 'success'
+  is_pinned?: boolean
+  is_active?: boolean
+  starts_at?: string
+  expires_at?: string
+}
+
+export interface UpdateAnnouncementRequest {
+  title?: string
+  message?: string
+  priority?: 'info' | 'warning' | 'alert' | 'success'
+  is_pinned?: boolean
+  is_active?: boolean
+  starts_at?: string
+  expires_at?: string
+}
+
+export interface AnnouncementListResponse {
+  data: Announcement[]
   meta: {
     page: number
     per_page: number

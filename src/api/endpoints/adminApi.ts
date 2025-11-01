@@ -35,6 +35,10 @@ import {
   AdminStatistics,
   AdminCombatListResponse,
   AdminRoleListResponse,
+  AnnouncementListResponse,
+  Announcement,
+  CreateAnnouncementRequest,
+  UpdateAnnouncementRequest,
 } from '@/types/api.types'
 
 export const adminApi = apiSlice.injectEndpoints({
@@ -422,6 +426,51 @@ export const adminApi = apiSlice.injectEndpoints({
       query: () => '/admin/roles',
       providesTags: ['Role'],
     }),
+
+    // Announcements Management
+    listAnnouncements: builder.query<
+      AnnouncementListResponse,
+      { page?: number; per_page?: number }
+    >({
+      query: (params = {}) => ({
+        url: '/admin/announcements',
+        params,
+      }),
+      providesTags: ['Announcement'],
+    }),
+    getAnnouncement: builder.query<{ data: Announcement }, number>({
+      query: (id) => `/admin/announcements/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Announcement', id }],
+    }),
+    createAnnouncement: builder.mutation<
+      { data: Announcement; message?: string },
+      CreateAnnouncementRequest
+    >({
+      query: (data) => ({
+        url: '/admin/announcements',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Announcement'],
+    }),
+    updateAnnouncement: builder.mutation<
+      { data: Announcement; message?: string },
+      { id: number; data: UpdateAnnouncementRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/admin/announcements/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Announcement', id }, 'Announcement'],
+    }),
+    deleteAnnouncement: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/admin/announcements/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Announcement'],
+    }),
   }),
 })
 
@@ -480,5 +529,11 @@ export const {
   useDeleteCombatMutation,
   // Roles
   useListRolesQuery,
+  // Announcements
+  useListAnnouncementsQuery,
+  useGetAnnouncementQuery,
+  useCreateAnnouncementMutation,
+  useUpdateAnnouncementMutation,
+  useDeleteAnnouncementMutation,
 } = adminApi
 
