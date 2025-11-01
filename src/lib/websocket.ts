@@ -44,7 +44,7 @@ function getWebSocketConfig() {
     const isHttps = url.protocol === 'https:'
     
     // For WSS, we typically don't need a port (uses 443) or can use 443 explicitly
-    // The /app/ path is handled automatically by Pusher.js
+    // Reverb WebSocket connection
     return {
       host: host, // Use same hostname as API (e.g., api.agameof.space)
       port: wsPort ? parseInt(wsPort) : (isHttps ? 443 : 8080), // Use 443 for WSS, 8080 for WS
@@ -65,6 +65,8 @@ export function initializeEcho(token: string): Echo {
     return echo
   }
 
+  // Laravel Echo with Reverb still requires pusher-js library and window.Pusher
+  // We're using Reverb broadcaster which connects to our Reverb server, not Pusher service
   window.Pusher = Pusher
   
   const wsConfig = getWebSocketConfig()
@@ -81,70 +83,31 @@ export function initializeEcho(token: string): Echo {
     authEndpoint = '/broadcasting/auth'
   }
   
-  console.log('WebSocket config:', wsConfig)
-  console.log('Auth endpoint:', authEndpoint)
-
-  // Check if we should use Pusher (staging/production) or Reverb (local)
-  const usePusher = import.meta.env.VITE_USE_PUSHER === 'true' || 
-                    import.meta.env.VITE_PUSHER_KEY !== undefined ||
-                    (wsConfig.forceTLS && !wsConfig.host.includes('localhost') && !wsConfig.host.includes('127.0.0.1'))
+  console.log('[WebSocket] Using Reverb exclusively')
+  console.log('[WebSocket] Configuration:', wsConfig)
+  console.log('[WebSocket] Auth endpoint:', authEndpoint)
   
-  const wsKey = import.meta.env.VITE_WS_KEY || import.meta.env.REVERB_APP_KEY || import.meta.env.VITE_PUSHER_KEY || 'o714i1l2lrdflpgv7mwg'
-  const pusherKey = import.meta.env.VITE_PUSHER_KEY || '33d7245f0190d9d32296'
-  const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER || 'eu'
+  const wsKey = import.meta.env.VITE_WS_KEY || import.meta.env.REVERB_APP_KEY || 'o714i1l2lrdflpgv7mwg'
+  const finalPort = wsConfig.port
   
-  let echoConfig: any
-  let finalPort: number // Declare outside branches for use in error logging
+  console.log('[WebSocket] Reverb Configuration:')
+  console.log('  Host:', wsConfig.host)
+  console.log('  Port:', wsConfig.forceTLS && finalPort === 443 ? '443 (default, not specified)' : finalPort)
+  console.log('  Key:', wsKey, '(from env:', import.meta.env.VITE_WS_KEY || import.meta.env.REVERB_APP_KEY || 'not set', ')')
+  console.log('  Protocol:', wsConfig.forceTLS ? 'WSS' : 'WS')
+  console.log('  Full URL:', `${wsConfig.forceTLS ? 'wss' : 'ws'}://${wsConfig.host}${wsConfig.forceTLS && finalPort === 443 ? '' : `:${finalPort}`}/app/${wsKey}`)
+  console.log('  Auth endpoint:', authEndpoint)
   
-  if (usePusher) {
-    // Use Pusher for staging/production
-    console.log('Using Pusher for WebSocket connection')
-    console.log('Pusher Configuration:')
-    console.log('  Key:', pusherKey)
-    console.log('  Cluster:', pusherCluster)
-    console.log('  Auth endpoint:', authEndpoint)
-    console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN')
-    
-    finalPort = 443 // Pusher uses standard HTTPS port
-    
-    echoConfig = {
-      broadcaster: 'pusher',
-      key: pusherKey,
-      cluster: pusherCluster,
-      forceTLS: true,
-      disableStats: true,
-      enabledTransports: ['ws', 'wss'],
-      authEndpoint: authEndpoint,
-      auth: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      },
-    }
-  } else {
-    // Use Reverb for local development
-    console.log('Using Reverb for WebSocket connection')
-    finalPort = wsConfig.port // Use the configured port (8080 for local, 443 for staging/production)
-    
-    console.log('Reverb Configuration:')
-    console.log('  Host:', wsConfig.host)
-    console.log('  Port:', wsConfig.forceTLS && finalPort === 443 ? '443 (default, not specified)' : finalPort)
-    console.log('  Key:', wsKey, '(from env:', import.meta.env.VITE_WS_KEY || 'not set', ')')
-    console.log('  Protocol:', wsConfig.forceTLS ? 'WSS' : 'WS')
-    console.log('  Full URL:', `${wsConfig.forceTLS ? 'wss' : 'ws'}://${wsConfig.host}${wsConfig.forceTLS && finalPort === 443 ? '' : `:${finalPort}`}/app/${wsKey}`)
-    console.log('  Auth endpoint:', authEndpoint)
-    
-    echoConfig = {
+  const echoConfig = {
     broadcaster: 'reverb',
-      key: wsKey,
+    key: wsKey,
     wsHost: wsConfig.host,
     wsPort: finalPort,
     wssPort: finalPort,
     forceTLS: wsConfig.forceTLS,
     encrypted: wsConfig.forceTLS,
     disableStats: true,
-      enabledTransports: wsConfig.forceTLS ? ['ws', 'wss'] : ['ws'],
+    enabledTransports: wsConfig.forceTLS ? ['ws', 'wss'] : ['ws'],
     authEndpoint: authEndpoint,
     auth: {
       headers: {
@@ -152,16 +115,17 @@ export function initializeEcho(token: string): Echo {
         Accept: 'application/json',
       },
     },
-    }
   }
 
-  console.log('Echo configuration:', echoConfig)
+  console.log('[WebSocket] Echo configuration:', echoConfig)
 
   echo = new Echo(echoConfig)
 
   // Add connection logging
   // Type assertion needed because Laravel Echo types don't expose connector
   const echoWithConnector = echo as any
+  // Reverb uses pusher-js library under the hood but connects to our Reverb server (not Pusher service)
+  // The variable name 'pusher' refers to the internal connector object, not the Pusher service
   if (echoWithConnector.connector?.pusher) {
     const pusher = echoWithConnector.connector.pusher
     
@@ -251,7 +215,7 @@ export function initializeEcho(token: string): Echo {
       }
     })
     
-    // Also log Pusher connection events
+    // Also log connection events (via pusher-js connector, but connecting to Reverb)
     pusher.connection.bind('connecting', () => {
       console.log('[WebSocket] 🔄 Connecting...')
     })
@@ -274,7 +238,7 @@ export function initializeEcho(token: string): Echo {
       }
     }, 100)
   } else {
-    console.error('[WebSocket] ❌ Pusher connector not available!')
+    console.error('[WebSocket] ❌ Reverb connector not available!')
   }
 
   return echo

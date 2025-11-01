@@ -11,8 +11,12 @@ import {
   handleResearchCompleted,
   handleAllianceMessage,
   handleTickProcessed,
+  handleFleetLaunched,
+  handlePlanetCaptured,
+  handlePlanetColonized,
   addNotification,
 } from '@/app/slices/notificationSlice'
+import { initializeTickCountdown, updateCountdownFromWebSocket } from '@/lib/tickService'
 import { initializeEcho, disconnectEcho, getEcho } from '@/lib/websocket'
 import { formatCoordinate } from '@/lib/coordinates'
 import { toast } from 'sonner'
@@ -27,6 +31,7 @@ export function useWebSocket() {
   // Use ref to prevent multiple subscriptions and track channel
   const subscribedRef = useRef<string | null>(null) // Track which empire ID we're subscribed to
   const channelRef = useRef<any>(null)
+  const allianceChannelRef = useRef<any>(null)
 
   useEffect(() => {
     if (!token || !empire) {
@@ -67,7 +72,7 @@ export function useWebSocket() {
     channelRef.current = privateChannel
     
     // Define all handlers BEFORE subscription so they can be called manually
-    // Handle empire updated event
+    // Handle empire updated event (enhanced for real-time updates)
     const handleEmpireUpdated = (data: any) => {
       console.log('[WebSocket] ✅ Received empire.updated event:', data)
       // Update empire state if data includes empire object
@@ -88,36 +93,74 @@ export function useWebSocket() {
         }
       }
       
-      // Invalidate Empire, Universe, and Resource tags to refresh all related data
-      dispatch(apiSlice.util.invalidateTags(['Empire', 'Universe', 'Resource']))
+      // Aggressively invalidate all Empire-related tags for real-time updates
+      const tags: any[] = ['Empire', 'Universe', 'Resource', 'Planet', 'Statistics']
+      
+      // Force refetch all active empire queries immediately
+      dispatch(apiSlice.util.invalidateTags(tags))
+      
+      // Also refetch specific queries that might be active
+      dispatch(apiSlice.util.invalidateTags([{ type: 'Empire', id: 'LIST' }]))
     }
     
-    // Handle planet updated event
+    // Handle planet updated event (enhanced for real-time updates)
     const handlePlanetUpdated = (data: any) => {
-      console.log('[WebSocket] ✅✅✅ PLANET UPDATED HANDLER CALLED ✅✅✅')
-      console.log('[WebSocket] Event data:', JSON.stringify(data, null, 2))
+      console.log('[WebSocket] ✅ PLANET UPDATED - Real-time update:', data)
       
-      // Invalidate construction queue for the specific planet if planet_id is provided
-      const tags: any[] = ['Planet', 'Resource', 'Empire']
-      if (data.planet_id) {
-        const planetId = Number(data.planet_id)
-        console.log('[WebSocket] Invalidating tags for planet:', planetId)
-        tags.push({ type: 'ConstructionQueue', id: planetId })
-        tags.push({ type: 'Planet', id: planetId })
-        tags.push({ type: 'Resource', id: planetId })
-        tags.push({ type: 'Facility', id: planetId })
-        tags.push({ type: 'Defence', id: planetId })
-        tags.push({ type: 'Ship', id: planetId })
-        tags.push({ type: 'Research', id: planetId })
-        tags.push({ type: 'Buildable', id: planetId })
+      // Extract planet ID from multiple possible locations
+      const planetId = data.planet?.id || data.planet_id || data.id
+      
+      // Aggressively invalidate all planet-related tags for real-time updates
+      const tags: any[] = ['Planet', 'Resource', 'Empire', 'Universe']
+      
+      if (planetId) {
+        const pid = Number(planetId)
+        console.log('[WebSocket] Invalidating all tags for planet:', pid)
+        
+        // Invalidate construction queue immediately (critical for real-time updates)
+        tags.push({ type: 'ConstructionQueue', id: pid })
+        tags.push({ type: 'Planet', id: pid })
+        tags.push({ type: 'Resource', id: pid })
+        tags.push({ type: 'Facility', id: pid })
+        tags.push({ type: 'Defence', id: pid })
+        tags.push({ type: 'Ship', id: pid })
+        tags.push({ type: 'Research', id: pid })
+        tags.push({ type: 'Buildable', id: pid })
+        
+        // Also invalidate general tags to ensure all planet lists update
+        tags.push('ConstructionQueue')
+        tags.push('Buildable')
       } else {
-        console.log('[WebSocket] ⚠️ No planet_id in event data, invalidating general tags only')
+        // Even without planet_id, invalidate all planet-related tags
+        console.log('[WebSocket] No planet_id, invalidating all planet tags')
+        tags.push('ConstructionQueue')
+        tags.push('Buildable')
       }
       
-      console.log('[WebSocket] Invalidating tags:', tags)
-      // Invalidate tags - RTK Query will automatically refetch active queries
+      // Invalidate tags immediately for real-time updates
       dispatch(apiSlice.util.invalidateTags(tags))
-      console.log('[WebSocket] ✅ Tags invalidated, queries should refetch automatically')
+      console.log('[WebSocket] ✅ Tags invalidated for real-time update')
+      
+      // Check if resources changed - if so, trigger resource update events
+      const changes = data.changes || {}
+      if (changes.tellerium_balance || changes.krypton_balance || changes.mines || changes.probes) {
+        // Dispatch custom event for resource updates (for UI components that listen)
+        window.dispatchEvent(
+          new CustomEvent('planet:resources:updated', {
+            detail: { planetId, changes, planet: data.planet || data },
+          })
+        )
+      }
+      
+      // Check if construction queue changed
+      if (changes.construction_queue || data.planet?.construction_queue !== undefined) {
+        // Dispatch custom event for construction queue updates
+        window.dispatchEvent(
+          new CustomEvent('planet:construction:updated', {
+            detail: { planetId, planet: data.planet || data },
+          })
+        )
+      }
     }
     
     // Handle fleet arrived event (per WebSocket events spec)
@@ -257,43 +300,216 @@ export function useWebSocket() {
       dispatch(apiSlice.util.invalidateTags(tags))
     }
     
-    // Handle construction completed event
+    // Handle construction completed event (enhanced per guide specs + real-time)
     const handleConstructionCompletedEvent = (data: any) => {
-      console.log('[WebSocket] Construction completed event:', data)
-      dispatch(handleConstructionCompleted({
-        planetId: data.planet_id,
-        itemType: data.item_type,
-        itemName: data.item_name || data.item_type?.replace(/_/g, ' '),
-      }))
-      // Invalidate specific collections depending on item type
-      const tags: any[] = ['Planet', 'ConstructionQueue', 'Buildable', 'Resource']
-      // Also invalidate the specific planet's construction queue and related data
-      if (data.planet_id) {
-        const planetId = Number(data.planet_id)
-        tags.push({ type: 'ConstructionQueue', id: planetId })
-        tags.push({ type: 'Planet', id: planetId })
-        tags.push({ type: 'Resource', id: planetId })
+      console.log('[WebSocket] ✅ Received construction.completed event:', data)
+      const { construction, planet } = data
+      const planetId = planet?.id || data.planet_id
+      const itemType = construction?.type || data.item_type || data.type
+      const itemSlug = construction?.item_slug || data.item_slug
+      const quantity = construction?.quantity || data.quantity || 1
+      const planetName = planet?.name || data.planet_name || `Planet ${planetId}`
+      
+      // Show notification with proper formatting
+      const itemNames: Record<string, string> = {
+        facility: 'Facility',
+        defence: 'Defence',
+        defense: 'Defence',
+        ship: 'Ship',
+        research: 'Research',
       }
-      const lower = String(data.item_type || '').toLowerCase()
+      const itemTypeName = itemNames[itemType?.toLowerCase() || ''] || itemType || 'Item'
+      
+      dispatch(handleConstructionCompleted({
+        planetId: planetId || 0,
+        itemType: itemType || 'unknown',
+        itemName: itemSlug?.replace(/_/g, ' ') || itemTypeName,
+      }))
+      
+      // Show toast notification
+      toast.success(`✅ ${itemTypeName} Complete`, {
+        description: `${quantity}x ${itemSlug?.replace(/_/g, ' ') || itemTypeName} completed on ${planetName}`,
+        duration: 5000,
+      })
+      
+      // Aggressively invalidate for real-time updates
+      const tags: any[] = ['Planet', 'ConstructionQueue', 'Buildable', 'Resource', 'Empire']
+      
+      if (planetId) {
+        const pid = Number(planetId)
+        // Invalidate specific planet tags immediately
+        tags.push({ type: 'ConstructionQueue', id: pid })
+        tags.push({ type: 'Planet', id: pid })
+        tags.push({ type: 'Resource', id: pid })
+      }
+      
+      // Also invalidate general tags to ensure all queries update
+      tags.push('ConstructionQueue')
+      
+      const lower = String(itemType || '').toLowerCase()
       if (lower.includes('facility')) {
         tags.push('Facility')
-        if (data.planet_id) tags.push({ type: 'Facility', id: Number(data.planet_id) })
+        if (planetId) tags.push({ type: 'Facility', id: Number(planetId) })
       }
       if (lower.includes('defence') || lower.includes('defense')) {
         tags.push('Defence')
-        if (data.planet_id) tags.push({ type: 'Defence', id: Number(data.planet_id) })
+        if (planetId) tags.push({ type: 'Defence', id: Number(planetId) })
       }
       if (lower.includes('ship')) {
         tags.push('Ship')
-        if (data.planet_id) tags.push({ type: 'Ship', id: Number(data.planet_id) })
+        if (planetId) tags.push({ type: 'Ship', id: Number(planetId) })
       }
       if (lower.includes('research')) {
         tags.push('Research')
-        if (data.planet_id) tags.push({ type: 'Research', id: Number(data.planet_id) })
+        if (planetId) tags.push({ type: 'Research', id: Number(planetId) })
       }
-      // Also invalidate Empire to refresh planet lists
-      tags.push('Empire')
+      
+      // Dispatch custom event for construction queue updates
+      window.dispatchEvent(
+        new CustomEvent('planet:construction:updated', {
+          detail: { planetId, completed: true, itemType, planet },
+        })
+      )
+      
       dispatch(apiSlice.util.invalidateTags(tags as any))
+    }
+    
+    // Handle fleet launched event (CRITICAL - defender warnings)
+    const handleFleetLaunchedEvent = (data: any) => {
+      console.log('[WebSocket] ✅ Received fleet.launched event:', data)
+      const { fleet, attacker } = data
+      const isDefender = fleet?.destination?.owner_empire_id === empire?.id
+      const destinationPlanetId = fleet?.destination?.planet_id
+      const destinationName = fleet?.destination?.planet_name || fleet?.destination?.coordinate || 'Unknown'
+      
+      dispatch(handleFleetLaunched({
+        isDefender,
+        attacker: attacker || fleet?.attacker,
+        fleet: fleet || data,
+        destinationPlanetId,
+      }))
+      
+      if (isDefender) {
+        // URGENT: Show prominent warning
+        toast.error('⚠️ Incoming Fleet Attack!', {
+          description: `${attacker?.name || 'Unknown'} has launched a fleet at your planet ${destinationName}`,
+          duration: 10000,
+          action: {
+            label: 'View Planet',
+            onClick: () => {
+              if (destinationPlanetId) {
+                window.location.href = `/planets/${destinationPlanetId}`
+              }
+            },
+          },
+        })
+        
+        // Trigger planet highlighting event (for map components)
+        window.dispatchEvent(
+          new CustomEvent('planet:highlight', {
+            detail: { planetId: destinationPlanetId },
+          })
+        )
+      } else {
+        // Attacker confirmation
+        toast.info('Fleet Launched', {
+          description: `Your fleet will arrive at tick ${fleet?.arrival_tick || 'Unknown'}`,
+          duration: 5000,
+        })
+      }
+      
+      dispatch(apiSlice.util.invalidateTags(['Fleet', 'Planet']))
+    }
+    
+    // Handle planet captured event (CRITICAL - ownership changes)
+    const handlePlanetCapturedEvent = (data: any) => {
+      console.log('[WebSocket] ✅ Received planet.captured event:', data)
+      const { planet, previous_owner, new_owner, combat_log_id } = data
+      const isPreviousOwner = previous_owner?.id === empire?.id
+      const isNewOwner = new_owner?.id === empire?.id
+      
+      dispatch(handlePlanetCaptured({
+        isPreviousOwner,
+        isNewOwner,
+        planet: planet || data.planet,
+        previousOwner: previous_owner,
+        newOwner: new_owner,
+        combatLogId: combat_log_id,
+      }))
+      
+      if (isPreviousOwner) {
+        // Planet lost
+        toast.error('⚠️ Planet Lost!', {
+          description: `${planet?.name || 'Planet'} has been captured by ${new_owner?.name || 'Unknown'}`,
+          duration: 10000,
+          action: combat_log_id
+            ? {
+                label: 'View Combat Report',
+                onClick: () => {
+                  window.location.href = `/combat/${combat_log_id}`
+                },
+              }
+            : undefined,
+        })
+      } else if (isNewOwner) {
+        // Planet captured
+        toast.success('🎯 Planet Captured!', {
+          description: `You have successfully captured ${planet?.name || 'Planet'}!`,
+          duration: 8000,
+          action: {
+            label: 'View Planet',
+            onClick: () => {
+              if (planet?.id) {
+                window.location.href = `/planets/${planet.id}`
+              }
+            },
+          },
+        })
+      }
+      
+      // Refresh data
+      dispatch(apiSlice.util.invalidateTags(['Empire', 'Planet', 'Universe', 'CombatLog']))
+    }
+    
+    // Handle planet colonized event (enhanced)
+    const handlePlanetColonizedEvent = (data: any) => {
+      console.log('[WebSocket] ✅ Received planet.colonized event:', data)
+      const { planet, empire: empireData } = data
+      const planetId = planet?.id || data.planet_id
+      const planetName = planet?.name || 'Planet'
+      const coordinate = planet?.coordinate || data.coordinate
+      const coordString = coordinate
+        ? `${coordinate.quadrant}:${coordinate.sector}:${coordinate.galaxy}:${coordinate.planet}`
+        : coordinate
+      
+      dispatch(handlePlanetColonized({
+        planet: planet || { id: planetId, name: planetName, coordinate },
+        empire: empireData || { id: empire?.id || 0, name: empire?.name || 'Unknown' },
+      }))
+      
+      // Show success notification
+      toast.success('🎉 Planet Colonized!', {
+        description: `Successfully colonized ${planetName} at ${coordString}`,
+        duration: 8000,
+        action: {
+          label: 'View Planet',
+          onClick: () => {
+            if (planetId) {
+              window.location.href = `/planets/${planetId}`
+            }
+          },
+        },
+      })
+      
+      // Refresh empire planets list
+      dispatch(apiSlice.util.invalidateTags(['Empire', 'Planet', 'Universe']))
+      
+      // Update universe map
+      window.dispatchEvent(
+        new CustomEvent('planet:updated', {
+          detail: { planet },
+        })
+      )
     }
     
     // Log connection status - wait for subscription before setting up listeners
@@ -419,6 +635,22 @@ export function useWebSocket() {
             if (eventName === 'announcement.published' || eventName.includes('announcement') && eventName.includes('published')) {
               console.log('[WebSocket] 🎯 Manually triggering announcement.published handler')
               handleAnnouncementCreated(eventData)
+            }
+            if (eventName === 'fleet.launched' || eventName.includes('fleet.launched') || eventName.includes('FleetLaunched')) {
+              console.log('[WebSocket] 🎯 Manually triggering fleet.launched handler')
+              handleFleetLaunchedEvent(eventData)
+            }
+            if (eventName === 'planet.captured' || eventName.includes('planet.captured') || eventName.includes('PlanetCaptured')) {
+              console.log('[WebSocket] 🎯 Manually triggering planet.captured handler')
+              handlePlanetCapturedEvent(eventData)
+            }
+            if (eventName === 'planet.colonized' || eventName.includes('planet.colonized') || eventName.includes('PlanetColonized')) {
+              console.log('[WebSocket] 🎯 Manually triggering planet.colonized handler')
+              handlePlanetColonizedEvent(eventData)
+            }
+            if (eventName === 'construction.completed' || eventName.includes('construction.completed') || eventName.includes('ConstructionCompleted')) {
+              console.log('[WebSocket] 🎯 Manually triggering construction.completed handler')
+              handleConstructionCompletedEvent(eventData)
             }
           } else {
             console.log('[WebSocket] 🚫 Event is for a different channel, ignoring')
@@ -571,11 +803,20 @@ export function useWebSocket() {
         dispatch(apiSlice.util.invalidateTags(['Alliance']))
       })
 
-      // Handle planet colonized event
-      privateChannel.listen('.planet.colonized', (data: any) => {
-        toast.success(`Planet colonized at ${data.coordinate}`)
-        dispatch(apiSlice.util.invalidateTags(['Planet', 'Empire']))
-      })
+      // Handle planet colonized event (enhanced)
+      privateChannel.listen('.planet.colonized', handlePlanetColonizedEvent)
+      privateChannel.listen('planet.colonized', handlePlanetColonizedEvent)
+      privateChannel.listen('PlanetColonized', handlePlanetColonizedEvent)
+      
+      // Handle fleet launched event (CRITICAL)
+      privateChannel.listen('.fleet.launched', handleFleetLaunchedEvent)
+      privateChannel.listen('fleet.launched', handleFleetLaunchedEvent)
+      privateChannel.listen('FleetLaunched', handleFleetLaunchedEvent)
+      
+      // Handle planet captured event (CRITICAL)
+      privateChannel.listen('.planet.captured', handlePlanetCapturedEvent)
+      privateChannel.listen('planet.captured', handlePlanetCapturedEvent)
+      privateChannel.listen('PlanetCaptured', handlePlanetCapturedEvent)
 
       // Handle fleet attacked event - try multiple naming variations
       privateChannel.listen('fleet.attacked', handleFleetAttackedEvent)
@@ -621,20 +862,38 @@ export function useWebSocket() {
     console.log('[WebSocket] ⚠️ Check Network tab for auth request to:', authEndpoint)
     console.log('[WebSocket] Connection state will be logged above - look for "Connected" or "failed" messages')
 
-    // Subscribe to public tick channel (Echo may auto-add 'public-' prefix, but docs show 'public.tick')
-    // Try both formats to be safe
-    const publicTickChannel = echo.channel('tick')
+    // Subscribe to public tick channel (use 'public.tick' as per guide)
+    const publicTickChannel = echo.channel('public.tick')
     
     publicTickChannel.listen('.tick.processed', (data: any) => {
       console.log('[WebSocket] ✅ Received tick.processed event:', data)
+      
+      // Update countdown from WebSocket event
+      if (data.next_tick_at && data.tick_interval) {
+        updateCountdownFromWebSocket({
+          tick_number: data.tick_number,
+          next_tick_at: data.next_tick_at,
+          tick_interval: data.tick_interval,
+          next_tick_eta: data.next_tick_eta,
+        })
+      } else {
+        // Fallback to old format
+        dispatch(setTick({ tick: data.tick_number, nextTickETA: data.next_tick_eta }))
+      }
+      
       dispatch(handleTickProcessed({
         tickNumber: data.tick_number,
-        nextTickEta: data.next_tick_eta,
+        nextTickEta: data.next_tick_eta || data.next_tick_at,
       }))
-      dispatch(setTick({ tick: data.tick_number, nextTickETA: data.next_tick_eta }))
       dispatch(setTickProcessing(false))
+      
       // Invalidate Signal tags when tick processes (signals are processed during ticks)
-      dispatch(apiSlice.util.invalidateTags(['Signal']))
+      dispatch(apiSlice.util.invalidateTags(['Signal', 'Tick']))
+    })
+    
+    // Initialize tick countdown from API on mount
+    initializeTickCountdown().catch((error) => {
+      console.error('[WebSocket] Failed to initialize tick countdown:', error)
     })
 
     // Subscribe to public announcements channel for real-time announcements
@@ -702,6 +961,45 @@ export function useWebSocket() {
             handleAnnouncementCreated(eventData)
           }
         }
+      })
+    }
+
+    // Subscribe to alliance channel automatically when empire is in an alliance
+    if (empire?.alliance_id) {
+      const allianceChannelName = `alliance.${empire.alliance_id}`
+      console.log('[WebSocket] Subscribing to alliance channel:', allianceChannelName)
+      
+      const allianceChannel = echo.private(allianceChannelName)
+      allianceChannelRef.current = allianceChannel
+      
+      // Handle alliance chat message event
+      allianceChannel.listen('.alliance.chat.message', (data: any) => {
+        console.log('[WebSocket] ✅ Received alliance.chat.message event:', data)
+        const { message } = data
+        const senderName = message?.sender_empire?.name || data.sender_name || 'Unknown'
+        
+        dispatch(handleAllianceMessage({
+          senderName,
+          message: message?.message || data.message || '',
+          allianceId: message?.alliance_id || empire.alliance_id || 0,
+        }))
+        
+        // Show toast notification (only if chat window is not focused)
+        toast.info(`Alliance Message from ${senderName}`, {
+          description: message?.message?.substring(0, 100) || '',
+          duration: 5000,
+        })
+        
+        // Invalidate alliance tags
+        dispatch(apiSlice.util.invalidateTags(['Alliance', 'Chat']))
+      })
+      
+      allianceChannel.subscribed(() => {
+        console.log('[WebSocket] ✅ Successfully subscribed to alliance channel:', allianceChannelName)
+      })
+      
+      allianceChannel.error((error: any) => {
+        console.error('[WebSocket] ❌ Alliance channel subscription error:', error)
       })
     }
 

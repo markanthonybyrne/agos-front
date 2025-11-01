@@ -29,8 +29,12 @@ export const defencesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Defence', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable', // Invalidate buildable items so new defences become available
+        'ConstructionQueue', // Invalidate for real-time queue updates
+        'Resource', // Invalidate for resource balance updates
       ],
     }),
     destroyDefences: builder.mutation<
@@ -42,7 +46,7 @@ export const defencesApi = apiSlice.injectEndpoints({
         method: 'DELETE',
         body: quantity ? { quantity } : {},
       }),
-      invalidatesTags: ['Defence', 'Planet', 'Buildable'],
+      invalidatesTags: ['Defence', 'Planet', 'Buildable', 'ConstructionQueue', 'Resource'],
     }),
     cancelDefenceConstruction: builder.mutation<
       ApiResponse<{ message: string; refund: { tellerium: number; krypton: number } }>,
@@ -54,8 +58,12 @@ export const defencesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Defence', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable',
+        'ConstructionQueue',
+        'Resource',
       ],
     }),
   }),

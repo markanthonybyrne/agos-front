@@ -7,7 +7,7 @@ export interface Notification {
   message: string
   timestamp: Date
   isRead: boolean
-  category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack'
+  category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack' | 'colonization' | 'capture'
   actionUrl?: string
   data?: any
 }
@@ -179,6 +179,100 @@ const notificationSlice = createSlice({
       })
       state.unreadCount += 1
     },
+    handleFleetLaunched: (state, action: PayloadAction<{ 
+      isDefender: boolean
+      attacker?: { id: number; name: string }
+      fleet: { id: number; destination: any; arrival_tick: number }
+      destinationPlanetId?: number
+    }>) => {
+      const { isDefender, attacker, fleet, destinationPlanetId } = action.payload
+      
+      if (isDefender) {
+        // Critical defender warning
+        state.notifications.unshift({
+          id: `fleet_launched_defender_${Date.now()}`,
+          type: 'error',
+          title: '⚠️ Incoming Fleet Attack!',
+          message: `${attacker?.name || 'Unknown'} has launched a fleet at your planet ${fleet.destination.planet_name || fleet.destination.coordinate || 'Unknown'}`,
+          timestamp: new Date(),
+          isRead: false,
+          category: 'attack',
+          actionUrl: destinationPlanetId ? `/planets/${destinationPlanetId}` : undefined,
+          data: { attacker, fleet, destinationPlanetId, isDefender: true }
+        })
+      } else {
+        // Attacker confirmation
+        state.notifications.unshift({
+          id: `fleet_launched_attacker_${Date.now()}`,
+          type: 'info',
+          title: 'Fleet Launched',
+          message: `Your fleet has been launched and will arrive at tick ${fleet.arrival_tick}`,
+          timestamp: new Date(),
+          isRead: false,
+          category: 'fleet',
+          actionUrl: `/fleets/${fleet.id}`,
+          data: { fleet, isDefender: false }
+        })
+      }
+      state.unreadCount += 1
+    },
+    handlePlanetCaptured: (state, action: PayloadAction<{ 
+      isPreviousOwner: boolean
+      isNewOwner: boolean
+      planet: { id: number; name: string; coordinate: any }
+      previousOwner?: { id: number; name: string } | null
+      newOwner: { id: number; name: string }
+      combatLogId?: number | null
+    }>) => {
+      const { isPreviousOwner, isNewOwner, planet, previousOwner, newOwner, combatLogId } = action.payload
+      
+      if (isPreviousOwner) {
+        // Planet lost
+        state.notifications.unshift({
+          id: `planet_lost_${Date.now()}`,
+          type: 'error',
+          title: '⚠️ Planet Lost!',
+          message: `${planet.name} has been captured by ${newOwner.name}`,
+          timestamp: new Date(),
+          isRead: false,
+          category: 'capture',
+          actionUrl: combatLogId ? `/combat/${combatLogId}` : `/planets/${planet.id}`,
+          data: { planet, capturedBy: newOwner, combatLogId, isLost: true }
+        })
+      } else if (isNewOwner) {
+        // Planet captured
+        state.notifications.unshift({
+          id: `planet_captured_${Date.now()}`,
+          type: 'success',
+          title: '🎯 Planet Captured!',
+          message: `You have successfully captured ${planet.name}!`,
+          timestamp: new Date(),
+          isRead: false,
+          category: 'capture',
+          actionUrl: `/planets/${planet.id}`,
+          data: { planet, capturedFrom: previousOwner, combatLogId, isCaptured: true }
+        })
+      }
+      state.unreadCount += 1
+    },
+    handlePlanetColonized: (state, action: PayloadAction<{ 
+      planet: { id: number; name: string; coordinate: any }
+      empire: { id: number; name: string }
+    }>) => {
+      const { planet, empire } = action.payload
+      state.notifications.unshift({
+        id: `planet_colonized_${Date.now()}`,
+        type: 'success',
+        title: '🎉 Planet Colonized!',
+        message: `Successfully colonized ${planet.name} at ${planet.coordinate?.quadrant}:${planet.coordinate?.sector}:${planet.coordinate?.galaxy}:${planet.coordinate?.planet}`,
+        timestamp: new Date(),
+        isRead: false,
+        category: 'colonization',
+        actionUrl: `/planets/${planet.id}`,
+        data: { planet, empire }
+      })
+      state.unreadCount += 1
+    },
   },
 })
 
@@ -196,6 +290,9 @@ export const {
   handleResearchCompleted,
   handleAllianceMessage,
   handleTickProcessed,
+  handleFleetLaunched,
+  handlePlanetCaptured,
+  handlePlanetColonized,
 } = notificationSlice.actions
 
 export default notificationSlice.reducer

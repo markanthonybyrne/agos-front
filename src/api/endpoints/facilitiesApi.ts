@@ -29,8 +29,12 @@ export const facilitiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Facility', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable', // Invalidate buildable items so new facilities become available
+        'ConstructionQueue', // Invalidate for real-time queue updates
+        'Resource', // Invalidate for resource balance updates
       ],
     }),
     upgradeFacility: builder.mutation<
@@ -41,7 +45,7 @@ export const facilitiesApi = apiSlice.injectEndpoints({
         url: `/facilities/${facilityId}/upgrade`,
         method: 'PUT',
       }),
-      invalidatesTags: ['Facility', 'Planet', 'Buildable'],
+      invalidatesTags: ['Facility', 'Planet', 'Buildable', 'ConstructionQueue', 'Resource'],
     }),
     upgradeFacilityBySlug: builder.mutation<
       ApiResponse<{ facility: Facility }>,
@@ -54,9 +58,13 @@ export const facilitiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Facility', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Facility',
         'Planet',
         'Buildable',
+        'ConstructionQueue',
+        'Resource',
       ],
     }),
     destroyFacility: builder.mutation<
@@ -67,7 +75,7 @@ export const facilitiesApi = apiSlice.injectEndpoints({
         url: `/facilities/${facilityId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Facility', 'Planet', 'Buildable'],
+      invalidatesTags: ['Facility', 'Planet', 'Buildable', 'ConstructionQueue', 'Resource'],
     }),
     cancelFacilityConstruction: builder.mutation<
       ApiResponse<{ message: string; refund: { tellerium: number; krypton: number } }>,
@@ -79,8 +87,12 @@ export const facilitiesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Facility', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable',
+        'ConstructionQueue',
+        'Resource',
       ],
     }),
   }),

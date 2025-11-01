@@ -29,8 +29,12 @@ export const shipsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Ship', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable',
+        'ConstructionQueue', // Invalidate for real-time queue updates
+        'Resource', // Invalidate for resource balance updates
       ],
     }),
     cancelShipConstruction: builder.mutation<
@@ -43,8 +47,12 @@ export const shipsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Ship', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable',
+        'ConstructionQueue', // Invalidate for real-time queue updates
+        'Resource', // Invalidate for resource balance updates
       ],
     }),
   }),

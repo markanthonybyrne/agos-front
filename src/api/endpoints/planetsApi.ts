@@ -40,8 +40,10 @@ export const planetsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { id }) => [
         { type: 'Planet', id },
+        { type: 'Resource', id },
         'Planet',
         'Empire',
+        'Resource', // Invalidate for real-time resource updates
       ],
     }),
     buyProbes: builder.mutation<
@@ -55,8 +57,10 @@ export const planetsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { id }) => [
         { type: 'Planet', id },
+        { type: 'Resource', id },
         'Planet',
         'Empire',
+        'Resource', // Invalidate for real-time resource updates
       ],
     }),
     getCostBreakdown: builder.query<

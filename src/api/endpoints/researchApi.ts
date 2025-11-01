@@ -39,7 +39,11 @@ export const researchApi = apiSlice.injectEndpoints({
         'Universe',
         'Planet',
         { type: 'Research', id: planet_id },
+        { type: 'ConstructionQueue', id: planet_id },
+        { type: 'Resource', id: planet_id },
         'Buildable',
+        'ConstructionQueue', // Invalidate for real-time queue updates
+        'Resource', // Invalidate for resource balance updates
       ],
     }),
     cancelResearch: builder.mutation<
@@ -52,8 +56,12 @@ export const researchApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planetId }) => [
         { type: 'Research', id: planetId },
+        { type: 'ConstructionQueue', id: planetId },
+        { type: 'Resource', id: planetId },
         'Planet',
         'Buildable',
+        'ConstructionQueue', // Invalidate for real-time queue updates
+        'Resource', // Invalidate for resource balance updates
       ],
     }),
   }),
