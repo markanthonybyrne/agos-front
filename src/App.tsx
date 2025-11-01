@@ -3,7 +3,11 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthGuard } from '@/components/common/AuthGuard'
+import { TickCountdownTimer } from '@/components/common/TickCountdownTimer'
 import { useAchievementNotifications } from '@/hooks/useAchievementNotifications'
+import { useGlobalTickData } from '@/hooks/useGlobalTickData'
+import { useTutorialDetection } from '@/hooks/useTutorialDetection'
+import { TutorialManager } from '@/components/tutorial/TutorialManager'
 import { AdminGuard } from '@/features/admin/components/AdminGuard'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { PlayerManual } from '@/features/manual/PlayerManual'
@@ -35,9 +39,16 @@ import { CombatsPage } from '@/features/admin/routes/CombatsPage'
 function AppContent() {
   // Initialize achievement notifications
   useAchievementNotifications()
+  
+  // Fetch tick data globally for all authenticated pages
+  useGlobalTickData()
+  
+  // Detect and trigger tutorial for first-time users
+  useTutorialDetection()
 
   return (
     <>
+      <TutorialManager />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
@@ -96,6 +107,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AppContent />
+      <TickCountdownTimer />
       <Toaster 
         position="top-right" 
         theme="dark"

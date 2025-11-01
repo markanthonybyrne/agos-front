@@ -5,6 +5,7 @@ import gameReducer from './slices/gameSlice'
 import uiReducer from './slices/uiSlice'
 import notificationReducer from './slices/notificationSlice'
 import panelReducer from './slices/panelSlice'
+import tutorialReducer from './slices/tutorialSlice'
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     ui: uiReducer,
     notifications: notificationReducer,
     panel: panelReducer,
+    tutorial: tutorialReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(apiSlice.middleware),

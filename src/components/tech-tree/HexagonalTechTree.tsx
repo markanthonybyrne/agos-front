@@ -68,13 +68,13 @@ function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<str
   
   eras.forEach((era, eraIndex) => {
     const eraItems = eraGroups.get(era) || []
-    const offsetY = eraIndex * (hexagonSize * 8) // Large gap between eras
+    const offsetY = eraIndex * (hexagonSize * 10) // Larger gap between eras
     
     eraItems.forEach((item, index) => {
       const col = index % itemsPerRow
       const row = Math.floor(index / itemsPerRow)
-      const x = col * (hexagonSize * 1.5) // Horizontal spacing
-      const y = row * (hexagonSize * 1.6) + offsetY // Vertical spacing with era offset
+      const x = col * (hexagonSize * 1.8) // Better horizontal spacing
+      const y = row * (hexagonSize * 1.9) + offsetY // Better vertical spacing with era offset
       positions.set(item.id, { x, y, era })
     })
   })
@@ -143,7 +143,7 @@ export function HexagonalTechTree({
       // Find the Y position (first item of this era)
       const firstItem = eraItems[0]
       const firstPos = pos.get(firstItem.id)
-      const y = firstPos ? firstPos.y - (hexagonSize * 3) : 0
+      const y = firstPos ? firstPos.y - (hexagonSize * 1.5) : 0
       
       return { era, x: avgX, y }
     })
@@ -201,9 +201,13 @@ export function HexagonalTechTree({
               x2={conn.to.x + hexagonSize / 2}
               y2={conn.to.y + hexagonSize / 2}
               stroke="currentColor"
-              strokeWidth="2"
-              className="text-primary/30"
+              strokeWidth="1.5"
+              strokeDasharray="4 4"
+              className="text-cyan-400/25 transition-all duration-300"
               markerEnd="url(#arrowhead)"
+              style={{
+                filter: 'drop-shadow(0 0 3px rgba(34, 211, 238, 0.3))',
+              }}
             />
           ))}
           
@@ -214,18 +218,25 @@ export function HexagonalTechTree({
                 x={x}
                 y={y}
                 textAnchor="middle"
-                className="text-4xl font-heading fill-cyan-400/80"
-                style={{ pointerEvents: 'none' }}
+                className="text-xs font-heading fill-cyan-400/80"
+                style={{ 
+                  pointerEvents: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.15em',
+                  textShadow: '0 0 8px rgba(34, 211, 238, 0.4)',
+                }}
               >
                 ERA {era}
               </text>
               <line
-                x1={x - hexagonSize * 10}
-                y1={y + 20}
-                x2={x + hexagonSize * 10}
-                y2={y + 20}
+                x1={x - hexagonSize * 12}
+                y1={y + 8}
+                x2={x + hexagonSize * 12}
+                y2={y + 8}
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1"
+                strokeDasharray="4 2"
                 className="text-cyan-500/30"
               />
             </g>
@@ -235,16 +246,16 @@ export function HexagonalTechTree({
           <defs>
             <marker
               id="arrowhead"
-              markerWidth="10"
-              markerHeight="10"
-              refX="9"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
               refY="3"
               orient="auto"
             >
               <polygon
-                points="0 0, 10 3, 0 6"
+                points="0 0, 8 3, 0 6"
                 fill="currentColor"
-                className="text-primary/30"
+                className="text-cyan-400/40"
               />
             </marker>
           </defs>
@@ -280,42 +291,42 @@ export function HexagonalTechTree({
                   imageUrl={item.imageUrl}
                   name={item.name}
                 >
-                  <span className="text-xs font-semibold text-center line-clamp-2">
+                  <span className="text-[10px] font-semibold text-center leading-tight px-1 line-clamp-2 tracking-tight">
                     {item.name}
                   </span>
                 </HexagonNode>
                 
                 {/* Hover tooltip */}
-                <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-80">
-                  <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-6 shadow-xl">
-                    <div className="space-y-2 max-w-[200px] mr-[30px] ml-auto">
-                      <div className="text-xs font-semibold text-foreground mb-2">
+                <div className="absolute -top-24 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 w-72 scale-95 group-hover:scale-100">
+                  <div className="panel-glass surface-gradient border border-cyan-500/40 card-glow p-4 shadow-2xl backdrop-blur-md">
+                    <div className="space-y-3">
+                      <div className="text-sm font-bold text-cyan-400 mb-1 tracking-wide">
                         {item.name}
                       </div>
                       {item.description && (
-                        <div className="text-xs text-muted-foreground mb-2">
+                        <div className="text-xs text-muted-foreground leading-relaxed mb-3">
                           {item.description}
                         </div>
                       )}
                       {(item.costTellerium !== undefined || item.costKrypton !== undefined) && (
-                        <div className="pt-2 border-t border-border/50 space-y-1">
-                          <div className="text-xs text-muted-foreground">Cost:</div>
+                        <div className="pt-3 border-t border-cyan-500/20 space-y-2">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Cost</div>
                           {item.costTellerium !== undefined && item.costTellerium > 0 && (
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
                                 <img src={getTelleriumImage()} alt="T" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
-                                <span className="text-xs">T:</span>
+                                <span className="text-xs font-medium">Tellerium</span>
                               </div>
-                              <span className="text-xs font-mono text-tellerium">{item.costTellerium.toLocaleString()}</span>
+                              <span className="text-xs font-mono font-bold text-tellerium">{item.costTellerium.toLocaleString()}</span>
                             </div>
                           )}
                           {item.costKrypton !== undefined && item.costKrypton > 0 && (
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
                                 <img src={getKryptonImage()} alt="K" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
-                                <span className="text-xs">K:</span>
+                                <span className="text-xs font-medium">Krypton</span>
                               </div>
-                              <span className="text-xs font-mono text-krypton">{item.costKrypton.toLocaleString()}</span>
+                              <span className="text-xs font-mono font-bold text-krypton">{item.costKrypton.toLocaleString()}</span>
                             </div>
                           )}
                         </div>

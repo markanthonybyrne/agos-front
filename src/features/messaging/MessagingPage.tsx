@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { Label } from '@/components/ui/label'
 import { useGetMailQuery, useSendMailMutation, useReplyMailMutation, useDeleteMailMutation, useGetMailDetailsQuery, useMarkMailAsReadMutation } from '@/api/endpoints/mailApi'
 import { useGetEmpiresQuery } from '@/api/endpoints/empiresApi'
@@ -30,11 +31,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 type MailType = 'inbox' | 'sent'
 
 export function MessagingPage() {
+  const { openPanel, closePanelsByType } = usePanel()
   const [activeTab, setActiveTab] = useState<MailType>('inbox')
   const [selectedMail, setSelectedMail] = useState<number | null>(null)
-  const [composeOpen, setComposeOpen] = useState(false)
-  const [replyOpen, setReplyOpen] = useState(false)
-  const [replyToMail, setReplyToMail] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'thread'>('list')
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -56,9 +55,6 @@ export function MessagingPage() {
     refetchOnMountOrArgChange: true, // Ensure mail list refetches when tags are invalidated
   })
 
-  const { data: empiresData } = useGetEmpiresQuery({ page: 1, per_page: 100 })
-  const [sendMail, { isLoading: isSending }] = useSendMailMutation()
-  const [replyMail, { isLoading: isReplying }] = useReplyMailMutation()
   const [deleteMail, { isLoading: isDeleting }] = useDeleteMailMutation()
   const [markMailAsRead] = useMarkMailAsReadMutation()
   
@@ -104,35 +100,12 @@ export function MessagingPage() {
     return bLatest - aLatest
   })
 
-  const handleSendMail = async (data: { to_empire_id: number; subject: string; body: string }) => {
-    try {
-      await sendMail(data).unwrap()
-      toast.success('Message sent successfully')
-      setComposeOpen(false)
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to send message')
-    }
+  const handleOpenCompose = () => {
+    openPanel(PanelType.COMPOSE_MAIL, PanelSize.MEDIUM)
   }
 
-  const handleReplyMail = async (data: { body: string }) => {
-    if (!replyToMail) return
-    
-    // Get the original message to extract subject and determine recipient
-    const originalMail = currentData?.data.find(m => m.id === replyToMail)
-    if (!originalMail) return
-    
-    try {
-      await replyMail({
-        original_mail_id: replyToMail,
-        subject: `Re: ${originalMail.subject}`,
-        body: data.body,
-      }).unwrap()
-      toast.success('Reply sent successfully')
-      setReplyOpen(false)
-      setReplyToMail(null)
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to send reply')
-    }
+  const handleOpenReply = (mail: any) => {
+    openPanel(PanelType.COMPOSE_MAIL, PanelSize.MEDIUM, { replyToMail: mail })
   }
 
   const handleDeleteMail = async (id: number) => {
@@ -470,10 +443,7 @@ export function MessagingPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setReplyToMail(threadMessages[0].id)
-                      setReplyOpen(true)
-                    }}
+                    onClick={() => handleOpenReply(threadMessages[0])}
                     className="text-blue-600 hover:bg-blue-50"
                   >
                     <Reply className="w-4 h-4 mr-1" />
@@ -537,10 +507,7 @@ export function MessagingPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setReplyToMail(mail.id)
-                      setReplyOpen(true)
-                    }}
+                    onClick={() => handleOpenReply(mail)}
                     className="text-blue-600 hover:bg-blue-50"
                   >
                     <Reply className="w-4 h-4 mr-1" />
@@ -576,27 +543,13 @@ export function MessagingPage() {
           <h1 className="text-xl font-heading glow-cyan">Messaging</h1>
           <p className="text-muted-foreground">Communicate with other empires</p>
         </div>
-        <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-cyan-600 hover:bg-cyan-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Compose
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Compose Message</DialogTitle>
-              <DialogDescription>
-                Send a message to another empire
-              </DialogDescription>
-            </DialogHeader>
-            <ComposeForm
-              empires={empiresData?.data || []}
-              onSend={handleSendMail}
-              isLoading={isSending}
-            />
-          </DialogContent>
-        </Dialog>
+        <Button 
+          onClick={handleOpenCompose}
+          className="bg-cyan-600 hover:bg-cyan-700"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Compose
+        </Button>
       </div>
 
       {/* Search and View Controls */}
@@ -687,133 +640,6 @@ export function MessagingPage() {
         </div>
       </div>
 
-      {/* Reply Dialog */}
-      <Dialog open={replyOpen} onOpenChange={setReplyOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Reply to Message</DialogTitle>
-            <DialogDescription>
-              Send a reply to this conversation.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault()
-            const formData = new FormData(e.currentTarget)
-            handleReplyMail({
-              body: formData.get('body') as string,
-            })
-          }} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reply-body">Message</Label>
-              <Textarea
-                id="reply-body"
-                name="body"
-                placeholder="Type your reply here..."
-                className="min-h-[200px]"
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setReplyOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isReplying}>
-                {isReplying ? (
-                  <>
-                    <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Reply
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
-  )
-}
-
-interface ComposeFormProps {
-  empires: any[]
-  onSend: (data: { to_empire_id: number; subject: string; body: string }) => void
-  isLoading: boolean
-}
-
-function ComposeForm({ empires, onSend, isLoading }: ComposeFormProps) {
-  const [formData, setFormData] = useState({
-    to_empire_id: 0,
-    subject: '',
-    body: '',
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (formData.to_empire_id && formData.subject && formData.body) {
-      onSend(formData)
-      setFormData({ to_empire_id: 0, subject: '', body: '' })
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="to_empire">To</Label>
-        <select
-          id="to_empire"
-          value={formData.to_empire_id}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, to_empire_id: Number(e.target.value) })}
-          className="w-full p-2 border border-border rounded-md bg-background"
-          required
-        >
-          <option value={0}>Select an empire...</option>
-          {empires.map((empire) => (
-            <option key={empire.id} value={empire.id}>
-              {empire.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <Label htmlFor="subject">Subject</Label>
-        <Input
-          id="subject"
-          value={formData.subject}
-          onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-          placeholder="Enter subject..."
-          maxLength={255}
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="body">Message</Label>
-        <Textarea
-          id="body"
-          value={formData.body}
-          onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-          placeholder="Enter your message..."
-          rows={8}
-          maxLength={10000}
-          required
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          {formData.body.length}/10000 characters
-        </p>
-      </div>
-      <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={isLoading || !formData.to_empire_id}>
-          {isLoading ? 'Sending...' : 'Send Message'}
-          <Send className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </form>
   )
 }

@@ -169,6 +169,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
               return (
                 <button
                   key={button.id}
+                  data-tutorial={`${button.id}-button`}
                   onClick={() => handleButtonClick(button)}
                   className={cn(
                     "relative flex items-center gap-2 px-4 py-2 transition-all duration-200",

@@ -34,6 +34,7 @@ import { BoostersPanel } from '@/components/premium/BoostersPanel'
 import { AchievementsPanel } from '@/components/premium/AchievementsPanel'
 import { SignalsPage } from '@/features/signals/SignalsPage'
 import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
+import { ComposeMailPanel } from '@/components/messaging/ComposeMailPanel'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -122,6 +123,14 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     case PanelType.COMBAT_LOGS:
       return <CombatLogsPage />
     
+    case PanelType.COMPOSE_MAIL:
+      return (
+        <ComposeMailPanel 
+          replyToMail={panel.data?.replyToMail}
+          onSuccess={() => onClose()}
+        />
+      )
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -147,31 +156,40 @@ export function PanelManager() {
   const minimizedPanels = panels.filter(p => p.state === PanelState.MINIMIZED)
   const normalPanels = panels.filter(p => p.state !== PanelState.MINIMIZED)
   
-  const titles: Record<PanelType, string> = {
-    [PanelType.TECH_TREE_FACILITIES]: 'Facility Tech Tree',
-    [PanelType.TECH_TREE_SHIPS]: 'Ship Tech Tree',
-    [PanelType.TECH_TREE_DEFENSES]: 'Defense Tech Tree',
-    [PanelType.TECH_TREE_RESEARCH]: 'Research Tech Tree',
-    [PanelType.BUILD_DETAIL]: 'Build Item',
-    [PanelType.FLEET_COMMAND]: 'Fleet Command',
-    [PanelType.VISUAL_COORDINATE]: 'Select Destination',
-    [PanelType.SHIP_SELECTOR]: 'Select Ships',
-    [PanelType.RESEARCH_DETAIL]: 'Research Details',
-    [PanelType.PLANET_VIEW]: 'Planet View',
-    [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
-    [PanelType.GALAXY_MAP]: 'Galaxy Map',
-    [PanelType.MESSAGING]: 'Messages',
-    [PanelType.NOTIFICATIONS]: 'Notifications',
-    [PanelType.RANKINGS]: 'Rankings',
-    [PanelType.SETTINGS]: 'Settings',
-    [PanelType.POLITICS]: 'Politics & Alliances',
-    [PanelType.CREATE_ALLIANCE_REQUEST]: 'Create Alliance Request',
-    [PanelType.MAP_PLANET_INFO]: 'Planet Information',
-    [PanelType.QUANTUM_CREDITS]: 'Quantum Credits',
-    [PanelType.BOOSTERS]: 'Boosters',
-    [PanelType.ACHIEVEMENTS]: 'Achievements',
-    [PanelType.SIGNALS]: 'Tachyon Signals',
-    [PanelType.COMBAT_LOGS]: 'Battle Reports',
+  const getPanelTitle = (panel: Panel): string => {
+    if (panel.type === PanelType.COMPOSE_MAIL && panel.data?.replyToMail) {
+      return 'Reply to Message'
+    }
+    
+    const titles: Record<PanelType, string> = {
+      [PanelType.TECH_TREE_FACILITIES]: 'Facility Tech Tree',
+      [PanelType.TECH_TREE_SHIPS]: 'Ship Tech Tree',
+      [PanelType.TECH_TREE_DEFENSES]: 'Defense Tech Tree',
+      [PanelType.TECH_TREE_RESEARCH]: 'Research Tech Tree',
+      [PanelType.BUILD_DETAIL]: 'Build Item',
+      [PanelType.FLEET_COMMAND]: 'Fleet Command',
+      [PanelType.VISUAL_COORDINATE]: 'Select Destination',
+      [PanelType.SHIP_SELECTOR]: 'Select Ships',
+      [PanelType.RESEARCH_DETAIL]: 'Research Details',
+      [PanelType.PLANET_VIEW]: 'Planet View',
+      [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
+      [PanelType.GALAXY_MAP]: 'Galaxy Map',
+      [PanelType.MESSAGING]: 'Messages',
+      [PanelType.NOTIFICATIONS]: 'Notifications',
+      [PanelType.RANKINGS]: 'Rankings',
+      [PanelType.SETTINGS]: 'Settings',
+      [PanelType.POLITICS]: 'Politics & Alliances',
+      [PanelType.CREATE_ALLIANCE_REQUEST]: 'Create Alliance Request',
+      [PanelType.MAP_PLANET_INFO]: 'Planet Information',
+      [PanelType.QUANTUM_CREDITS]: 'Quantum Credits',
+      [PanelType.BOOSTERS]: 'Boosters',
+      [PanelType.ACHIEVEMENTS]: 'Achievements',
+      [PanelType.SIGNALS]: 'Tachyon Signals',
+      [PanelType.COMBAT_LOGS]: 'Battle Reports',
+      [PanelType.COMPOSE_MAIL]: 'Compose Message',
+    }
+    
+    return titles[panel.type] || 'Panel'
   }
 
   return (
@@ -195,7 +213,7 @@ export function PanelManager() {
                   onClose={() => handleClose(panel.id)}
                   onMinimize={() => handleMinimize(panel.id)}
                   onMaximize={() => handleMaximize(panel.id)}
-                  title={titles[panel.type] || 'Panel'}
+                  title={getPanelTitle(panel)}
                   size={PanelSize.FULL_HEIGHT}
                   panelState={panel.state}
                   zIndex={panel.zIndex}
@@ -216,7 +234,7 @@ export function PanelManager() {
             onClose={() => handleClose(panel.id)}
             onMinimize={() => handleMinimize(panel.id)}
             onMaximize={() => handleMaximize(panel.id)}
-            title={titles[panel.type] || 'Panel'}
+            title={getPanelTitle(panel)}
             size={panel.size}
             panelState={panel.state}
             zIndex={panel.zIndex}
@@ -239,7 +257,7 @@ export function PanelManager() {
                 onClick={() => handleMaximize(panel.id)}
                 className="panel-glass border-t border-l border-r px-4 py-2 text-sm font-semibold transition-all hover:bg-muted/20 hover:border-cyan/50 whitespace-nowrap rounded-t-lg"
               >
-                {titles[panel.type] || 'Panel'}
+                {getPanelTitle(panel)}
               </button>
               <button
                 onClick={() => handleClose(panel.id)}

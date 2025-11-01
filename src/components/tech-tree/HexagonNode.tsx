@@ -82,7 +82,7 @@ export function HexagonNode({
   // Calculate hexagon points for SVG
   const centerX = size / 2
   const centerY = size / 2
-  const radius = size / 2 - 4 // Leave some padding
+  const radius = size / 2 - 6 // Better padding for cleaner look
   
   const points = Array.from({ length: 6 }, (_, i) => {
     const angle = (Math.PI / 3) * i - Math.PI / 2
@@ -126,8 +126,8 @@ export function HexagonNode({
         <polygon
           points={points}
           fill="none"
-          className={cn(config.borderColor, 'opacity-50 blur-sm')}
-          strokeWidth="4"
+          className={cn(config.borderColor, 'opacity-60 blur-md')}
+          strokeWidth="3"
         />
       </svg>
 
@@ -143,12 +143,12 @@ export function HexagonNode({
           <img
             src={imageUrl}
             alt={name}
-            className="w-full h-full object-contain p-2"
+            className="w-full h-full object-contain p-3"
             style={{ imageRendering: 'auto' }}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center gap-1 p-4">
-            {Icon && <Icon className={cn('w-6 h-6', config.borderColor)} />}
+          <div className="flex flex-col items-center justify-center gap-1.5 p-5">
+            {Icon && <Icon className={cn('w-7 h-7', config.borderColor)} />}
             {children}
           </div>
         )}
@@ -157,7 +157,7 @@ export function HexagonNode({
       {/* Lock overlay for locked items */}
       {status === HexagonStatus.LOCKED && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <Lock className="w-8 h-8 text-muted-foreground/50" />
+          <Lock className="w-7 h-7 text-muted-foreground/40" />
         </div>
       )}
     </div>

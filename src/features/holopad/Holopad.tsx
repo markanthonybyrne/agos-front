@@ -65,12 +65,36 @@ export function Holopad() {
         useEffect(() => {
           const d: any = data || {}
           const tickFromMe = d.current_tick ?? d.tick_timing?.current_tick ?? d.tick?.current ?? d.currentTick ?? d.tickNumber ?? d.next_tick?.tick_number
-    const etaFromMe = d.next_tick_eta ?? d.tick_timing?.next_tick_eta ?? d.next_tick?.next_eta ?? d.next_tick_at ?? d.nextTickEta ?? (typeof d.next_tick?.eta_seconds === 'number' ? new Date(Date.now() + d.next_tick.eta_seconds * 1000).toISOString() : undefined)
+          
+          // Handle eta_seconds as number (can be negative)
+          let etaFromMe: string | undefined
+          let tickInterval: number | undefined
+          
+          if (typeof d.next_tick?.eta_seconds === 'number') {
+            const etaSeconds = d.next_tick.eta_seconds
+            
+            // Determine tick interval (default to 300 seconds = 5 minutes)
+            // Try to detect interval from the data, or use default
+            tickInterval = d.tick_interval_seconds ?? d.next_tick?.interval_seconds ?? 300
+            
+            if (etaSeconds < 0) {
+              // Tick has passed, calculate when next tick will be
+              const secondsUntilNext = tickInterval - (Math.abs(etaSeconds) % tickInterval)
+              etaFromMe = new Date(Date.now() + secondsUntilNext * 1000).toISOString()
+            } else {
+              // Tick is in the future
+              etaFromMe = new Date(Date.now() + etaSeconds * 1000).toISOString()
+            }
+          } else {
+            etaFromMe = d.next_tick_eta ?? d.tick_timing?.next_tick_eta ?? d.next_tick?.next_eta ?? d.next_tick_at ?? d.nextTickEta
+          }
+          
           if (tickFromMe && etaFromMe) {
             dispatch(
               setTick({
                 tick: Number(tickFromMe),
                 nextTickETA: String(etaFromMe),
+                tickIntervalSeconds: tickInterval,
               })
             )
           }
