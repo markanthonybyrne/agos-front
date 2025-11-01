@@ -5,13 +5,11 @@ import {
   X,
   Building2,
   Rocket,
-  Mail,
-  Trophy,
   LogOut,
   ChevronDown,
   Shield,
   Scan,
-  Sword
+  Sword,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -70,14 +68,6 @@ const HUD_BUTTONS: HUDButton[] = [
     color: 'text-blue-400',
   },
   {
-    id: 'mail',
-    icon: Mail,
-    label: 'Mail',
-    panelType: PanelType.MESSAGING,
-    panelSize: PanelSize.XLARGE,
-    color: 'text-yellow-400',
-  },
-  {
     id: 'signals',
     icon: Scan,
     label: 'Signals',
@@ -92,14 +82,6 @@ const HUD_BUTTONS: HUDButton[] = [
     panelType: PanelType.COMBAT_LOGS,
     panelSize: PanelSize.XLARGE,
     color: 'text-red-400',
-  },
-  {
-    id: 'rankings',
-    icon: Trophy,
-    label: 'Rankings',
-    panelType: PanelType.RANKINGS,
-    panelSize: PanelSize.XLARGE,
-    color: 'text-amber-400',
   },
   {
     id: 'politics',

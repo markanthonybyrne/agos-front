@@ -31,6 +31,7 @@ import { PlanetsPage } from '@/features/admin/routes/PlanetsPage'
 import { FleetsPage as AdminFleetsPage } from '@/features/admin/routes/FleetsPage'
 import { AlliancesPage as AdminAlliancesPage } from '@/features/admin/routes/AlliancesPage'
 import { MailPage } from '@/features/admin/routes/MailPage'
+import { ChatPage } from '@/features/admin/routes/ChatPage'
 import { AnnouncementsPage } from '@/features/admin/routes/AnnouncementsPage'
 import { TicksPage } from '@/features/admin/routes/TicksPage'
 import { ResourcesPage } from '@/features/admin/routes/ResourcesPage'
@@ -85,6 +86,7 @@ function AppContent() {
                           <Route path="/fleets" element={<AdminFleetsPage />} />
                           <Route path="/alliances" element={<AdminAlliancesPage />} />
                           <Route path="/mail" element={<MailPage />} />
+                          <Route path="/chat" element={<ChatPage />} />
                           <Route path="/announcements" element={<AnnouncementsPage />} />
                           <Route path="/ticks" element={<TicksPage />} />
                           <Route path="/resources" element={<ResourcesPage />} />

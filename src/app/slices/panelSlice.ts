@@ -26,6 +26,7 @@ export enum PanelType {
   SIGNALS = 'SIGNALS',
   COMBAT_LOGS = 'COMBAT_LOGS',
   COMPOSE_MAIL = 'COMPOSE_MAIL',
+  CHAT = 'CHAT',
 }
 
 export enum PanelSize {

@@ -35,6 +35,7 @@ import { AchievementsPanel } from '@/components/premium/AchievementsPanel'
 import { SignalsPage } from '@/features/signals/SignalsPage'
 import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
 import { ComposeMailPanel } from '@/components/messaging/ComposeMailPanel'
+import { ChatPanel } from '@/features/chat/ChatPanel'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -130,6 +131,9 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
           onSuccess={() => onClose()}
         />
       )
+    
+    case PanelType.CHAT:
+      return <ChatPanel />
     
     default:
       return <div>Panel content not implemented yet</div>

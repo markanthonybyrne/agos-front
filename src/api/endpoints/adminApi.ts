@@ -39,6 +39,10 @@ import {
   Announcement,
   CreateAnnouncementRequest,
   UpdateAnnouncementRequest,
+  AdminChatMessage,
+  AdminChatMessageListResponse,
+  BanUserFromChatRequest,
+  MuteUserFromChatRequest,
 } from '@/types/api.types'
 
 export const adminApi = apiSlice.injectEndpoints({
@@ -471,6 +475,61 @@ export const adminApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Announcement'],
     }),
+
+    // Chat Moderation
+    listChatMessages: builder.query<
+      AdminChatMessageListResponse,
+      { page?: number; per_page?: number; channel_slug?: string; empire_id?: number }
+    >({
+      query: (params = {}) => ({
+        url: '/admin/chat/messages',
+        params,
+      }),
+      providesTags: ['Chat'],
+    }),
+    deleteChatMessage: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/admin/chat/messages/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    banUserFromChat: builder.mutation<
+      { message: string },
+      BanUserFromChatRequest
+    >({
+      query: (data) => ({
+        url: '/admin/chat/ban',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Chat', 'User'],
+    }),
+    muteUserFromChat: builder.mutation<
+      { message: string },
+      MuteUserFromChatRequest
+    >({
+      query: (data) => ({
+        url: '/admin/chat/mute',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Chat', 'User'],
+    }),
+    unbanUserFromChat: builder.mutation<{ message: string }, number>({
+      query: (empireId) => ({
+        url: `/admin/chat/ban/${empireId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Chat', 'User'],
+    }),
+    unmuteUserFromChat: builder.mutation<{ message: string }, number>({
+      query: (empireId) => ({
+        url: `/admin/chat/mute/${empireId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Chat', 'User'],
+    }),
   }),
 })
 
@@ -535,5 +594,12 @@ export const {
   useCreateAnnouncementMutation,
   useUpdateAnnouncementMutation,
   useDeleteAnnouncementMutation,
+  // Chat
+  useListChatMessagesQuery,
+  useDeleteChatMessageMutation,
+  useBanUserFromChatMutation,
+  useMuteUserFromChatMutation,
+  useUnbanUserFromChatMutation,
+  useUnmuteUserFromChatMutation,
 } = adminApi
 

@@ -970,6 +970,101 @@ export interface SendAllianceChatRequest {
   message: string
 }
 
+// Universal Chat System Types
+export interface ChatChannel {
+  id: number
+  slug: string
+  name: string
+  description: string
+  max_message_length: number
+  rate_limit_per_minute: number
+}
+
+export interface ChatChannelListResponse {
+  channels: ChatChannel[]
+}
+
+export interface ChatMessage {
+  id: number
+  channel_slug: string
+  sender_empire: {
+    id: number
+    name: string
+  }
+  message: string
+  mentions: number[]
+  is_edited: boolean
+  edited_at: string | null
+  is_moderated: boolean
+  created_at: string
+}
+
+export interface ChatMessageListResponse {
+  channel_slug: string
+  messages: ChatMessage[]
+}
+
+export interface SendChatMessageRequest {
+  message: string
+}
+
+export interface EditChatMessageRequest {
+  message: string
+}
+
+export interface SendTypingIndicatorRequest {
+  is_typing: boolean
+}
+
+export interface OnlineUser {
+  empire_id: number
+  empire_name: string
+  last_seen: string
+}
+
+export interface OnlineUsersResponse {
+  channel_slug: string
+  count: number
+  online_users: OnlineUser[]
+}
+
+// Admin Chat Types
+export interface AdminChatMessage {
+  id: number
+  channel_slug: string
+  sender_empire: {
+    id: number
+    name: string
+  }
+  message: string
+  mentions: number[]
+  is_edited: boolean
+  edited_at: string | null
+  is_moderated: boolean
+  created_at: string
+}
+
+export interface AdminChatMessageListResponse {
+  data: AdminChatMessage[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface BanUserFromChatRequest {
+  empire_id: number
+  reason?: string
+  duration_hours?: number
+}
+
+export interface MuteUserFromChatRequest {
+  empire_id: number
+  duration_hours?: number
+}
+
 export interface BuildDefenceRequest {
   defence_slug: string
   quantity: number
