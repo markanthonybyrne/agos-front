@@ -1284,6 +1284,28 @@ export function UniverseMap() {
       planets = galaxyPlanetsData.planets
     }
     
+    // Generate random asteroid clusters for this galaxy
+    const generateAsteroids = (count: number) => {
+      const asteroids: Array<{ clusterX: number; clusterY: number; asteroids: Array<{ x: number; y: number; size: number; rotation: number }> }> = []
+      for (let i = 0; i < count; i++) {
+        const clusterX = Math.random() * 200 - 100
+        const clusterY = Math.random() * 200 - 100
+        const clusterSize = 3 + Math.floor(Math.random() * 3)
+        const asteroidInCluster = []
+        for (let j = 0; j < clusterSize; j++) {
+          asteroidInCluster.push({
+            x: (Math.random() - 0.5) * 5,
+            y: (Math.random() - 0.5) * 5,
+            size: 8 + Math.random() * 4,
+            rotation: Math.random() * 360
+          })
+        }
+        asteroids.push({ clusterX, clusterY, asteroids: asteroidInCluster })
+      }
+      return asteroids
+    }
+    const asteroids = generateAsteroids(12)
+    
     if (planets && planets.length > 0) {
       return (
         <>
@@ -1404,6 +1426,37 @@ export function UniverseMap() {
                     </div>
                   )
                 })}
+              </div>
+              
+              {/* Asteroid clusters - rendered outside scaled container to maintain size */}
+              <div className="absolute inset-0 pointer-events-none">
+                {asteroids.map((cluster, clusterIdx) => (
+                  <div
+                    key={`asteroid-cluster-${clusterIdx}`}
+                    className="absolute"
+                    style={{
+                      left: '50%',
+                      top: '50%',
+                      transform: `translate(calc(-50% + ${cluster.clusterX}%), calc(-50% + ${cluster.clusterY}%))`,
+                    }}
+                  >
+                    {cluster.asteroids.map((asteroid, asteroidIdx) => (
+                      <img
+                        key={`asteroid-${clusterIdx}-${asteroidIdx}`}
+                        src="/assets/images/planets/asteroid.png"
+                        alt="Asteroid"
+                        className="absolute opacity-60"
+                        style={{
+                          width: `${asteroid.size}px`,
+                          height: `${asteroid.size}px`,
+                          left: `${asteroid.x}px`,
+                          top: `${asteroid.y}px`,
+                          transform: `rotate(${asteroid.rotation}deg)`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

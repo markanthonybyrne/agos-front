@@ -25,7 +25,7 @@ import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
 import { logout } from '@/app/slices/authSlice'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Avatar } from '@/components/common/Avatar'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { getUserAvatarUrl } from '@/lib/avatar'
@@ -99,6 +99,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
   const { openPanel, backdropVisible, closeAllPanels } = usePanel()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const notificationsCount = useAppSelector(state => 
     state.notifications.notifications.filter(n => !n.isRead).length
   )
@@ -118,105 +119,107 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
   }
 
   return (
-    <div className={cn(
-      "fixed top-0 left-16 right-0 z-30 transition-all duration-300",
-      backdropVisible && "bg-background/80 backdrop-blur-md border-b border-border/50",
-      className
-    )}>
-      <div className="w-full px-4 py-2">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex-shrink-0 mr-4">
-            <img 
-              src="/assets/images/logo.png" 
-              alt="War For Galaxy" 
-              className="h-12 w-auto object-contain"
-            />
-          </div>
+    <div className="fixed top-0 left-16 right-0 z-30">
+      <div className="w-full px-4 py-2 flex items-center justify-between">
+        {/* Logo */}
+        <div className="flex-shrink-0">
+          <img 
+            src="/assets/images/logo.png" 
+            alt="War For Galaxy" 
+            className="h-12 w-auto object-contain"
+          />
+        </div>
 
-          {/* HUD Buttons - Centered */}
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 justify-center">
+        {/* HUD Buttons - Tab style with glass background */}
+        <div 
+          className="panel-glass surface-gradient card-glow vignette border border-border/50"
+          style={{
+            clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
+          }}
+        >
+          <div className="flex items-end gap-0">
             {HUD_BUTTONS.map((button) => {
               const Icon = button.icon
+              const isActive = button.route ? location.pathname === button.route : false
               return (
-                <Button
+                <button
                   key={button.id}
-                  variant="ghost"
-                  size="sm"
                   onClick={() => handleButtonClick(button)}
                   className={cn(
-                    "relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200",
-                    "hover:bg-muted/50 hover:scale-105",
-                    "focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background",
-                    button.color
+                    "relative flex items-center gap-2 px-4 py-2 transition-all duration-200",
+                    "uppercase text-xs font-semibold tracking-wide",
+                    isActive
+                      ? "bg-background text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
                   )}
+                  style={isActive ? {
+                    clipPath: 'polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
+                  } : {}}
                 >
                   <Icon className="w-4 h-4" />
-                  <span className="text-xs font-semibold tracking-wide hidden md:inline">
-                    {button.label}
-                  </span>
-                </Button>
+                  <span>{button.label}</span>
+                </button>
               )
             })}
           </div>
+        </div>
 
-          {/* Right side actions */}
-          <div className="flex items-center gap-2">
-            {/* Notifications */}
+        {/* Right side actions */}
+        <div className="flex items-center gap-2">
+          {/* Notifications */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openPanel(PanelType.NOTIFICATIONS, PanelSize.MEDIUM)}
+            className="relative"
+          >
+            <Bell className="w-4 h-4" />
+            {notificationsCount > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]"
+              >
+                {notificationsCount > 9 ? '9+' : notificationsCount}
+              </Badge>
+            )}
+          </Button>
+
+          {/* User Avatar Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 p-0">
+                <Avatar
+                  src={getUserAvatarUrl(data?.user)}
+                  name={data?.user?.username || 'User'}
+                  size="md"
+                  className="border-2 border-cyan/50"
+                />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 panel-glass">
+              <DropdownMenuItem onClick={() => openPanel(PanelType.SETTINGS, PanelSize.LARGE)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-400">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Close all panels */}
+          {showClose && backdropVisible && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => openPanel(PanelType.NOTIFICATIONS, PanelSize.MEDIUM)}
-              className="relative"
+              onClick={() => closeAllPanels()}
+              className="text-muted-foreground hover:text-foreground"
             >
-              <Bell className="w-4 h-4" />
-              {notificationsCount > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]"
-                >
-                  {notificationsCount > 9 ? '9+' : notificationsCount}
-                </Badge>
-              )}
+              <X className="w-4 h-4" />
             </Button>
-
-            {/* User Avatar Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 p-0">
-                  <Avatar
-                    src={getUserAvatarUrl(data?.user)}
-                    name={data?.user?.username || 'User'}
-                    size="md"
-                    className="border-2 border-cyan/50"
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 panel-glass">
-                <DropdownMenuItem onClick={() => openPanel(PanelType.SETTINGS, PanelSize.LARGE)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-400">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Close all panels */}
-            {showClose && backdropVisible && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => closeAllPanels()}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

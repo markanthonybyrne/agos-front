@@ -86,6 +86,27 @@ export function PlanetsList() {
     navigate('/map')
   }
 
+  // Generate random asteroid clusters
+  const generateAsteroids = (count: number) => {
+    return Array.from({ length: count }, (_, i) => {
+      // Random positions across the viewable area
+      const clusterX = Math.random() * 200 - 100 // -100% to 100% (centered at 0)
+      const clusterY = Math.random() * 200 - 100
+      const clusterSize = 3 + Math.random() * 3 // 3-6 asteroids per cluster
+      
+      return {
+        id: `asteroid-${i}`,
+        x: clusterX,
+        y: clusterY,
+        count: Math.floor(clusterSize),
+        offsetX: (Math.random() - 0.5) * 5, // Spread within cluster
+        offsetY: (Math.random() - 0.5) * 5,
+      }
+    })
+  }
+  
+  const asteroids = generateAsteroids(8) // 8 clusters of asteroids
+
   const getPlanetGlowColor = (slug?: string) => {
     switch (slug) {
       case 'arid':
@@ -219,6 +240,35 @@ export function PlanetsList() {
               </div>
             )
           })}
+          
+          {/* Asteroid clusters */}
+          {asteroids.map((cluster) => (
+            <div
+              key={cluster.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: '50%',
+                top: '50%',
+                transform: `translate(calc(-50% + ${cluster.x}%), calc(-50% + ${cluster.y}%))`,
+              }}
+            >
+              {Array.from({ length: cluster.count }).map((_, i) => (
+                <img
+                  key={`${cluster.id}-${i}`}
+                  src="/assets/images/planets/asteroid.png"
+                  alt="Asteroid"
+                  className="absolute opacity-60"
+                  style={{
+                    width: `${8 + Math.random() * 4}px`,
+                    height: `${8 + Math.random() * 4}px`,
+                    left: `${i * cluster.offsetX}px`,
+                    top: `${i * cluster.offsetY}px`,
+                    transform: `rotate(${Math.random() * 360}deg)`,
+                  }}
+                />
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>

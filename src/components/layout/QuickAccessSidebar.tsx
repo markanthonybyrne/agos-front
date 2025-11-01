@@ -16,16 +16,8 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
 
   return (
     <div className="fixed left-0 top-0 bottom-0 w-16 z-20 pointer-events-none">
-      {/* EVE-style vertical icon bar with gradient */}
-      <div className="w-full h-full flex flex-col items-center pt-24 pb-4 gap-2">
-        {/* Background bar with gradient */}
-        <div className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.1) 50%, rgba(37, 99, 235, 0.15) 100%)',
-            backdropFilter: 'blur(8px)',
-          }}
-        />
-        <div className="absolute inset-0 border-r border-blue-500/20 pointer-events-none" />
+      {/* EVE-style vertical icon bar with glass effect */}
+      <div className="w-full h-full flex flex-col items-center pt-24 pb-4 gap-2 panel-glass surface-gradient card-glow vignette border-r border-border/50">
         
         {/* Command Center Button */}
         <div className="relative group pointer-events-auto z-10">
