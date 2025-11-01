@@ -5,6 +5,7 @@ import { HexagonStatus } from './HexagonNode'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType } from '@/app/slices/panelSlice'
+import { toast } from 'sonner'
 
 interface ResearchTechTreeProps {
   planetId: number
@@ -63,6 +64,12 @@ export function ResearchTechTree({ planetId, className }: ResearchTechTreeProps)
   }, [definitions, planetResearchData, researchProgress])
 
   const handleItemClick = (item: TechTreeItem) => {
+    // Prevent building if prerequisites not met
+    if (item.status === HexagonStatus.PREREQUISITE_NOT_MET) {
+      toast.error('Prerequisites not met for this item')
+      return
+    }
+    
     // Open a research detail panel or start research directly
     openPanel(PanelType.RESEARCH_DETAIL, 'MEDIUM' as any, {
       type: 'research',

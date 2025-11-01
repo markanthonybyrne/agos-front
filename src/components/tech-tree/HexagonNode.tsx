@@ -91,7 +91,7 @@ export function HexagonNode({
     return `${x},${y}`
   }).join(' ')
 
-  const isInteractive = onClick && status !== HexagonStatus.LOCKED
+  const isInteractive = onClick && status !== HexagonStatus.LOCKED && status !== HexagonStatus.PREREQUISITE_NOT_MET
 
   return (
     <div

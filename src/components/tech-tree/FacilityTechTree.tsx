@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAppSelector } from '@/app/hooks'
 import { PanelType } from '@/app/slices/panelSlice'
 import { usePanel } from '@/components/common/PanelManager'
+import { toast } from 'sonner'
 
 interface FacilityTechTreeProps {
   planetId: number
@@ -34,7 +35,7 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
     const buildableSlugs = new Set(
       Array.isArray(buildableItems.facilities)
         ? buildableItems.facilities.map((f: any) => f.slug)
-        : Object.keys(buildableItems.facilities || {})
+        : Object.values(buildableItems.facilities || {}).map((f: any) => f.slug)
     )
 
     // Get built facility levels
@@ -90,6 +91,12 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
   }, [definitions, buildableItems, facilitiesList])
 
   const handleItemClick = (item: TechTreeItem) => {
+    // Prevent building if prerequisites not met
+    if (item.status === HexagonStatus.PREREQUISITE_NOT_MET) {
+      toast.error('Prerequisites not met for this item')
+      return
+    }
+    
     // Open a build detail panel
     openPanel(PanelType.BUILD_DETAIL, 'MEDIUM' as any, {
       type: 'facility',

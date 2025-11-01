@@ -7,6 +7,7 @@ import { getShipImage } from '@/lib/shipImages'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType } from '@/app/slices/panelSlice'
+import { toast } from 'sonner'
 
 interface ShipTechTreeProps {
   planetId: number
@@ -25,7 +26,7 @@ export function ShipTechTree({ planetId, className }: ShipTechTreeProps) {
     const buildableSlugs = new Set(
       Array.isArray(buildableItems.ships)
         ? buildableItems.ships.map((s: any) => s.slug)
-        : Object.keys(buildableItems.ships || {})
+        : Object.values(buildableItems.ships || {}).map((s: any) => s.slug)
     )
 
     return definitions.ships.map((ship) => {
@@ -64,6 +65,12 @@ export function ShipTechTree({ planetId, className }: ShipTechTreeProps) {
   }, [definitions, buildableItems])
 
   const handleItemClick = (item: TechTreeItem) => {
+    // Prevent building if prerequisites not met
+    if (item.status === HexagonStatus.PREREQUISITE_NOT_MET) {
+      toast.error('Prerequisites not met for this item')
+      return
+    }
+    
     // Open a build detail panel
     openPanel(PanelType.BUILD_DETAIL, 'MEDIUM' as any, {
       type: 'ship',

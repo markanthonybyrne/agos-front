@@ -7,6 +7,7 @@ import { getDefenseImage } from '@/lib/defenseImages'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType } from '@/app/slices/panelSlice'
+import { toast } from 'sonner'
 
 interface DefenseTechTreeProps {
   planetId: number
@@ -33,7 +34,7 @@ export function DefenseTechTree({ planetId, className }: DefenseTechTreeProps) {
     const buildableSlugs = new Set(
       Array.isArray(buildableItems.defences)
         ? buildableItems.defences.map((d: any) => d.slug)
-        : Object.keys(buildableItems.defences || {})
+        : Object.values(buildableItems.defences || {}).map((d: any) => d.slug)
     )
 
     // Get built defence quantities
@@ -78,6 +79,12 @@ export function DefenseTechTree({ planetId, className }: DefenseTechTreeProps) {
   }, [definitions, buildableItems, defencesList])
 
   const handleItemClick = (item: TechTreeItem) => {
+    // Prevent building if prerequisites not met
+    if (item.status === HexagonStatus.PREREQUISITE_NOT_MET) {
+      toast.error('Prerequisites not met for this item')
+      return
+    }
+    
     // Open a build detail panel
     openPanel(PanelType.BUILD_DETAIL, 'MEDIUM' as any, {
       type: 'defense',
