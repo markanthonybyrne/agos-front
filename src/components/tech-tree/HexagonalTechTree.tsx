@@ -63,8 +63,8 @@ function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<str
   })
 
   // Position items tier by tier with proper spacing
-  // Use a more compact vertical layout by limiting items per row
-  const itemsPerRow = 6
+  // Use a compact vertical layout by limiting items per row
+  const itemsPerRow = 3
   
   tierGroups.forEach((tierItems, tier) => {
     tierItems.forEach((item, index) => {
@@ -72,9 +72,9 @@ function calculatePositions(items: TechTreeItem[], hexagonSize: number): Map<str
       // Spread items evenly horizontally within their tier, wrapping to multiple rows if needed
       const col = index % itemsPerRow
       const subRow = Math.floor(index / itemsPerRow)
-      // Staggered hexagonal grid with proper spacing
-      const x = col * (hexagonSize * 1.75)
-      const y = (row + subRow) * (hexagonSize * 1.5) // Increased vertical spacing from 1.1 to 1.5
+      // Compact hexagonal grid with proper spacing
+      const x = col * (hexagonSize * 1.4)
+      const y = (row + subRow) * (hexagonSize * 1.6) // More vertical spacing
       positions.set(item.id, { x, y })
     })
   })
@@ -93,12 +93,12 @@ function calculateConnections(
     if (item.prerequisites && item.prerequisites.length > 0) {
       const toPos = positions.get(item.id)
       if (toPos) {
-        item.prerequisites.forEach(prereqId => {
-          const fromPos = positions.get(prereqId)
-          if (fromPos) {
-            connections.push({ from: fromPos, to: toPos })
-          }
-        })
+        // Only connect to the first prerequisite to reduce visual clutter
+        const prereqId = item.prerequisites[0]
+        const fromPos = positions.get(prereqId)
+        if (fromPos) {
+          connections.push({ from: fromPos, to: toPos })
+        }
       }
     }
   })
@@ -142,7 +142,7 @@ export function HexagonalTechTree({
   }, [items, hexagonSize])
 
   return (
-    <div className={cn('relative w-full h-full min-h-[600px] max-h-[800px] overflow-auto', className)}>
+    <div className={cn('relative w-full h-full overflow-auto', className)}>
       <svg
         width={bounds.width}
         height={bounds.height}

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatResource } from '@/lib/formatters'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { HexagonalGrid } from './HexagonalGrid'
 
 interface PlanetImageDisplayProps {
   planetId: number
@@ -38,7 +39,7 @@ export function PlanetImageDisplay({
     medium: 'w-48 h-48',
     large: 'w-64 h-64',
     xlarge: 'w-96 h-96',
-    xxlarge: 'w-[600px] h-[600px]',
+    xxlarge: 'w-[800px] h-[800px]',
   }
 
   const getPlanetGlowColor = (slug?: string) => {
@@ -81,6 +82,8 @@ export function PlanetImageDisplay({
           "absolute inset-0 blur-2xl rounded-full -z-10 pointer-events-none",
           getPlanetGlowColor(planetSlug).replace('shadow-', 'bg-').replace('/50', '/20')
         )} />
+        {/* Hexagonal grid overlay */}
+        <HexagonalGrid planetId={planetId} size={size} />
       </div>
 
       {/* Planet info overlay */}

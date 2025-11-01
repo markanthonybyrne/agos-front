@@ -866,6 +866,7 @@ export interface BuildableItem {
   build_time: number // API returns build_time in seconds
   prerequisites: string[]
   description: string
+  era?: number // Era required for this item
 }
 
 export interface BuildableFacility extends BuildableItem {
