@@ -28,6 +28,7 @@ import { MessagingPage } from '@/features/messaging/MessagingPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { PoliticsPage } from '@/features/politics/PoliticsPage'
+import { NotificationTrayPanel } from '@/components/notifications/NotificationTrayPanel'
 import { CreateAllianceRequestForm } from '@/features/politics/components/CreateAllianceRequestForm'
 import { QuantumCreditsPanel } from '@/components/premium/QuantumCreditsPanel'
 import { BoostersPanel } from '@/components/premium/BoostersPanel'
@@ -95,7 +96,7 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
       return <MessagingPage />
     
     case PanelType.NOTIFICATIONS:
-      return <div>Notifications panel</div>
+      return <NotificationTrayPanel />
     
     case PanelType.RANKINGS:
       return <RankingsPage />

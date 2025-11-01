@@ -18,7 +18,7 @@ interface NotificationCenterProps {
 export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps) {
   const dispatch = useAppDispatch()
   const { notifications, unreadCount } = useAppSelector((state) => state.notifications)
-  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'attack' | 'tick'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'attack' | 'tick' | 'announcement'>('all')
 
   console.log('NotificationCenter render:', { isOpen, notificationsCount: notifications.length, unreadCount })
 
@@ -98,7 +98,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
         }
       }}
     >
-      <Card className="panel-glass w-full max-w-md h-[600px] flex flex-col shadow-2xl border-2 border-primary/20">
+      <Card className="panel-glass w-full max-w-2xl h-[600px] flex flex-col shadow-2xl border-2 border-primary/20">
         <CardHeader className="flex flex-row items-center justify-between pb-4">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-primary" />

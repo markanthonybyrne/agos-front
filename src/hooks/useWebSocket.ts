@@ -21,6 +21,7 @@ import { initializeEcho, disconnectEcho, getEcho } from '@/lib/websocket'
 import { formatCoordinate } from '@/lib/coordinates'
 import { toast } from 'sonner'
 import { apiSlice } from '@/api/apiSlice'
+import { notifyWithToast } from '@/lib/notificationHelper'
 
 export function useWebSocket() {
   const dispatch = useAppDispatch()
@@ -32,6 +33,8 @@ export function useWebSocket() {
   const subscribedRef = useRef<string | null>(null) // Track which empire ID we're subscribed to
   const channelRef = useRef<any>(null)
   const allianceChannelRef = useRef<any>(null)
+  const initializedRef = useRef<boolean>(false)
+  const subscriptionsRef = useRef<Array<{ channel: string; events: string[] }>>([])
 
   useEffect(() => {
     if (!token || !empire) {
@@ -39,16 +42,61 @@ export function useWebSocket() {
         channelRef.current = null
       }
       subscribedRef.current = null
+      initializedRef.current = false
       return
     }
     
     // Prevent multiple subscriptions to the same channel
-    if (subscribedRef.current === `empire.${empire.id}`) {
-      console.log('[WebSocket] Already subscribed to', subscribedRef.current, ', skipping...')
+    if (subscribedRef.current === `empire.${empire.id}` && initializedRef.current) {
       return
     }
 
+    console.log('[WebSocket] 🚀 Initializing WebSocket connection and ALL channel subscriptions...')
     const echo = initializeEcho(token)
+    
+    // Reset subscriptions tracking
+    subscriptionsRef.current = []
+    
+    // Helper function to track subscription - call this when channel is confirmed subscribed
+    const trackSubscription = (channelName: string, events: string[]) => {
+      // Check if already tracked
+      const existing = subscriptionsRef.current.find(sub => sub.channel === channelName)
+      if (!existing) {
+        subscriptionsRef.current.push({
+          channel: channelName,
+          events: [...events]
+        })
+        console.log(`[WebSocket] ✅ Tracked subscription: ${channelName} with ${events.length} events`)
+        logSubscriptionSummary()
+      }
+    }
+    
+    // Helper function to log subscription summary
+    const logSubscriptionSummary = () => {
+      // Debounce to avoid logging multiple times rapidly
+      if ((logSubscriptionSummary as any).timeout) {
+        clearTimeout((logSubscriptionSummary as any).timeout)
+      }
+      (logSubscriptionSummary as any).timeout = setTimeout(() => {
+        const subscriptions = subscriptionsRef.current
+        const totalChannels = subscriptions.length
+        const totalEvents = subscriptions.reduce((sum, sub) => sum + sub.events.length, 0)
+        
+        // Only log if we have subscriptions and haven't logged yet
+        if (totalChannels > 0 && !initializedRef.current) {
+          console.log('[WebSocket] 📊 WebSocket Initialization Summary:')
+          console.log(`[WebSocket] ✅ Connected and configured`)
+          console.log(`[WebSocket] ✅ Total channels subscribed: ${totalChannels}`)
+          console.log(`[WebSocket] ✅ Total events subscribed: ${totalEvents}`)
+          console.log('[WebSocket] 📋 Channel breakdown:')
+          subscriptions.forEach(sub => {
+            console.log(`[WebSocket]   - ${sub.channel}: ${sub.events.length} events (${sub.events.slice(0, 3).join(', ')}${sub.events.length > 3 ? '...' : ''})`)
+          })
+          console.log('[WebSocket] ✅ ALL WebSocket channels and events are now subscribed and ready!')
+          initializedRef.current = true
+        }
+      }, 1500) // Wait 1.5 seconds after last subscription to log summary
+    }
     
     // Get auth endpoint for logging
     const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'
@@ -62,10 +110,6 @@ export function useWebSocket() {
 
     // Subscribe to private empire channel
     const channelName = `empire.${empire.id}`
-    console.log('[WebSocket] Subscribing to channel:', channelName)
-    console.log('[WebSocket] Auth endpoint for subscription:', authEndpoint)
-    console.log('[WebSocket] Using token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN')
-    
     subscribedRef.current = channelName
     
     const privateChannel = echo.private(channelName)
@@ -74,7 +118,6 @@ export function useWebSocket() {
     // Define all handlers BEFORE subscription so they can be called manually
     // Handle empire updated event (enhanced for real-time updates)
     const handleEmpireUpdated = (data: any) => {
-      console.log('[WebSocket] ✅ Received empire.updated event:', data)
       // Update empire state if data includes empire object
       if (data.empire) {
         dispatch(updateEmpire(data.empire))
@@ -89,7 +132,12 @@ export function useWebSocket() {
         if (changes.alliance_id) changeMessages.push(`Alliance ${changes.alliance_id ? 'joined' : 'left'}`)
         
         if (changeMessages.length > 0) {
-          toast.info(`Empire updated: ${changeMessages.join(', ')}`)
+          notifyWithToast(dispatch, {
+            type: 'info',
+            title: 'Empire updated',
+            message: changeMessages.join(', '),
+            category: 'general',
+          })
         }
       }
       
@@ -105,8 +153,6 @@ export function useWebSocket() {
     
     // Handle planet updated event (enhanced for real-time updates)
     const handlePlanetUpdated = (data: any) => {
-      console.log('[WebSocket] ✅ PLANET UPDATED - Real-time update:', data)
-      
       // Extract planet ID from multiple possible locations
       const planetId = data.planet?.id || data.planet_id || data.id
       
@@ -115,8 +161,6 @@ export function useWebSocket() {
       
       if (planetId) {
         const pid = Number(planetId)
-        console.log('[WebSocket] Invalidating all tags for planet:', pid)
-        
         // Invalidate construction queue immediately (critical for real-time updates)
         tags.push({ type: 'ConstructionQueue', id: pid })
         tags.push({ type: 'Planet', id: pid })
@@ -132,14 +176,12 @@ export function useWebSocket() {
         tags.push('Buildable')
       } else {
         // Even without planet_id, invalidate all planet-related tags
-        console.log('[WebSocket] No planet_id, invalidating all planet tags')
         tags.push('ConstructionQueue')
         tags.push('Buildable')
       }
       
       // Invalidate tags immediately for real-time updates
       dispatch(apiSlice.util.invalidateTags(tags))
-      console.log('[WebSocket] ✅ Tags invalidated for real-time update')
       
       // Check if resources changed - if so, trigger resource update events
       const changes = data.changes || {}
@@ -165,7 +207,6 @@ export function useWebSocket() {
     
     // Handle fleet arrived event (per WebSocket events spec)
     const handleFleetArrivedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received fleet.arrived event:', data)
       // Per spec: data.fleet.id, data.fleet.destination.coordinate
       const fleetData = data.fleet || data
       dispatch(handleFleetArrived({
@@ -180,7 +221,6 @@ export function useWebSocket() {
     
     // Handle resources updated event
     const handleResourcesUpdated = (data: any) => {
-      console.log('[WebSocket] ✅ Received resources.updated event:', data)
       // Real-time resource updates - invalidate planet resources
       const tags: any[] = ['Resource', 'Planet', 'Empire', 'Universe']
       if (data.planet_id) {
@@ -190,14 +230,20 @@ export function useWebSocket() {
       dispatch(apiSlice.util.invalidateTags(tags))
     }
     
-    // Handle mail received event (per WebSocket events spec)
+      // Handle mail received event (per WebSocket events spec)
     const handleMailReceived = (data: any) => {
-      console.log('[WebSocket] ✅ Received mail.received event:', data)
       // Per spec: data.mail.from_empire.name, data.mail.subject
       const mailData = data.mail || data
       const mailSubject = mailData.subject || 'New message'
       const senderName = mailData.from_empire?.name || data.from_empire?.name || data.sender_name || 'Unknown'
-      toast.info(`New mail from ${senderName}: ${mailSubject}`)
+      notifyWithToast(dispatch, {
+        type: 'info',
+        title: 'New Mail',
+        message: `${senderName}: ${mailSubject}`,
+        category: 'general',
+        actionUrl: '/mail',
+        data: { mailId: mailData.id, senderName, subject: mailSubject },
+      })
       // Invalidate mail tags and unread count to refresh UI
       dispatch(apiSlice.util.invalidateTags([
         { type: 'Mail', id: 'inbox' },
@@ -208,7 +254,6 @@ export function useWebSocket() {
     
     // Handle fleet attacked event
     const handleFleetAttackedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received fleet.attacked event:', data)
       dispatch(handleFleetAttacked({
         fleetId: data.fleet_id,
         attacker: data.attacker_name || data.attacker || 'Unknown',
@@ -220,7 +265,6 @@ export function useWebSocket() {
     
     // Handle empire attacked event
     const handleEmpireAttackedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received empire.attacked event:', data)
       dispatch(handleEmpireAttacked({
         planetId: data.planet_id,
         attacker: data.attacker_name || data.attacker || 'Unknown',
@@ -232,7 +276,6 @@ export function useWebSocket() {
     
     // Handle combat resolved event (on private channel - per WebSocket events spec)
     const handleCombatResolvedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received combat.resolved event:', data)
       // Invalidate tags to refresh data
       dispatch(apiSlice.util.invalidateTags(['Universe', 'Planet', 'Fleet', 'CombatLog', 'Empire']))
       
@@ -286,7 +329,6 @@ export function useWebSocket() {
     
     // Handle research completed event
     const handleResearchCompletedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received research.completed event:', data)
       dispatch(handleResearchCompleted({
         researchName: data.research_name || data.research_slug?.replace(/_/g, ' '),
         planetId: data.planet_id,
@@ -302,7 +344,6 @@ export function useWebSocket() {
     
     // Handle construction completed event (enhanced per guide specs + real-time)
     const handleConstructionCompletedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received construction.completed event:', data)
       const { construction, planet } = data
       const planetId = planet?.id || data.planet_id
       const itemType = construction?.type || data.item_type || data.type
@@ -376,7 +417,6 @@ export function useWebSocket() {
     
     // Handle fleet launched event (CRITICAL - defender warnings)
     const handleFleetLaunchedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received fleet.launched event:', data)
       const { fleet, attacker } = data
       const isDefender = fleet?.destination?.owner_empire_id === empire?.id
       const destinationPlanetId = fleet?.destination?.planet_id
@@ -423,7 +463,6 @@ export function useWebSocket() {
     
     // Handle planet captured event (CRITICAL - ownership changes)
     const handlePlanetCapturedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received planet.captured event:', data)
       const { planet, previous_owner, new_owner, combat_log_id } = data
       const isPreviousOwner = previous_owner?.id === empire?.id
       const isNewOwner = new_owner?.id === empire?.id
@@ -473,7 +512,6 @@ export function useWebSocket() {
     
     // Handle planet colonized event (enhanced)
     const handlePlanetColonizedEvent = (data: any) => {
-      console.log('[WebSocket] ✅ Received planet.colonized event:', data)
       const { planet, empire: empireData } = data
       const planetId = planet?.id || data.planet_id
       const planetName = planet?.name || 'Planet'
@@ -512,43 +550,28 @@ export function useWebSocket() {
       )
     }
     
-    // Log connection status - wait for subscription before setting up listeners
+    // Track all events for private channel (declared outside callback so it's accessible)
+    const privateChannelEvents: string[] = []
+    
+    // Wait for subscription before setting up listeners
     privateChannel.subscribed(() => {
-      console.log('[WebSocket] ✅ Successfully subscribed to channel:', channelName)
-      console.log('[WebSocket] Channel is ready, setting up event listeners')
+      console.log(`[WebSocket] ✅ Successfully subscribed to private channel: ${channelName}`)
       
-      // Set up comprehensive event debugging AND manual event forwarding
+      // Set up manual event forwarding for reliability
       const echoWithConnector = echo as any
       if (echoWithConnector.connector?.pusher) {
         const pusher = echoWithConnector.connector.pusher
         const channelNameForPusher = `private-${channelName}`
-        const doublePrefixChannelName = `private-private-${channelName}` // Handle double prefix case
+        const doublePrefixChannelName = `private-private-${channelName}`
         
-        console.log('[WebSocket] 🔍 Channel names for matching:', {
-          channelName,
-          channelNameForPusher,
-          doublePrefixChannelName
-        })
-        
-        // CRITICAL: Intercept Pusher messages and manually forward them to our handlers
-        // This bypasses Laravel Echo's event routing which might be broken
-        console.log('[WebSocket] 📡 Setting up connection-level message interceptor')
+        // Intercept Pusher messages and manually forward them to our handlers
         pusher.connection.bind('message', (event: any) => {
-          console.log('[WebSocket] 🔔🔔🔔 PUSHER MESSAGE RECEIVED ON CONNECTION 🔔🔔🔔', {
-            channel: event.channel,
-            event: event.event,
-            hasData: !!event.data
-          })
-          
-          // Skip events without a channel (like pusher:pong)
+          // Skip events without a channel
           if (!event.channel) {
-            console.log('[WebSocket] Skipping event without channel:', event.event)
             return
           }
           
           // Handle both normal and double-prefixed channel names
-          // Pusher can show: private-empire.6 (single prefix) or private-private-empire.6 (double prefix)
-          // We subscribe to: empire.6 (Laravel Echo adds private- prefix)
           const normalizedChannel = event.channel.replace(/^private-private-/, 'private-')
           const isOurChannel = normalizedChannel === channelNameForPusher || 
                               event.channel === channelNameForPusher ||
@@ -557,16 +580,8 @@ export function useWebSocket() {
                               event.channel === `private-private-${channelName}` ||
                               event.channel.includes(`empire.${empire.id}`)
           
-          console.log('[WebSocket] Channel match check:', {
-            eventChannel: event.channel,
-            normalizedChannel: normalizedChannel,
-            expectedChannel: channelNameForPusher,
-            isOurChannel: isOurChannel
-          })
-          
-          // Skip internal Pusher events and pings/pongs
+          // Skip internal Pusher events
           if (event.event && (event.event.startsWith('pusher_internal:') || event.event.startsWith('pusher:'))) {
-            console.log('[WebSocket] Skipping internal Pusher event:', event.event)
             return
           }
           
@@ -574,86 +589,52 @@ export function useWebSocket() {
             const eventName = event.event
             const eventData = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
             
-            console.log('[WebSocket] 🔔🔔🔔 RAW PUSHER MESSAGE FOR OUR CHANNEL 🔔🔔🔔:', {
-              channel: event.channel,
-              normalizedChannel: normalizedChannel,
-              expectedChannel: channelNameForPusher,
-              event: eventName,
-              data: eventData
-            })
-            
-            // Manually trigger our handlers based on exact event name match
-            // Events are coming as: "planet.updated" (no prefix, no namespace)
+            // Manually trigger our handlers based on event name match
             if (eventName === 'planet.updated' || eventName.includes('planet.updated') || eventName.includes('PlanetUpdated')) {
-              console.log('[WebSocket] 🎯🎯🎯 MATCHED planet.updated EVENT - TRIGGERING HANDLER 🎯🎯🎯')
-              console.log('[WebSocket] Event name:', eventName)
-              console.log('[WebSocket] Event data:', eventData)
               handlePlanetUpdated(eventData)
-            } else {
-              console.log('[WebSocket] ⚠️ Event name does not match planet.updated:', eventName)
             }
             if (eventName === 'construction.completed' || eventName.includes('construction.completed') || eventName.includes('ConstructionCompleted')) {
-              console.log('[WebSocket] 🎯 Manually triggering construction.completed handler')
               handleConstructionCompletedEvent(eventData)
             }
             if (eventName === 'research.completed' || eventName.includes('research.completed') || eventName.includes('ResearchCompleted')) {
-              console.log('[WebSocket] 🎯 Manually triggering research.completed handler')
               handleResearchCompletedEvent(eventData)
             }
             if (eventName === 'fleet.arrived' || eventName.includes('fleet.arrived') || eventName.includes('FleetArrived')) {
-              console.log('[WebSocket] 🎯 Manually triggering fleet.arrived handler')
               handleFleetArrivedEvent(eventData)
             }
             if (eventName === 'resources.updated' || eventName.includes('resources.updated') || eventName.includes('ResourcesUpdated')) {
-              console.log('[WebSocket] 🎯 Manually triggering resources.updated handler')
               handleResourcesUpdated(eventData)
             }
             if (eventName === 'empire.updated' || eventName.includes('empire.updated') || eventName.includes('EmpireUpdated')) {
-              console.log('[WebSocket] 🎯 Manually triggering empire.updated handler')
               handleEmpireUpdated(eventData)
             }
             if (eventName === 'mail.received' || eventName.includes('mail.received') || eventName.includes('MailReceived')) {
-              console.log('[WebSocket] 🎯 Manually triggering mail.received handler')
               handleMailReceived(eventData)
             }
             if (eventName === 'fleet.attacked' || eventName.includes('fleet.attacked') || eventName.includes('FleetAttacked')) {
-              console.log('[WebSocket] 🎯 Manually triggering fleet.attacked handler')
               handleFleetAttackedEvent(eventData)
             }
             if (eventName === 'empire.attacked' || eventName.includes('empire.attacked') || eventName.includes('EmpireAttacked')) {
-              console.log('[WebSocket] 🎯 Manually triggering empire.attacked handler')
               handleEmpireAttackedEvent(eventData)
             }
             if (eventName === 'combat.resolved' || eventName.includes('combat.resolved') || eventName.includes('CombatResolved')) {
-              console.log('[WebSocket] 🎯 Manually triggering combat.resolved handler')
               handleCombatResolvedEvent(eventData)
             }
             if (eventName === 'announcement.created' || eventName.includes('announcement') && eventName.includes('created')) {
-              console.log('[WebSocket] 🎯 Manually triggering announcement.created handler')
               handleAnnouncementCreated(eventData)
             }
             if (eventName === 'announcement.published' || eventName.includes('announcement') && eventName.includes('published')) {
-              console.log('[WebSocket] 🎯 Manually triggering announcement.published handler')
               handleAnnouncementCreated(eventData)
             }
             if (eventName === 'fleet.launched' || eventName.includes('fleet.launched') || eventName.includes('FleetLaunched')) {
-              console.log('[WebSocket] 🎯 Manually triggering fleet.launched handler')
               handleFleetLaunchedEvent(eventData)
             }
             if (eventName === 'planet.captured' || eventName.includes('planet.captured') || eventName.includes('PlanetCaptured')) {
-              console.log('[WebSocket] 🎯 Manually triggering planet.captured handler')
               handlePlanetCapturedEvent(eventData)
             }
             if (eventName === 'planet.colonized' || eventName.includes('planet.colonized') || eventName.includes('PlanetColonized')) {
-              console.log('[WebSocket] 🎯 Manually triggering planet.colonized handler')
               handlePlanetColonizedEvent(eventData)
             }
-            if (eventName === 'construction.completed' || eventName.includes('construction.completed') || eventName.includes('ConstructionCompleted')) {
-              console.log('[WebSocket] 🎯 Manually triggering construction.completed handler')
-              handleConstructionCompletedEvent(eventData)
-            }
-          } else {
-            console.log('[WebSocket] 🚫 Event is for a different channel, ignoring')
           }
         })
         
@@ -663,38 +644,10 @@ export function useWebSocket() {
           const doublePrefixPusherChannel = pusher.channel(doublePrefixChannelName)
           
           if (pusherChannel) {
-            console.log('[WebSocket] ✅ Pusher channel found:', channelNameForPusher)
-            
-            // Check what callbacks are registered
-            const callbacks = (pusherChannel as any).callbacks || (pusherChannel as any)._callbacks || {}
-            // Pusher stores callbacks in a nested structure, let's inspect it properly
-            console.log('[WebSocket] 📋 Pusher channel callbacks structure:', callbacks)
-            
-            // Try to get all registered event names
-            const eventNames: string[] = []
-            if (callbacks && typeof callbacks === 'object') {
-              Object.keys(callbacks).forEach(key => {
-                if (key !== '_callbacks' && key !== 'callbacks') {
-                  eventNames.push(key)
-                } else if (callbacks[key] && typeof callbacks[key] === 'object') {
-                  eventNames.push(...Object.keys(callbacks[key]))
-                }
-              })
-            }
-            console.log('[WebSocket] 📋 Registered event listeners:', eventNames.length > 0 ? eventNames : 'None found')
-            
-            // Also check Laravel Echo's internal listener storage
-            const echoListeners = (privateChannel as any).events || (privateChannel as any)._events || {}
-            console.log('[WebSocket] 📋 Laravel Echo registered listeners:', Object.keys(echoListeners))
-            
-            // Override handleEvent to manually forward events
             const originalHandleEvent = (pusherChannel as any).handleEvent
             if (originalHandleEvent) {
               (pusherChannel as any).handleEvent = function(eventName: string, data: any) {
-                console.log('[WebSocket] 🔔 CHANNEL HANDLE EVENT:', eventName, 'Data:', data)
-                // Call original handler
                 const result = originalHandleEvent.call(this, eventName, data)
-                // Also manually trigger Echo listeners
                 try {
                   privateChannel.listen(eventName, () => {})
                 } catch (e) {
@@ -703,22 +656,13 @@ export function useWebSocket() {
                 return result
               }
             }
-          } else {
-            console.warn('[WebSocket] ⚠️ Pusher channel not found:', channelNameForPusher)
           }
           
-          // Also check the double prefix channel
           if (doublePrefixPusherChannel) {
-            console.log('[WebSocket] ✅ Double-prefix Pusher channel ALSO found:', doublePrefixChannelName)
-            
-            // Override handleEvent on double prefix channel too
             const originalHandleEvent2 = (doublePrefixPusherChannel as any).handleEvent
             if (originalHandleEvent2) {
               (doublePrefixPusherChannel as any).handleEvent = function(eventName: string, data: any) {
-                console.log('[WebSocket] 🔔 DOUBLE-PREFIX CHANNEL HANDLE EVENT:', eventName, 'Data:', data)
-                // Call original handler
                 const result = originalHandleEvent2.call(this, eventName, data)
-                // Also manually trigger Echo listeners
                 try {
                   privateChannel.listen(eventName, () => {})
                 } catch (e) {
@@ -727,8 +671,6 @@ export function useWebSocket() {
                 return result
               }
             }
-          } else {
-            console.warn('[WebSocket] ⚠️ Double-prefix Pusher channel not found:', doublePrefixChannelName)
           }
         }, 1000)
       }
@@ -740,12 +682,20 @@ export function useWebSocket() {
       privateChannel.listen('EmpireUpdated', handleEmpireUpdated)
       privateChannel.listen('App\\Events\\EmpireUpdated', handleEmpireUpdated)
       privateChannel.listen('App.Events.EmpireUpdated', handleEmpireUpdated)
+      privateChannelEvents.push('empire.updated', '.empire.updated', 'EmpireUpdated', 'App\\Events\\EmpireUpdated', 'App.Events.EmpireUpdated')
 
       // Handle news created event
       privateChannel.listen('news.created', (data: any) => {
-        toast.info('New news item available')
+        notifyWithToast(dispatch, {
+          type: 'info',
+          title: 'New News Item',
+          message: 'A new news item is available',
+          category: 'general',
+          data: { newsId: data.news?.id || data.id },
+        })
         dispatch(apiSlice.util.invalidateTags(['Empire']))
       })
+      privateChannelEvents.push('news.created')
 
       // Handle mail received event - try multiple naming variations
       privateChannel.listen('mail.received', handleMailReceived)
@@ -754,6 +704,7 @@ export function useWebSocket() {
       privateChannel.listen('mail_received', handleMailReceived)
       privateChannel.listen('App\\Events\\MailReceived', handleMailReceived)
       privateChannel.listen('App.Events.MailReceived', handleMailReceived)
+      privateChannelEvents.push('mail.received', '.mail.received', 'MailReceived', 'mail_received', 'App\\Events\\MailReceived', 'App.Events.MailReceived')
 
       // Register fleet listeners
       privateChannel.listen('fleet.arrived', handleFleetArrivedEvent)
@@ -761,6 +712,7 @@ export function useWebSocket() {
       privateChannel.listen('FleetArrived', handleFleetArrivedEvent)
       privateChannel.listen('App\\Events\\FleetArrived', handleFleetArrivedEvent)
       privateChannel.listen('App.Events.FleetArrived', handleFleetArrivedEvent)
+      privateChannelEvents.push('fleet.arrived', '.fleet.arrived', 'FleetArrived', 'App\\Events\\FleetArrived', 'App.Events.FleetArrived')
 
       // Handle planet updated event (if owned) - try multiple naming variations
       privateChannel.listen('planet.updated', handlePlanetUpdated)
@@ -768,15 +720,16 @@ export function useWebSocket() {
       privateChannel.listen('PlanetUpdated', handlePlanetUpdated)
       privateChannel.listen('App\\Events\\PlanetUpdated', handlePlanetUpdated)
       privateChannel.listen('App.Events.PlanetUpdated', handlePlanetUpdated)
+      privateChannelEvents.push('planet.updated', '.planet.updated', 'PlanetUpdated', 'App\\Events\\PlanetUpdated', 'App.Events.PlanetUpdated')
 
       // Try multiple event name variations for construction completed
       privateChannel.listen('.construction.completed', handleConstructionCompletedEvent)
       privateChannel.listen('construction.completed', handleConstructionCompletedEvent)
       privateChannel.listen('ConstructionCompleted', handleConstructionCompletedEvent)
       privateChannel.listen('construction_completed', handleConstructionCompletedEvent)
-      // Also try with the App namespace prefix (Laravel convention)
       privateChannel.listen('App\\Events\\ConstructionCompleted', handleConstructionCompletedEvent)
       privateChannel.listen('App.Events.ConstructionCompleted', handleConstructionCompletedEvent)
+      privateChannelEvents.push('.construction.completed', 'construction.completed', 'ConstructionCompleted', 'construction_completed', 'App\\Events\\ConstructionCompleted', 'App.Events.ConstructionCompleted')
 
       // Register resources listeners
       privateChannel.listen('resources.updated', handleResourcesUpdated)
@@ -784,6 +737,7 @@ export function useWebSocket() {
       privateChannel.listen('ResourcesUpdated', handleResourcesUpdated)
       privateChannel.listen('App\\Events\\ResourcesUpdated', handleResourcesUpdated)
       privateChannel.listen('App.Events.ResourcesUpdated', handleResourcesUpdated)
+      privateChannelEvents.push('resources.updated', '.resources.updated', 'ResourcesUpdated', 'App\\Events\\ResourcesUpdated', 'App.Events.ResourcesUpdated')
 
       // Register research listeners
       privateChannel.listen('research.completed', handleResearchCompletedEvent)
@@ -791,6 +745,7 @@ export function useWebSocket() {
       privateChannel.listen('ResearchCompleted', handleResearchCompletedEvent)
       privateChannel.listen('App\\Events\\ResearchCompleted', handleResearchCompletedEvent)
       privateChannel.listen('App.Events.ResearchCompleted', handleResearchCompletedEvent)
+      privateChannelEvents.push('research.completed', '.research.completed', 'ResearchCompleted', 'App\\Events\\ResearchCompleted', 'App.Events.ResearchCompleted')
 
       // Handle alliance message event
       privateChannel.listen('.alliance.message', (data: any) => {
@@ -802,21 +757,25 @@ export function useWebSocket() {
         toast.info(`New alliance message from ${data.sender_name}`)
         dispatch(apiSlice.util.invalidateTags(['Alliance']))
       })
+      privateChannelEvents.push('.alliance.message')
 
       // Handle planet colonized event (enhanced)
       privateChannel.listen('.planet.colonized', handlePlanetColonizedEvent)
       privateChannel.listen('planet.colonized', handlePlanetColonizedEvent)
       privateChannel.listen('PlanetColonized', handlePlanetColonizedEvent)
+      privateChannelEvents.push('.planet.colonized', 'planet.colonized', 'PlanetColonized')
       
       // Handle fleet launched event (CRITICAL)
       privateChannel.listen('.fleet.launched', handleFleetLaunchedEvent)
       privateChannel.listen('fleet.launched', handleFleetLaunchedEvent)
       privateChannel.listen('FleetLaunched', handleFleetLaunchedEvent)
+      privateChannelEvents.push('.fleet.launched', 'fleet.launched', 'FleetLaunched')
       
       // Handle planet captured event (CRITICAL)
       privateChannel.listen('.planet.captured', handlePlanetCapturedEvent)
       privateChannel.listen('planet.captured', handlePlanetCapturedEvent)
       privateChannel.listen('PlanetCaptured', handlePlanetCapturedEvent)
+      privateChannelEvents.push('.planet.captured', 'planet.captured', 'PlanetCaptured')
 
       // Handle fleet attacked event - try multiple naming variations
       privateChannel.listen('fleet.attacked', handleFleetAttackedEvent)
@@ -825,6 +784,7 @@ export function useWebSocket() {
       privateChannel.listen('fleet_attacked', handleFleetAttackedEvent)
       privateChannel.listen('App\\Events\\FleetAttacked', handleFleetAttackedEvent)
       privateChannel.listen('App.Events.FleetAttacked', handleFleetAttackedEvent)
+      privateChannelEvents.push('fleet.attacked', '.fleet.attacked', 'FleetAttacked', 'fleet_attacked', 'App\\Events\\FleetAttacked', 'App.Events.FleetAttacked')
 
       // Handle empire attacked event - try multiple naming variations
       privateChannel.listen('empire.attacked', handleEmpireAttackedEvent)
@@ -833,6 +793,7 @@ export function useWebSocket() {
       privateChannel.listen('empire_attacked', handleEmpireAttackedEvent)
       privateChannel.listen('App\\Events\\EmpireAttacked', handleEmpireAttackedEvent)
       privateChannel.listen('App.Events.EmpireAttacked', handleEmpireAttackedEvent)
+      privateChannelEvents.push('empire.attacked', '.empire.attacked', 'EmpireAttacked', 'empire_attacked', 'App\\Events\\EmpireAttacked', 'App.Events.EmpireAttacked')
 
       // Handle combat resolved event on private channel - try multiple naming variations
       privateChannel.listen('combat.resolved', handleCombatResolvedEvent)
@@ -841,12 +802,26 @@ export function useWebSocket() {
       privateChannel.listen('combat_resolved', handleCombatResolvedEvent)
       privateChannel.listen('App\\Events\\CombatResolved', handleCombatResolvedEvent)
       privateChannel.listen('App.Events.CombatResolved', handleCombatResolvedEvent)
+      privateChannelEvents.push('combat.resolved', '.combat.resolved', 'CombatResolved', 'combat_resolved', 'App\\Events\\CombatResolved', 'App.Events.CombatResolved')
 
       // Handle fleet departed event
       privateChannel.listen('.fleet.departed', (data: any) => {
-        toast.info(`Fleet departed from ${data.origin_coordinate}`)
+        notifyWithToast(dispatch, {
+          type: 'info',
+          title: 'Fleet Departed',
+          message: `Fleet departed from ${data.origin_coordinate || 'origin'}`,
+          category: 'fleet',
+          actionUrl: data.fleet_id ? `/fleets/${data.fleet_id}` : '/fleets',
+          data: { fleetId: data.fleet_id, originCoordinate: data.origin_coordinate },
+        })
         dispatch(apiSlice.util.invalidateTags(['Fleet']))
       })
+      privateChannelEvents.push('.fleet.departed')
+      
+      // Track subscription for private channel
+      console.log(`[WebSocket] ✅ Successfully subscribed to private channel: ${channelName}`)
+      console.log(`[WebSocket] ✅ Registered ${privateChannelEvents.length} events on private-${channelName}`)
+      trackSubscription(`private-${channelName}`, privateChannelEvents)
     })
 
     privateChannel.error((error: any) => {
@@ -857,39 +832,80 @@ export function useWebSocket() {
       subscribedRef.current = null // Reset on error so it can retry
     })
 
-    // Log when subscription is attempted
-    console.log('[WebSocket] Channel subscription initiated, waiting for confirmation...')
-    console.log('[WebSocket] ⚠️ Check Network tab for auth request to:', authEndpoint)
-    console.log('[WebSocket] Connection state will be logged above - look for "Connected" or "failed" messages')
 
     // Subscribe to public tick channel (use 'public.tick' as per guide)
     const publicTickChannel = echo.channel('public.tick')
+    const tickChannelEvents: string[] = []
     
-    publicTickChannel.listen('.tick.processed', (data: any) => {
-      console.log('[WebSocket] ✅ Received tick.processed event:', data)
+    publicTickChannel.error((error: any) => {
+      console.error('[WebSocket] Error subscribing to tick channel:', error)
+    })
+    
+    const handleTickProcessedEvent = (data: any) => {
+      
+      const tickNumber = data.tick_number || data.tickNumber || data.tick?.number || data.tick
+      const nextTickEta = data.next_tick_eta || data.next_tick_at || data.nextTickEta || data.nextTickAt
       
       // Update countdown from WebSocket event
       if (data.next_tick_at && data.tick_interval) {
         updateCountdownFromWebSocket({
-          tick_number: data.tick_number,
+          tick_number: tickNumber,
           next_tick_at: data.next_tick_at,
           tick_interval: data.tick_interval,
-          next_tick_eta: data.next_tick_eta,
+          next_tick_eta: nextTickEta,
         })
       } else {
         // Fallback to old format
-        dispatch(setTick({ tick: data.tick_number, nextTickETA: data.next_tick_eta }))
+        dispatch(setTick({ tick: tickNumber, nextTickETA: nextTickEta }))
       }
       
+      // Create notification (handleTickProcessed already adds to notification tray)
       dispatch(handleTickProcessed({
-        tickNumber: data.tick_number,
-        nextTickEta: data.next_tick_eta || data.next_tick_at,
+        tickNumber: tickNumber,
+        nextTickEta: nextTickEta || 'calculating...',
       }))
+      
+      // Also show toast for immediate visibility
+      toast.info(`Tick ${tickNumber} Processed`, {
+        description: `Game tick ${tickNumber} has completed processing`,
+        duration: 5000,
+      })
+      
       dispatch(setTickProcessing(false))
       
       // Invalidate Signal tags when tick processes (signals are processed during ticks)
-      dispatch(apiSlice.util.invalidateTags(['Signal', 'Tick']))
+      dispatch(apiSlice.util.invalidateTags(['Signal', 'Tick', 'Planet', 'Resource', 'Fleet', 'Empire']))
+    }
+    
+    // Listen for multiple event name variations
+    const wrappedTickHandler = (data: any) => {
+      handleTickProcessedEvent(data)
+    }
+    
+    // Register events FIRST, then set up subscription callback
+    publicTickChannel.listen('.tick.processed', wrappedTickHandler)
+    publicTickChannel.listen('tick.processed', wrappedTickHandler)
+    publicTickChannel.listen('TickProcessed', wrappedTickHandler)
+    publicTickChannel.listen('App\\Events\\TickProcessed', wrappedTickHandler)
+    publicTickChannel.listen('App.Events.TickProcessed', wrappedTickHandler)
+    tickChannelEvents.push('.tick.processed', 'tick.processed', 'TickProcessed', 'App\\Events\\TickProcessed', 'App.Events.TickProcessed')
+    
+    // Now set up subscription callback AFTER events are registered
+    publicTickChannel.subscribed(() => {
+      console.log('[WebSocket] ✅ Successfully subscribed to public channel: public.tick')
+      trackSubscription('public.tick', tickChannelEvents)
     })
+    
+    // Also check if already subscribed (in case it subscribed synchronously)
+    const echoWithConnectorForTick = echo as any
+    if (echoWithConnectorForTick.connector?.pusher) {
+      const pusher = echoWithConnectorForTick.connector.pusher
+      const tickPusherChannel = pusher.channel('public.tick')
+      if (tickPusherChannel && (tickPusherChannel as any).subscribed) {
+        // Already subscribed, track it now
+        setTimeout(() => trackSubscription('public.tick', tickChannelEvents), 100)
+      }
+    }
     
     // Initialize tick countdown from API on mount
     initializeTickCountdown().catch((error) => {
@@ -898,10 +914,9 @@ export function useWebSocket() {
 
     // Subscribe to public announcements channel for real-time announcements
     const announcementsChannel = echo.channel('announcements')
-    console.log('[WebSocket] Subscribing to announcements channel')
+    const announcementChannelEvents: string[] = []
     
     const handleAnnouncementCreated = (data: any) => {
-      console.log('[WebSocket] ✅ Received announcement.created event:', data)
       const announcement = data.announcement || data
       const title = announcement.title || 'New announcement'
       const priority = announcement.priority || 'info'
@@ -927,37 +942,70 @@ export function useWebSocket() {
       dispatch(apiSlice.util.invalidateTags(['Announcement']))
     }
     
-    // Listen for various announcement event names
+    // Register events FIRST, then set up subscription callback
     announcementsChannel.listen('announcement.created', handleAnnouncementCreated)
     announcementsChannel.listen('.announcement.created', handleAnnouncementCreated)
     announcementsChannel.listen('AnnouncementCreated', handleAnnouncementCreated)
     announcementsChannel.listen('announcement.published', handleAnnouncementCreated)
     announcementsChannel.listen('.announcement.published', handleAnnouncementCreated)
     announcementsChannel.listen('AnnouncementPublished', handleAnnouncementCreated)
+    announcementChannelEvents.push('announcement.created', '.announcement.created', 'AnnouncementCreated', 'announcement.published', '.announcement.published', 'AnnouncementPublished')
     
-    // Also intercept at connection level for announcements channel
+    // Now set up subscription callback AFTER events are registered
+    announcementsChannel.subscribed(() => {
+      console.log('[WebSocket] ✅ Successfully subscribed to public channel: announcements')
+      trackSubscription('announcements', announcementChannelEvents)
+    })
+    
+    // Also check if already subscribed (in case it subscribed synchronously)
+    const echoWithConnectorForAnnouncements = echo as any
+    if (echoWithConnectorForAnnouncements.connector?.pusher) {
+      const pusher = echoWithConnectorForAnnouncements.connector.pusher
+      const announcementsPusherChannel = pusher.channel('announcements')
+      if (announcementsPusherChannel && (announcementsPusherChannel as any).subscribed) {
+        // Already subscribed, track it now
+        setTimeout(() => trackSubscription('announcements', announcementChannelEvents), 100)
+      }
+    }
+    
+    // Intercept at connection level for debugging multiple channels (tick and announcements)
     const echoWithConnector = echo as any
     if (echoWithConnector.connector?.pusher) {
       const pusher = echoWithConnector.connector.pusher
       
       pusher.connection.bind('message', (event: any) => {
+        const channelName = event.channel || 'unknown'
+        const eventName = event.event || 'unknown'
+        
+        // Check if this is for the tick channel
+        if (channelName === 'public-tick' || channelName === 'public.tick' || channelName.includes('tick')) {
+          // If it's a tick.processed event, manually trigger handler
+          if (eventName.includes('tick') && (eventName.includes('processed') || eventName.includes('Processed'))) {
+            const eventData = typeof event.data === 'string' ? (() => {
+              try {
+                return JSON.parse(event.data)
+              } catch {
+                return event.data
+              }
+            })() : event.data
+            handleTickProcessedEvent(eventData)
+          }
+        }
+        
         // Check if this is for the announcements channel
-        if (event.channel && (event.channel === 'public-announcements' || event.channel.includes('announcements'))) {
-          console.log('[WebSocket] 🔔 Announcement event received:', {
-            channel: event.channel,
-            event: event.event,
-            data: event.data
-          })
+        if (channelName === 'public-announcements' || channelName === 'announcements' || channelName.includes('announcements')) {
+          const eventData = typeof event.data === 'string' ? (() => {
+            try {
+              return JSON.parse(event.data)
+            } catch {
+              return event.data
+            }
+          })() : event.data
           
-          const eventName = event.event
-          const eventData = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-          
-          if (eventName === 'announcement.created' || eventName.includes('announcement') && eventName.includes('created')) {
-            console.log('[WebSocket] 🎯 Manually triggering announcement.created handler')
+          if (eventName === 'announcement.created' || (eventName.includes('announcement') && eventName.includes('created'))) {
             handleAnnouncementCreated(eventData)
           }
-          if (eventName === 'announcement.published' || eventName.includes('announcement') && eventName.includes('published')) {
-            console.log('[WebSocket] 🎯 Manually triggering announcement.published handler')
+          if (eventName === 'announcement.published' || (eventName.includes('announcement') && eventName.includes('published'))) {
             handleAnnouncementCreated(eventData)
           }
         }
@@ -967,14 +1015,13 @@ export function useWebSocket() {
     // Subscribe to alliance channel automatically when empire is in an alliance
     if (empire?.alliance_id) {
       const allianceChannelName = `alliance.${empire.alliance_id}`
-      console.log('[WebSocket] Subscribing to alliance channel:', allianceChannelName)
+      const allianceChannelEvents: string[] = []
       
       const allianceChannel = echo.private(allianceChannelName)
       allianceChannelRef.current = allianceChannel
       
       // Handle alliance chat message event
       allianceChannel.listen('.alliance.chat.message', (data: any) => {
-        console.log('[WebSocket] ✅ Received alliance.chat.message event:', data)
         const { message } = data
         const senderName = message?.sender_empire?.name || data.sender_name || 'Unknown'
         
@@ -993,42 +1040,67 @@ export function useWebSocket() {
         // Invalidate alliance tags
         dispatch(apiSlice.util.invalidateTags(['Alliance', 'Chat']))
       })
+      allianceChannelEvents.push('.alliance.chat.message')
       
+      // Set up subscription callback AFTER events are registered
       allianceChannel.subscribed(() => {
-        console.log('[WebSocket] ✅ Successfully subscribed to alliance channel:', allianceChannelName)
+        console.log(`[WebSocket] ✅ Successfully subscribed to private channel: ${allianceChannelName}`)
+        console.log(`[WebSocket] ✅ Registered ${allianceChannelEvents.length} events on ${allianceChannelName}`)
+        trackSubscription(`private-${allianceChannelName}`, allianceChannelEvents)
       })
       
       allianceChannel.error((error: any) => {
-        console.error('[WebSocket] ❌ Alliance channel subscription error:', error)
+        console.error('[WebSocket] Alliance channel subscription error:', error)
       })
     }
 
-          // Subscribe to galaxy channels for map updates
-          // Echo may auto-add 'public-' prefix, so use 'galaxy.{q}.{s}.{g}' format
-          if (meData?.planets) {
-            const galaxyChannels = new Set<string>()
-            meData.planets.forEach((planet: any) => {
+    // Subscribe to galaxy channels for map updates when planet data is available
+    // Echo may auto-add 'public-' prefix, so use 'galaxy.{q}.{s}.{g}' format
+    if (meData?.planets) {
+      const galaxyChannels = new Set<string>()
+      meData.planets.forEach((planet: any) => {
         const coordString = formatCoordinate(planet.coordinate)
         const [quad, sec, gal] = coordString.split(':')
         const channelName = `galaxy.${quad}.${sec}.${gal}`
         if (!galaxyChannels.has(channelName)) {
           galaxyChannels.add(channelName)
           const galaxyChannel = echo.channel(channelName)
+          const galaxyChannelEvents: string[] = []
+          
           galaxyChannel.listen('planet.updated', () => {
             dispatch(apiSlice.util.invalidateTags(['Universe', 'Planet']))
           })
           galaxyChannel.listen('.combat.resolved', (data: any) => {
-            console.log('[WebSocket] ✅ Combat resolved event on public channel:', data)
             // Invalidate tags to refresh data
             dispatch(apiSlice.util.invalidateTags(['Universe', 'Planet', 'Fleet', 'CombatLog', 'Empire']))
           })
+          galaxyChannelEvents.push('planet.updated', '.combat.resolved')
+          
+          // Set up subscription callback AFTER events are registered
+          galaxyChannel.subscribed(() => {
+            console.log(`[WebSocket] ✅ Successfully subscribed to public channel: ${channelName}`)
+            console.log(`[WebSocket] ✅ Registered ${galaxyChannelEvents.length} events on ${channelName}`)
+            trackSubscription(channelName, galaxyChannelEvents)
+          })
         }
       })
+      console.log(`[WebSocket] ✅ Subscribed to ${galaxyChannels.size} galaxy channels for map updates`)
+    } else if (token && empire) {
+      // Log that we're waiting for planet data
+      console.log('[WebSocket] ⏳ Waiting for planet data to subscribe to galaxy channels...')
     }
+    
+    // Final summary check after delay to ensure all channels are tracked
+    // This catches any channels that subscribed but their callbacks haven't fired yet
+    setTimeout(() => {
+      if (!initializedRef.current && subscriptionsRef.current.length > 0) {
+        console.log('[WebSocket] 🔍 Final subscription check - triggering summary...')
+        logSubscriptionSummary()
+      }
+    }, 3000) // After 3 seconds, force summary if not already logged
 
     // Cleanup function
     return () => {
-      console.log('[WebSocket] Cleaning up WebSocket subscription for channel:', channelName)
       if (channelRef.current) {
         try {
           // Laravel Echo doesn't have a leave method, channels are automatically cleaned up
@@ -1049,6 +1121,6 @@ export function useWebSocket() {
       subscribedRef.current = null
       // Don't disconnect Echo here as it might be used by other components
     }
-  }, [token, empire?.id, dispatch]) // Removed meData from dependencies to prevent re-subscription
+  }, [token, empire?.id, dispatch, meData?.planets]) // Include meData.planets to subscribe to galaxy channels when available
 }
 

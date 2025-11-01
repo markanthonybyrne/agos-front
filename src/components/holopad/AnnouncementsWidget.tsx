@@ -18,23 +18,14 @@ export function AnnouncementsWidget({
     pollingInterval: 60000, // Poll every minute to catch new announcements
   })
   
-  // Debug logging
-  console.log('[AnnouncementsWidget] Data:', data)
-  console.log('[AnnouncementsWidget] Loading:', isLoading)
-  console.log('[AnnouncementsWidget] Error:', error)
-  console.log('[AnnouncementsWidget] Raw announcements:', data?.announcements)
-  
   // Map API announcement to widget format
   const rawAnnouncements = data?.announcements || []
-  console.log('[AnnouncementsWidget] Raw announcements array:', rawAnnouncements)
   
   const filtered = rawAnnouncements.filter((a: Announcement) => {
     // If is_active is not provided in the response, default to true (show the announcement)
     const isActive = a.is_active !== false // Default to true if undefined/null
-    console.log(`[AnnouncementsWidget] Announcement ${a.id} (${a.title}): is_active=${a.is_active} (treated as ${isActive}), will ${isActive ? 'show' : 'filter out'}`)
     return isActive
   })
-  console.log('[AnnouncementsWidget] After filtering (active only):', filtered.length, 'announcements')
   
   const announcements: Array<{
     id: number
@@ -45,13 +36,6 @@ export function AnnouncementsWidget({
     priority?: string
   }> = filtered
     .map((a: Announcement) => {
-      console.log(`[AnnouncementsWidget] Mapping announcement ${a.id}:`, {
-        title: a.title,
-        message: a.message,
-        is_active: a.is_active,
-        is_pinned: a.is_pinned ?? false,
-        priority: a.priority,
-      })
       return {
         id: a.id,
         title: a.title,
@@ -67,8 +51,6 @@ export function AnnouncementsWidget({
       if (!a.is_important && b.is_important) return 1
       return new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
     })
-  
-  console.log('[AnnouncementsWidget] Final announcements array:', announcements)
   
   const formatDate = (dateString: string) => {
     try {

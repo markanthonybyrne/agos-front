@@ -7,7 +7,7 @@ export interface Notification {
   message: string
   timestamp: Date
   isRead: boolean
-  category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack' | 'colonization' | 'capture'
+  category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack' | 'colonization' | 'capture' | 'announcement'
   actionUrl?: string
   data?: any
 }
