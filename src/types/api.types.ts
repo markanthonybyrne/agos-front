@@ -9,6 +9,62 @@ export interface ApiResponse<T> {
   details?: Record<string, string[]>
 }
 
+// Premium Currency Types
+export interface QuantumCreditsTransaction {
+  amount: number
+  type: 'earned' | 'purchased' | 'spent'
+  reason: string
+  created_at: string
+}
+
+export interface QuantumCreditsBalance {
+  balance: number
+  last_daily_login_claim: string | null
+  daily_login_streak: number
+  can_claim_daily: boolean
+  transactions: QuantumCreditsTransaction[]
+}
+
+export interface ActiveBooster {
+  id: number
+  type: 'production' | 'construction' | 'signal'
+  multiplier: string
+  started_at: string
+  expires_at: string
+}
+
+export interface ActiveBoostersResponse {
+  boosters: ActiveBooster[]
+}
+
+export interface ActivateBoosterRequest {
+  type: 'production' | 'construction'
+}
+
+export interface ActivateBoosterResponse {
+  booster: {
+    id: number
+    empire_id: number
+    booster_type: string
+    multiplier: string
+    started_at: string
+    expires_at: string
+  }
+  cost: number
+  new_balance: number
+}
+
+export interface Achievement {
+  slug: string
+  unlocked_at: string | null
+  quantum_credits_awarded: number
+}
+
+export interface AchievementsResponse {
+  achievements: Achievement[]
+  available: Record<string, number>
+}
+
 // Direct response types (for endpoints that don't wrap responses)
 export interface DirectResponse<T> {
   [key: string]: T

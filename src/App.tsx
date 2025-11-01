@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthGuard } from '@/components/common/AuthGuard'
+import { useAchievementNotifications } from '@/hooks/useAchievementNotifications'
 import { AdminGuard } from '@/features/admin/components/AdminGuard'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { PlayerManual } from '@/features/manual/PlayerManual'
@@ -31,9 +32,12 @@ import { TicksPage } from '@/features/admin/routes/TicksPage'
 import { ResourcesPage } from '@/features/admin/routes/ResourcesPage'
 import { CombatsPage } from '@/features/admin/routes/CombatsPage'
 
-function App() {
+function AppContent() {
+  // Initialize achievement notifications
+  useAchievementNotifications()
+
   return (
-    <ErrorBoundary>
+    <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
@@ -84,6 +88,14 @@ function App() {
           }
         />
       </Routes>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
       <Toaster 
         position="top-right" 
         theme="dark"

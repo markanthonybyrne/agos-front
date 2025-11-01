@@ -21,6 +21,9 @@ import { PlanetsWidget } from '@/components/holopad/PlanetsWidget'
 import { EmpireStatusWidget } from '@/components/holopad/EmpireStatusWidget'
 import { ActiveOperationsWidget } from '@/components/holopad/ActiveOperationsWidget'
 import { AnnouncementsWidget } from '@/components/holopad/AnnouncementsWidget'
+import { QuantumCreditsWidget } from '@/components/holopad/QuantumCreditsWidget'
+import { BoostersWidget } from '@/components/holopad/BoostersWidget'
+import { AchievementsWidget } from '@/components/holopad/AchievementsWidget'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -120,9 +123,12 @@ export function Holopad() {
       { i: 'empire', x: 0, y: 0, w: 12, h: 3 },
       { i: 'operations', x: 0, y: 3, w: 6, h: 4 },
       { i: 'resources', x: 6, y: 3, w: 6, h: 4 },
-      { i: 'planets', x: 0, y: 7, w: 6, h: 5 },
-      { i: 'status', x: 6, y: 7, w: 6, h: 5 },
-      { i: 'announcements', x: 0, y: 12, w: 6, h: 6 },
+      { i: 'quantum_credits', x: 0, y: 7, w: 4, h: 4 },
+      { i: 'boosters', x: 4, y: 7, w: 4, h: 4 },
+      { i: 'achievements', x: 8, y: 7, w: 4, h: 4 },
+      { i: 'planets', x: 0, y: 11, w: 6, h: 5 },
+      { i: 'status', x: 6, y: 11, w: 6, h: 5 },
+      { i: 'announcements', x: 0, y: 16, w: 6, h: 6 },
     ]
   })
 
@@ -263,6 +269,33 @@ export function Holopad() {
             onMinimize={() => handleMinimizeWidget('status')}
             onClose={() => handleCloseWidget('status')}
             isMinimized={minimizedWidgets.has('status')}
+          />
+        </div>
+
+        {/* Quantum Credits Widget */}
+        <div key="quantum_credits">
+          <QuantumCreditsWidget
+            onMinimize={() => handleMinimizeWidget('quantum_credits')}
+            onClose={() => handleCloseWidget('quantum_credits')}
+            isMinimized={minimizedWidgets.has('quantum_credits')}
+          />
+        </div>
+
+        {/* Boosters Widget */}
+        <div key="boosters">
+          <BoostersWidget
+            onMinimize={() => handleMinimizeWidget('boosters')}
+            onClose={() => handleCloseWidget('boosters')}
+            isMinimized={minimizedWidgets.has('boosters')}
+          />
+        </div>
+
+        {/* Achievements Widget */}
+        <div key="achievements">
+          <AchievementsWidget
+            onMinimize={() => handleMinimizeWidget('achievements')}
+            onClose={() => handleCloseWidget('achievements')}
+            isMinimized={minimizedWidgets.has('achievements')}
           />
         </div>
 

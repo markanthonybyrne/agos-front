@@ -27,7 +27,7 @@ export const planetsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Planet', 'Empire'],
+      invalidatesTags: ['Planet', 'Empire', 'Achievement'],
     }),
     buyMines: builder.mutation<
       ApiResponse<{ planet: Planet; cost: { tellerium: number; krypton: number } }>,

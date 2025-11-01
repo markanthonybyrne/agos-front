@@ -29,6 +29,9 @@ import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { PoliticsPage } from '@/features/politics/PoliticsPage'
 import { CreateAllianceRequestForm } from '@/features/politics/components/CreateAllianceRequestForm'
+import { QuantumCreditsPanel } from '@/components/premium/QuantumCreditsPanel'
+import { BoostersPanel } from '@/components/premium/BoostersPanel'
+import { AchievementsPanel } from '@/components/premium/AchievementsPanel'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -102,6 +105,15 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     case PanelType.CREATE_ALLIANCE_REQUEST:
       return <CreateAllianceRequestForm onSuccess={onClose} onCancel={onClose} />
     
+    case PanelType.QUANTUM_CREDITS:
+      return <QuantumCreditsPanel />
+    
+    case PanelType.BOOSTERS:
+      return <BoostersPanel />
+    
+    case PanelType.ACHIEVEMENTS:
+      return <AchievementsPanel />
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -147,6 +159,9 @@ export function PanelManager() {
     [PanelType.POLITICS]: 'Politics & Alliances',
     [PanelType.CREATE_ALLIANCE_REQUEST]: 'Create Alliance Request',
     [PanelType.MAP_PLANET_INFO]: 'Planet Information',
+    [PanelType.QUANTUM_CREDITS]: 'Quantum Credits',
+    [PanelType.BOOSTERS]: 'Boosters',
+    [PanelType.ACHIEVEMENTS]: 'Achievements',
   }
 
   return (

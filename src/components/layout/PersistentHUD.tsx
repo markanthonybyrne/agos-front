@@ -28,8 +28,10 @@ import { logout } from '@/app/slices/authSlice'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Avatar } from '@/components/common/Avatar'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
+import { useGetQuantumCreditsQuery } from '@/api/endpoints/premiumApi'
 import { BRAND } from '@/lib/brandImages'
 import { getUserAvatarUrl } from '@/lib/avatar'
+import { getQuantumCreditsImage } from '@/lib/quantumCreditsImages'
 
 interface HUDButton {
   id: string
@@ -105,6 +107,10 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
     state.notifications.notifications.filter(n => !n.isRead).length
   )
   const { data } = useGetMeQuery()
+  const { data: qcData } = useGetQuantumCreditsQuery(undefined, {
+    pollingInterval: 60000, // Poll every minute
+  })
+  const empire = useAppSelector((state) => state.auth.empire)
 
   const handleButtonClick = (button: HUDButton) => {
     if (button.route) {
@@ -167,6 +173,38 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
 
         {/* Right side actions */}
         <div className="flex items-center gap-2">
+          {/* User Score */}
+          {empire && (
+            <div 
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 panel-glass surface-gradient card-glow vignette border border-border/50 text-xs"
+              style={{
+                clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
+              }}
+            >
+              <span className="text-muted-foreground">Score:</span>
+              <span className="font-mono font-semibold text-cyan-400">
+                {empire.score?.toLocaleString?.() || empire.score}
+              </span>
+            </div>
+          )}
+
+          {/* Quantum Credits */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openPanel(PanelType.QUANTUM_CREDITS, PanelSize.MEDIUM)}
+            className="relative flex items-center gap-2"
+          >
+            <img
+              src={getQuantumCreditsImage()}
+              alt="Quantum Credits"
+              className="w-4 h-4"
+            />
+            <span className="font-mono text-cyan-400">
+              {qcData?.balance ?? 0}
+            </span>
+          </Button>
+
           {/* Notifications */}
           <Button
             variant="ghost"
