@@ -8,7 +8,7 @@ import {
   closeAllPanels as closeAllPanelsAction,
   closePanelsByType as closePanelsByTypeAction,
 } from '@/app/slices/panelSlice'
-import { PanelSize, PanelType, PanelState } from '@/app/slices/panelSlice'
+import { PanelSize, PanelType, PanelState, Panel } from '@/app/slices/panelSlice'
 import { SlidingPanel } from './SlidingPanel'
 import { useCallback } from 'react'
 import { X } from 'lucide-react'
@@ -189,7 +189,7 @@ export function PanelManager() {
       [PanelType.COMPOSE_MAIL]: 'Compose Message',
     }
     
-    return titles[panel.type] || 'Panel'
+    return (titles[panel.type] as string) || 'Panel'
   }
 
   return (

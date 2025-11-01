@@ -35,11 +35,11 @@ export function useGlobalTickData() {
       // Try to detect interval from the data, or use default
       tickInterval = d.tick_interval_seconds ?? d.next_tick?.interval_seconds ?? 300
       
-      if (etaSeconds < 0) {
+      if (etaSeconds < 0 && tickInterval) {
         // Tick has passed, calculate when next tick will be
         const secondsUntilNext = tickInterval - (Math.abs(etaSeconds) % tickInterval)
         etaFromMe = new Date(Date.now() + secondsUntilNext * 1000).toISOString()
-      } else {
+      } else if (etaSeconds >= 0) {
         // Tick is in the future
         etaFromMe = new Date(Date.now() + etaSeconds * 1000).toISOString()
       }
