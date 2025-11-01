@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Circle, Home, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { cn } from '@/lib/utils'
 
 interface PlanetGridProps {
   planets: Planet[]
@@ -116,15 +117,20 @@ export function PlanetGrid({ planets, isLoading, onPlanetClick, selectedPlanetId
           const coord = parseCoordinate(planet.coordinate)
           const isSelected = planet.id === selectedPlanetId
           const isOwned = planet.owner_empire_id === empire?.id
+          const isDiscovered = planet.discovered !== false // Default to true if not specified
+          const isVisible = planet.visibility?.is_visible !== false
 
           return (
             <Card
               key={planet.id}
-              className={`
-                aspect-square cursor-pointer transition-all hover:scale-105 hover:border-cyan/60
-                ${isSelected ? 'border-cyan-400 ring-2 ring-cyan-400/50' : 'border-muted/20'}
-                ${isOwned ? 'bg-green-500/5' : planet.owner_empire_id ? 'bg-red-500/5' : 'bg-muted/5'}
-              `}
+              className={cn(
+                "aspect-square cursor-pointer transition-all hover:scale-105 hover:border-cyan/60",
+                isSelected && 'border-cyan-400 ring-2 ring-cyan-400/50',
+                !isSelected && 'border-muted/20',
+                isOwned ? 'bg-green-500/5' : planet.owner_empire_id ? 'bg-red-500/5' : 'bg-muted/5',
+                !isDiscovered && "opacity-50 grayscale",
+                !isVisible && "border-dashed"
+              )}
               onClick={() => onPlanetClick(planet)}
             >
               <div className="h-full p-2 flex flex-col items-center justify-center relative overflow-hidden">
@@ -143,6 +149,9 @@ export function PlanetGrid({ planets, isLoading, onPlanetClick, selectedPlanetId
                   <div className="scale-75">
                     {getPlanetStatusBadge(planet)}
                   </div>
+                  {!isDiscovered && (
+                    <span className="text-xs text-muted-foreground mt-1">Undiscovered</span>
+                  )}
                 </div>
               </div>
             </Card>

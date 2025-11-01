@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FleetDetails } from '@/types/api.types'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useMoveFleetMutation } from '@/api/endpoints/fleetsApi'
+import { useValidateFleetRangeMutation } from '@/api/endpoints/universeApi'
 import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
 import { useTick } from '@/hooks/useTick'
 import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
 import { formatTicksToTime } from '@/lib/formatters'
-import { Rocket, Clock, Loader2 } from 'lucide-react'
+import { Rocket, Clock, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTravelTime } from '@/hooks/useTravelTime'
 
@@ -33,12 +35,45 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
   const [isCalculatingTravelTime, setIsCalculatingTravelTime] = useState(false)
   
   const [moveFleet, { isLoading: isMoving }] = useMoveFleetMutation()
+  const [validateRange, { data: rangeValidation, isLoading: isValidating }] = useValidateFleetRangeMutation()
   const { calculateTravelTime } = useTravelTime()
   const { data: planetsData, isLoading: isLoadingPlanets } = useGetPlanetsQuery()
   const { data: shipDefinitionsData } = useGetShipDefinitionsQuery()
   const { currentTick } = useTick()
   const ownedPlanets = planetsData?.planets || []
   const shipDefinitions = shipDefinitionsData?.ships || []
+
+  // Validate fleet range when destination changes
+  useEffect(() => {
+    const validateDestination = async () => {
+      // Get origin coordinate from fleet
+      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+      
+      if (fleet.origin_coordinate) {
+        originCoord = fleet.origin_coordinate
+      } else if ((fleet as any).origin?.coordinate) {
+        const parsed = parseCoordinate((fleet as any).origin.coordinate)
+        if (parsed) {
+          originCoord = parsed
+        }
+      }
+      
+      if (originCoord && destinationCoord) {
+        validateRange({
+          origin_quadrant: originCoord.quadrant,
+          origin_sector: originCoord.sector,
+          origin_galaxy: originCoord.galaxy,
+          destination_quadrant: destinationCoord.quadrant,
+          destination_sector: destinationCoord.sector,
+          destination_galaxy: destinationCoord.galaxy,
+        })
+      }
+    }
+    
+    if (destinationCoord.quadrant && destinationCoord.sector && destinationCoord.galaxy) {
+      validateDestination()
+    }
+  }, [destinationCoord, fleet, validateRange])
 
   const handlePlanetSelect = (value: string) => {
     if (value === 'manual') {
@@ -379,6 +414,27 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
             </div>
           </div>
 
+          {/* Range Validation Alert */}
+          {rangeValidation && !rangeValidation.can_reach && (
+            <Alert variant="destructive" className="border-red-500/50 bg-red-950/20">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Destination Out of Range</AlertTitle>
+              <AlertDescription>
+                {rangeValidation.reason}
+                {rangeValidation.required_research && rangeValidation.required_research.length > 0 && (
+                  <div className="mt-2 text-sm">
+                    <strong>Required Research:</strong>
+                    <ul className="list-disc list-inside ml-2 mt-1">
+                      {rangeValidation.required_research.map((r, idx) => (
+                        <li key={idx}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Order Type */}
           <div className="space-y-2">
             <Label htmlFor="order-type">Order Type</Label>
@@ -456,7 +512,7 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
             <Button variant="outline" onClick={onClose} disabled={isMoving}>
               Cancel
             </Button>
-            <Button onClick={handleMove} disabled={isMoving}>
+            <Button onClick={handleMove} disabled={isMoving || (rangeValidation && !rangeValidation.can_reach)}>
               {isMoving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

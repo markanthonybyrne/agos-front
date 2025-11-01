@@ -35,6 +35,8 @@ export const researchApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { planet_id }) => [
         'Research',
+        'Empire',
+        'Universe',
         'Planet',
         { type: 'Research', id: planet_id },
         'Buildable',

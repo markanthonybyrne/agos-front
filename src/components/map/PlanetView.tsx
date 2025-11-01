@@ -6,6 +6,7 @@ import { Planet } from '@/types/api.types'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatResource } from '@/lib/formatters'
 import { useAuth } from '@/hooks/useAuth'
+import { cn } from '@/lib/utils'
 import { 
   Home, 
   AlertCircle, 
@@ -95,16 +96,20 @@ export function PlanetView({ planets, onPlanetClick, className = '' }: PlanetVie
         const isExpanded = expandedPlanet?.id === planet.id
         const planetImage = getPlanetImage(planet)
         const { facilitiesCount, defensesCount } = getPlanetCounts(planet)
+        const isDiscovered = planet.discovered !== false // Default to true if not specified
+        const isVisible = planet.visibility?.is_visible !== false
 
         return (
           <Card
             key={planet.id}
-            className={`
-              relative aspect-square cursor-pointer overflow-hidden
-              planet-interactive orbit-float ${isExpanded ? 'expanded' : ''}
-              ${isOwned ? 'bg-green-500/5 border-green-500/30' : planet.owner_empire_id ? 'bg-red-500/5 border-red-500/30' : 'bg-muted/5 border-muted/20'}
-              transition-all duration-300
-            `}
+            className={cn(
+              "relative aspect-square cursor-pointer overflow-hidden",
+              "planet-interactive orbit-float transition-all duration-300",
+              isExpanded && "expanded",
+              !isDiscovered && "opacity-50 grayscale",
+              isOwned ? 'bg-green-500/5 border-green-500/30' : planet.owner_empire_id ? 'bg-red-500/5 border-red-500/30' : 'bg-muted/5 border-muted/20',
+              !isVisible && "border-dashed"
+            )}
             onMouseEnter={() => setHoveredPlanet(planet)}
             onMouseLeave={() => setHoveredPlanet(null)}
             onClick={() => {
@@ -156,6 +161,13 @@ export function PlanetView({ planets, onPlanetClick, className = '' }: PlanetVie
               <div className="scale-75 mb-2">
                 {getPlanetStatusBadge(planet)}
               </div>
+
+              {/* Undiscovered indicator */}
+              {!isDiscovered && (
+                <Badge variant="outline" className="text-xs mt-1 bg-muted/50">
+                  Undiscovered
+                </Badge>
+              )}
 
               {/* Resources */}
               {(planet.tellerium_balance || planet.krypton_balance) && (

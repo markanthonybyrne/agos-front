@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useGetMapQuery, useGetUniverseStructureQuery } from '@/api/endpoints/universeApi'
+import { useGetMapQuery, useGetUniverseStructureQuery, useGetVisibilityQuery, useGetDiscoverableQuery } from '@/api/endpoints/universeApi'
 import { useSearchPlanetsQuery, useFindNearbyPlanetsQuery, useDiscoverGalaxyMutation } from '@/api/endpoints/planetsApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -68,6 +68,7 @@ interface SearchFilters {
 export function UniverseMap() {
   const [searchParams] = useSearchParams()
   const [mapState, setMapState] = useState<MapState>({ level: 'quadrant' })
+  const [hasAutoNavigated, setHasAutoNavigated] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('explore')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null)
@@ -114,6 +115,9 @@ export function UniverseMap() {
     skip: false // Always fetch nearby planets so they're available when tab is opened
   })
 
+  const { data: visibilityData } = useGetVisibilityQuery()
+  const { data: discoverableData } = useGetDiscoverableQuery()
+
   const [discoverGalaxy, { isLoading: isDiscovering }] = useDiscoverGalaxyMutation()
   
   // Handle URL params for deep linking to specific galaxy
@@ -134,6 +138,117 @@ export function UniverseMap() {
     }
   }, [searchParams])
 
+  // Auto-navigate to deepest visible level based on visibility (only once on initial load)
+  useEffect(() => {
+    // Only auto-navigate once on initial load when we have visibility data
+    if (hasAutoNavigated || !visibilityData || isLoading) return
+    
+    const visibilityLevel = visibilityData.visibility_level
+    
+    // If only galaxy visibility, navigate directly to the first visible galaxy
+    if (visibilityLevel === 'galaxy' && visibilityData.visible_galaxies?.length > 0) {
+      const firstGalaxy = visibilityData.visible_galaxies[0]
+      setMapState({
+        level: 'planet',
+        selectedQuadrant: firstGalaxy.quadrant,
+        selectedSector: firstGalaxy.sector,
+        selectedGalaxy: firstGalaxy.galaxy,
+      })
+      setHasAutoNavigated(true)
+      return
+    }
+    
+    // If sector visibility, navigate to the first visible sector
+    if (visibilityLevel === 'sector' && visibilityData.visible_sectors?.length > 0) {
+      const firstSector = visibilityData.visible_sectors[0]
+      // If only one sector visible, go deeper
+      if (visibilityData.visible_sectors.length === 1) {
+        // Find first visible galaxy in this sector
+        const galaxyInSector = visibilityData.visible_galaxies?.find(
+          (g: any) => g.quadrant === firstSector.quadrant && g.sector === firstSector.sector
+        )
+        if (galaxyInSector) {
+          // If only one galaxy in sector, go to planet view
+          const galaxiesInSector = visibilityData.visible_galaxies?.filter(
+            (g: any) => g.quadrant === firstSector.quadrant && g.sector === firstSector.sector
+          ) || []
+          
+          if (galaxiesInSector.length === 1) {
+            setMapState({
+              level: 'planet',
+              selectedQuadrant: galaxyInSector.quadrant,
+              selectedSector: galaxyInSector.sector,
+              selectedGalaxy: galaxyInSector.galaxy,
+            })
+          } else {
+            setMapState({
+              level: 'galaxy',
+              selectedQuadrant: firstSector.quadrant,
+              selectedSector: firstSector.sector,
+            })
+          }
+        } else {
+          setMapState({
+            level: 'galaxy',
+            selectedQuadrant: firstSector.quadrant,
+            selectedSector: firstSector.sector,
+          })
+        }
+      } else {
+        // Multiple sectors - stay at sector view
+        setMapState({
+          level: 'sector',
+          selectedQuadrant: firstSector.quadrant,
+        })
+      }
+      setHasAutoNavigated(true)
+      return
+    }
+    
+    // If quadrant visibility, navigate to first visible quadrant
+    if (visibilityLevel === 'quadrant' && visibilityData.visible_quadrants?.length > 0) {
+      const firstQuadrant = visibilityData.visible_quadrants[0]
+      // If only one quadrant visible, go deeper
+      if (visibilityData.visible_quadrants.length === 1) {
+        // Check if there's only one sector
+        const sectorsInQuadrant = visibilityData.visible_sectors?.filter(
+          (s: any) => s.quadrant === firstQuadrant.quadrant
+        ) || []
+        
+        if (sectorsInQuadrant.length === 1) {
+          const sector = sectorsInQuadrant[0]
+          // Check if there's only one galaxy
+          const galaxiesInSector = visibilityData.visible_galaxies?.filter(
+            (g: any) => g.quadrant === sector.quadrant && g.sector === sector.sector
+          ) || []
+          
+          if (galaxiesInSector.length === 1) {
+            const galaxy = galaxiesInSector[0]
+            setMapState({
+              level: 'planet',
+              selectedQuadrant: galaxy.quadrant,
+              selectedSector: galaxy.sector,
+              selectedGalaxy: galaxy.galaxy,
+            })
+          } else {
+            setMapState({
+              level: 'galaxy',
+              selectedQuadrant: sector.quadrant,
+              selectedSector: sector.sector,
+            })
+          }
+        } else {
+          setMapState({
+            level: 'sector',
+            selectedQuadrant: firstQuadrant.quadrant,
+          })
+        }
+      }
+      // Otherwise stay at quadrant level if multiple quadrants visible
+      setHasAutoNavigated(true)
+    }
+  }, [visibilityData, isLoading, hasAutoNavigated])
+
   // Debug logging
   useEffect(() => {
     console.log('Map API response:', mapData)
@@ -142,7 +257,9 @@ export function UniverseMap() {
     console.log('Is loading:', isLoading)
     console.log('Error:', error)
     console.log('Universe structure:', universeStructure)
-  }, [mapData, mapState, viewMode, isLoading, error, universeStructure])
+    console.log('Visibility data:', visibilityData)
+    console.log('Should show back button:', mapState.level !== 'quadrant' && !(visibilityData && visibilityData.visibility_level === 'galaxy'))
+  }, [mapData, mapState, viewMode, isLoading, error, universeStructure, visibilityData])
 
   // Calculate discovery cost when galaxy is selected
   useEffect(() => {
@@ -288,9 +405,248 @@ export function UniverseMap() {
     setDragStart({ x: e.clientX, y: e.clientY })
   }
 
+  // Helper to check if a quadrant is visible
+  const isQuadrantVisible = (quadrantId: number): boolean => {
+    if (!visibilityData) return true // Default to visible if no data
+    
+    // Check if explicitly in visible_quadrants
+    if (visibilityData.visible_quadrants?.some(q => q.quadrant === quadrantId)) {
+      return true
+    }
+    
+    // Check if contains visible sectors or galaxies
+    const hasVisibleSector = visibilityData.visible_sectors?.some(
+      s => s.quadrant === quadrantId
+    )
+    const hasVisibleGalaxy = visibilityData.visible_galaxies?.some(
+      g => g.quadrant === quadrantId
+    )
+    
+    return hasVisibleSector || hasVisibleGalaxy || false
+  }
+
+  // Helper to check if a sector is visible
+  const isSectorVisible = (quadrantId: number, sectorId: number): boolean => {
+    if (!visibilityData) return true // Default to visible if no data
+    
+    // Check if explicitly in visible_sectors
+    if (visibilityData.visible_sectors?.some(
+      s => s.quadrant === quadrantId && s.sector === sectorId
+    )) {
+      return true
+    }
+    
+    // Check if contains visible galaxies
+    const hasVisibleGalaxy = visibilityData.visible_galaxies?.some(
+      g => g.quadrant === quadrantId && g.sector === sectorId
+    )
+    
+    return hasVisibleGalaxy || false
+  }
+
+  // Helper to check if a galaxy is visible
+  const isGalaxyVisible = (quadrantId: number, sectorId: number, galaxyId: number): boolean => {
+    if (!visibilityData) return true // Default to visible if no data
+    
+    return visibilityData.visible_galaxies?.some(
+      g => g.quadrant === quadrantId && g.sector === sectorId && g.galaxy === galaxyId
+    ) || false
+  }
+
+  // Helper to check if a galaxy is discoverable
+  const isGalaxyDiscoverable = (quadrant: number, sector: number, galaxy: number): boolean => {
+    return discoverableData?.discoverable_galaxies?.some(
+      (g) => g.quadrant === quadrant && g.sector === sector && g.galaxy === galaxy
+    ) || false
+  }
+
   const renderQuadrantView = () => {
-    // Try to get quadrants from mapData first, then from universeStructure
-    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    // NEW: Try hierarchical visibility arrays first (from backend)
+    const hierarchicalQuadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    const hierarchicalGalaxies = mapData?.galaxies || mapDataAny?.data?.galaxies || []
+    
+    if (hierarchicalQuadrants.length > 0) {
+      // Filter to only visible quadrants
+      const visibleQuadrants = hierarchicalQuadrants.filter(
+        (q: any) => q.visibility?.is_visible === true
+      )
+      
+      // If visibility level is "galaxy", show galaxies directly from quadrant level
+      const shouldShowGalaxiesDirectly = visibilityData?.visibility_level === 'galaxy'
+      
+      if (shouldShowGalaxiesDirectly && hierarchicalGalaxies.length > 0) {
+        // Group visible galaxies by quadrant and show them directly
+        const visibleGalaxiesByQuadrant = visibleQuadrants.map((quadrant: any) => {
+          const galaxiesInQuadrant = hierarchicalGalaxies.filter(
+            (g: any) => g.quadrant === quadrant.quadrant && g.visibility?.is_visible === true
+          )
+          return { quadrant, galaxies: galaxiesInQuadrant }
+        })
+        
+        return (
+          <div className="space-y-4">
+            {/* Visibility unlock message */}
+            {visibilityData && (
+              <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-400">
+                        Research Sensor Technology to unlock sector visibility
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies). Click a galaxy to jump directly to it.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {visibleGalaxiesByQuadrant.map(({ quadrant, galaxies }: any) => (
+              <div key={quadrant.quadrant} className="space-y-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-cyan-400" />
+                  Quadrant {quadrant.quadrant}
+                </h3>
+                {galaxies.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {galaxies.map((galaxy: any) => {
+                      const isDiscoverable = isGalaxyDiscoverable(galaxy.quadrant, galaxy.sector, galaxy.galaxy)
+                      const visiblePlanetCount = mapData?.planets?.filter((p: any) => {
+                        const coord = parseCoordinate(p.coordinate)
+                        return coord && 
+                          coord.quadrant === galaxy.quadrant &&
+                          coord.sector === galaxy.sector &&
+                          coord.galaxy === galaxy.galaxy &&
+                          p.visibility?.is_visible === true
+                      }).length || 0
+                      
+                      return (
+                        <Card 
+                          key={`${galaxy.quadrant}:${galaxy.sector}:${galaxy.galaxy}`} 
+                          className={cn(
+                            "panel-glass cursor-pointer hover:border-purple/40 transition-colors relative",
+                            "border-purple/20",
+                            isDiscoverable && "ring-2 ring-yellow-400/30"
+                          )}
+                          onClick={() => {
+                            setMapState({
+                              level: 'planet',
+                              selectedQuadrant: galaxy.quadrant,
+                              selectedSector: galaxy.sector,
+                              selectedGalaxy: galaxy.galaxy,
+                            })
+                          }}
+                        >
+                          {isDiscoverable && (
+                            <div className="absolute top-2 right-2">
+                              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                                <Telescope className="w-3 h-3 mr-1" />
+                                Discoverable
+                              </Badge>
+                            </div>
+                          )}
+                          <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                              <Star className="w-5 h-5 text-purple-400" />
+                              Galaxy {galaxy.galaxy}
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                              Sector {galaxy.sector}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Visible Planets:</span>
+                                <span className="font-mono">{visiblePlanetCount}</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <Card className="panel-glass border-muted/20">
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-muted-foreground">No visible galaxies in this quadrant</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      }
+      
+      // Normal quadrant view (when sectors are visible)
+      return (
+        <div className="space-y-4">
+          {/* Visibility unlock message */}
+          {visibilityData && visibilityData.visibility_level === 'galaxy' && (
+            <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-400">
+                      Research Sensor Technology to unlock sector visibility
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {visibleQuadrants.map((quadrant: any) => {
+              const isVisible = quadrant.visibility?.is_visible === true
+              return (
+                <Card 
+                  key={quadrant.quadrant} 
+                  className={cn(
+                    "panel-glass cursor-pointer hover:border-cyan/40 transition-colors",
+                    isVisible ? "border-cyan/20" : "border-yellow/20 opacity-50"
+                  )}
+                  onClick={() => navigateToLevel('sector', { id: quadrant.quadrant })}
+                >
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Globe className="w-5 h-5 text-cyan-400" />
+                      Quadrant {quadrant.quadrant}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Sectors:</span>
+                        <span className="font-mono">
+                          {mapData?.sectors?.filter((s: any) => s.quadrant === quadrant.quadrant && s.visibility?.is_visible === true).length || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Galaxies:</span>
+                        <span className="font-mono">
+                          {mapData?.galaxies?.filter((g: any) => g.quadrant === quadrant.quadrant && g.visibility?.is_visible === true).length || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
+    
+    // Fallback: Try nested structure (legacy)
+    const quadrants = mapDataAny?.data?.quadrants_nested || []
     
     // If no quadrants in mapData and we have universeStructure, build quadrants from it
     if ((!quadrants || quadrants.length === 0) && universeStructure?.structure) {
@@ -306,14 +662,41 @@ export function UniverseMap() {
       }))
       
       if (structureQuadrants.length > 0) {
+        // Filter quadrants by visibility
+        const visibleQuadrants = structureQuadrants.filter((q: any) => isQuadrantVisible(q.id))
+        
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {structureQuadrants.map((quadrant: any) => (
-              <Card 
-                key={quadrant.id} 
-                className="panel-glass border-cyan/20 cursor-pointer hover:border-cyan/40 transition-colors"
-                onClick={() => navigateToLevel('sector', quadrant)}
-              >
+          <div className="space-y-4">
+            {/* Visibility unlock message */}
+            {visibilityData && visibilityData.visibility_level === 'galaxy' && (
+              <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-400">
+                        Research Sensor Technology to unlock sector visibility
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {visibleQuadrants.map((quadrant: any) => {
+                const isVisible = isQuadrantVisible(quadrant.id)
+                return (
+                  <Card 
+                    key={quadrant.id} 
+                    className={cn(
+                      "panel-glass cursor-pointer hover:border-cyan/40 transition-colors",
+                      isVisible ? "border-cyan/20" : "border-yellow/20 opacity-50"
+                    )}
+                    onClick={() => navigateToLevel('sector', quadrant)}
+                  >
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Globe className="w-5 h-5 text-cyan-400" />
@@ -336,7 +719,9 @@ export function UniverseMap() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+                )
+              })}
+            </div>
           </div>
         )
       }
@@ -344,14 +729,41 @@ export function UniverseMap() {
     
     // If we have quadrants with planets from mapData
     if (quadrants && quadrants.length > 0) {
+      // Filter quadrants by visibility
+      const visibleQuadrants = quadrants.filter((q: any) => isQuadrantVisible(q.id))
+      
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quadrants.map((quadrant: any) => (
-            <Card 
-              key={quadrant.id} 
-              className="panel-glass border-cyan/20 cursor-pointer hover:border-cyan/40 transition-colors"
-              onClick={() => navigateToLevel('sector', quadrant)}
-            >
+        <div className="space-y-4">
+          {/* Visibility unlock message */}
+          {visibilityData && visibilityData.visibility_level === 'galaxy' && (
+            <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-400">
+                      Research Sensor Technology to unlock sector visibility
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {visibleQuadrants.map((quadrant: any) => {
+              const isVisible = isQuadrantVisible(quadrant.id)
+              return (
+                <Card 
+                  key={quadrant.id} 
+                  className={cn(
+                    "panel-glass cursor-pointer hover:border-cyan/40 transition-colors",
+                    isVisible ? "border-cyan/20" : "border-yellow/20 opacity-50"
+                  )}
+                  onClick={() => navigateToLevel('sector', quadrant)}
+                >
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Globe className="w-5 h-5 text-cyan-400" />
@@ -375,10 +787,12 @@ export function UniverseMap() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )
-    }
+                )
+              })}
+            </div>
+          </div>
+        )
+      }
     
     // Fallback: show planets directly if available
     const planets: any[] = mapDataAny?.planets || mapDataAny?.data?.planets || []
@@ -467,8 +881,84 @@ export function UniverseMap() {
   }
 
   const renderSectorView = () => {
-    // Try to get sectors from mapData first
-    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    // NEW: Try hierarchical visibility arrays first (from backend)
+    const hierarchicalSectors = mapData?.sectors || mapDataAny?.data?.sectors || []
+    
+    if (hierarchicalSectors.length > 0 && mapState.selectedQuadrant) {
+      // Filter to sectors in the selected quadrant and only visible ones
+      const visibleSectors = hierarchicalSectors.filter(
+        (s: any) => s.quadrant === mapState.selectedQuadrant && s.visibility?.is_visible === true
+      )
+      
+      return (
+        <div className="space-y-4">
+          {/* Visibility unlock message */}
+          {visibilityData && visibilityData.visibility_level === 'galaxy' && mapState.selectedQuadrant && (
+            <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-400">
+                      Research Sensor Technology to unlock sector visibility
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {visibleSectors.map((sector: any) => {
+              const isVisible = sector.visibility?.is_visible === true
+              return (
+                <Card 
+                  key={`${sector.quadrant}:${sector.sector}`} 
+                  className={cn(
+                    "panel-glass cursor-pointer hover:border-blue/40 transition-colors",
+                    isVisible ? "border-blue/20" : "border-yellow/20 opacity-50"
+                  )}
+                  onClick={() => navigateToLevel('galaxy', { id: sector.sector })}
+                >
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Layers className="w-5 h-5 text-blue-400" />
+                      Sector {sector.sector}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Galaxies:</span>
+                        <span className="font-mono">
+                          {mapData?.galaxies?.filter(
+                            (g: any) => g.quadrant === sector.quadrant && g.sector === sector.sector
+                          ).length || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Planets:</span>
+                        <span className="font-mono">
+                          {mapData?.planets?.filter((p: any) => {
+                            const coord = parseCoordinate(p.coordinate)
+                            return coord && coord.quadrant === sector.quadrant && coord.sector === sector.sector
+                          }).length || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
+    
+    // Fallback: Try nested structure (legacy)
+    const quadrants = mapDataAny?.data?.quadrants_nested || []
     const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
     let sectors = quadrant?.sectors || []
     
@@ -503,14 +993,47 @@ export function UniverseMap() {
       )
     }
 
+    // Filter sectors by visibility
+    const visibleSectors = sectors.filter((s: any) => 
+      mapState.selectedQuadrant 
+        ? isSectorVisible(mapState.selectedQuadrant, s.id)
+        : true
+    )
+
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {sectors.map((sector: any) => (
-          <Card 
-            key={sector.id} 
-            className="panel-glass border-blue/20 cursor-pointer hover:border-blue/40 transition-colors"
-            onClick={() => navigateToLevel('galaxy', sector)}
-          >
+      <div className="space-y-4">
+        {/* Visibility unlock message */}
+        {visibilityData && visibilityData.visibility_level === 'galaxy' && mapState.selectedQuadrant && (
+          <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-yellow-400">
+                    Research Sensor Technology to unlock sector visibility
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {visibleSectors.map((sector: any) => {
+            const isVisible = mapState.selectedQuadrant 
+              ? isSectorVisible(mapState.selectedQuadrant, sector.id)
+              : true
+            return (
+              <Card 
+                key={sector.id} 
+                className={cn(
+                  "panel-glass cursor-pointer hover:border-blue/40 transition-colors",
+                  isVisible ? "border-blue/20" : "border-yellow/20 opacity-50"
+                )}
+                onClick={() => navigateToLevel('galaxy', sector)}
+              >
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Layers className="w-5 h-5 text-blue-400" />
@@ -533,14 +1056,134 @@ export function UniverseMap() {
               </div>
             </CardContent>
           </Card>
-        ))}
+            )
+          })}
+        </div>
       </div>
     )
   }
 
   const renderGalaxyView = () => {
-    // Try to get galaxies from mapData first
-    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    // NEW: Try hierarchical visibility arrays first (from backend)
+    const hierarchicalGalaxies = mapData?.galaxies || mapDataAny?.data?.galaxies || []
+    
+    if (hierarchicalGalaxies.length > 0 && mapState.selectedQuadrant && mapState.selectedSector) {
+      // Filter to galaxies in the selected quadrant/sector and only visible ones
+      const visibleGalaxies = hierarchicalGalaxies.filter(
+        (g: any) => 
+          g.quadrant === mapState.selectedQuadrant && 
+          g.sector === mapState.selectedSector &&
+          g.visibility?.is_visible === true
+      )
+      
+      return (
+        <div className="space-y-4">
+          {/* Visibility unlock message */}
+          {visibilityData && !visibilityData.unlocked_by?.sensor_technology && (
+            <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-400">
+                      Research Sensor Technology to unlock entire sector visibility
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Currently only showing planets in visible galaxies
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Filter galaxies by visibility */}
+          {(() => {
+            if (visibleGalaxies.length === 0) {
+              return (
+                <Card className="panel-glass border-purple/20">
+                  <CardContent className="pt-6 text-center">
+                    <Star className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Visible Galaxies</h3>
+                    <p className="text-muted-foreground">
+                      You don't have visibility to any galaxies in this sector yet.
+                    </p>
+                    {visibilityData && (
+                      <p className="text-sm text-yellow-400 mt-2">
+                        Research Sensor Technology to unlock sector visibility
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            }
+            
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {visibleGalaxies.map((galaxy: any) => {
+                  // Count visible planets for this galaxy
+                  const visiblePlanetCount = mapData?.planets?.filter((p: any) => {
+                    const coord = parseCoordinate(p.coordinate)
+                    return coord && 
+                      coord.quadrant === galaxy.quadrant &&
+                      coord.sector === galaxy.sector &&
+                      coord.galaxy === galaxy.galaxy &&
+                      p.visibility?.is_visible === true
+                  }).length || 0
+                  
+                  // Check if galaxy is discoverable
+                  const isDiscoverable = isGalaxyDiscoverable(galaxy.quadrant, galaxy.sector, galaxy.galaxy)
+                  const isVisible = galaxy.visibility?.is_visible === true
+                  
+                  return (
+                    <Card 
+                      key={`${galaxy.quadrant}:${galaxy.sector}:${galaxy.galaxy}`} 
+                      className={cn(
+                        "panel-glass cursor-pointer hover:border-purple/40 transition-colors relative",
+                        isVisible ? "border-purple/20" : "border-yellow/20 opacity-50",
+                        isDiscoverable && "ring-2 ring-yellow-400/30"
+                      )}
+                      onClick={() => navigateToLevel('planet', { id: galaxy.galaxy })}
+                    >
+                      {isDiscoverable && (
+                        <div className="absolute top-2 right-2">
+                          <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                            <Telescope className="w-3 h-3 mr-1" />
+                            Discoverable
+                          </Badge>
+                        </div>
+                      )}
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Star className={cn("w-5 h-5", isVisible ? "text-purple-400" : "text-yellow-400")} />
+                          Galaxy {galaxy.galaxy}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Visible Planets:</span>
+                            <span className="font-mono">{visiblePlanetCount}</span>
+                          </div>
+                          {!isVisible && (
+                            <Badge variant="outline" className="w-full justify-center mt-2 text-xs">
+                              Hidden
+                            </Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
+      )
+    }
+    
+    // Fallback: Try nested structure (legacy)
+    const quadrants = mapDataAny?.data?.quadrants_nested || []
     const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
     const sectors = quadrant?.sectors || []
     const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
@@ -579,70 +1222,166 @@ export function UniverseMap() {
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {galaxies.map((galaxy: any) => {
-          // Calculate planet count - prefer planets array length, fallback to planet_count from structure
-          const planetCount = galaxy.planets?.length || galaxy.planet_count || 0
-          const colonizedCount = galaxy.planets?.filter((p: any) => p.owner_empire_id).length || 0
+      <div className="space-y-4">
+        {/* Visibility unlock message */}
+        {visibilityData && !visibilityData.unlocked_by?.sensor_technology && (
+          <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-yellow-400">
+                    Research Sensor Technology to unlock entire sector visibility
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Currently only showing planets in visible galaxies
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Filter galaxies by visibility */}
+        {(() => {
+          const visibleGalaxies = galaxies.filter((g: any) => 
+            mapState.selectedQuadrant && mapState.selectedSector
+              ? isGalaxyVisible(mapState.selectedQuadrant, mapState.selectedSector, g.id)
+              : true
+          )
+          
+          if (visibleGalaxies.length === 0 && galaxies.length > 0) {
+            return (
+          <Card className="panel-glass border-purple/20">
+            <CardContent className="pt-6 text-center">
+              <Star className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Visible Galaxies</h3>
+              <p className="text-muted-foreground">
+                You don't have visibility to any galaxies in this sector yet.
+              </p>
+              {visibilityData && (
+                <p className="text-sm text-yellow-400 mt-2">
+                  Research Sensor Technology to unlock sector visibility
+                </p>
+              )}
+            </CardContent>
+          </Card>
+            )
+          }
           
           return (
-            <Card 
-              key={galaxy.id} 
-              className="panel-glass border-purple/20 cursor-pointer hover:border-purple/40 transition-colors"
-              onClick={() => navigateToLevel('planet', galaxy)}
-            >
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Star className="w-5 h-5 text-purple-400" />
-                  Galaxy {galaxy.id}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Planets:</span>
-                    <span className="font-mono">{planetCount}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {visibleGalaxies.map((galaxy: any) => {
+            // Calculate planet count - prefer planets array length, fallback to planet_count from structure
+            const planetCount = galaxy.planets?.length || galaxy.planet_count || 0
+            const colonizedCount = galaxy.planets?.filter((p: any) => p.owner_empire_id).length || 0
+            const visiblePlanetCount = galaxy.planets?.filter((p: any) => p.visibility?.is_visible !== false).length || planetCount
+            
+            // Check if galaxy is discoverable
+            const isDiscoverable = mapState.selectedQuadrant && mapState.selectedSector
+              ? isGalaxyDiscoverable(mapState.selectedQuadrant, mapState.selectedSector, galaxy.id)
+              : false
+            
+            // Check if galaxy is visible (has visibility data)
+            const isVisible = mapState.selectedQuadrant && mapState.selectedSector
+              ? isGalaxyVisible(mapState.selectedQuadrant, mapState.selectedSector, galaxy.id)
+              : galaxy.visibility?.is_visible !== false
+            
+            return (
+              <Card 
+                key={galaxy.id} 
+                className={cn(
+                  "panel-glass cursor-pointer hover:border-purple/40 transition-colors relative",
+                  !isVisible ? "border-yellow/20 opacity-50" : "border-purple/20",
+                  isDiscoverable && "ring-2 ring-yellow-400/30"
+                )}
+                onClick={() => navigateToLevel('planet', galaxy)}
+              >
+                {isDiscoverable && (
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                      <Telescope className="w-3 h-3 mr-1" />
+                      Discoverable
+                    </Badge>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Colonized:</span>
-                    <span className="font-mono">{colonizedCount}</span>
+                )}
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Star className={cn("w-5 h-5", isVisible ? "text-purple-400" : "text-yellow-400")} />
+                    Galaxy {galaxy.id}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Visible Planets:</span>
+                      <span className="font-mono">{visiblePlanetCount}</span>
+                    </div>
+                    {planetCount > visiblePlanetCount && (
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Total:</span>
+                        <span className="font-mono">{planetCount}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Colonized:</span>
+                      <span className="font-mono">{colonizedCount}</span>
+                    </div>
+                    {!isVisible && (
+                      <Badge variant="outline" className="w-full justify-center mt-2 text-xs">
+                        Hidden
+                      </Badge>
+                    )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+              )
+            })}
+            </div>
           )
-        })}
+        })()}
       </div>
     )
   }
 
   const renderPlanetView = () => {
-    // Try to get planets from mapData first
-    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
-    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
-    const sectors = quadrant?.sectors || []
-    const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
-    const galaxies = sector?.galaxies || []
-    const galaxy = galaxies.find((g: any) => g.id === mapState.selectedGalaxy) || galaxies[0]
-    let planets: Planet[] = galaxy?.planets || []
+    // NEW: Try flat planets array first (from hierarchical response)
+    let planets: Planet[] = mapData?.planets || mapDataAny?.data?.planets || []
     
-    // If no planets in nested structure, try to get from flat planets array in mapData
-    if (planets.length === 0 && mapDataAny?.planets) {
-      planets = mapDataAny.planets.filter((p: any) => {
+    // Filter planets by coordinate and visibility
+    if (mapState.selectedQuadrant && mapState.selectedSector && mapState.selectedGalaxy) {
+      planets = planets.filter((p: any) => {
         const coord = parseCoordinate(p.coordinate)
         return coord && 
           coord.quadrant === mapState.selectedQuadrant &&
           coord.sector === mapState.selectedSector &&
-          coord.galaxy === mapState.selectedGalaxy
+          coord.galaxy === mapState.selectedGalaxy &&
+          p.visibility?.is_visible === true // Filter by visibility
       })
+    } else {
+      // Filter only by visibility if no specific galaxy selected
+      planets = planets.filter((p: any) => p.visibility?.is_visible === true)
     }
     
-    // If still no planets, use galaxyPlanetsData from searchPlanets query
+    // If still no planets, try galaxyPlanetsData from searchPlanets query
     if (planets.length === 0 && galaxyPlanetsData?.planets) {
-      planets = galaxyPlanetsData.planets
+      planets = galaxyPlanetsData.planets.filter((p: any) => p.visibility?.is_visible !== false)
     }
     
-    if (!planets || planets.length === 0) {
+    // Fallback: Try nested structure (legacy)
+    if (planets.length === 0) {
+      const quadrants = mapDataAny?.data?.quadrants_nested || []
+      const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
+      const sectors = quadrant?.sectors || []
+      const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
+      const galaxies = sector?.galaxies || []
+      const galaxy = galaxies.find((g: any) => g.id === mapState.selectedGalaxy) || galaxies[0]
+      planets = galaxy?.planets?.filter((p: any) => p.visibility?.is_visible !== false) || []
+    }
+    
+    const visiblePlanets = planets
+    
+    if (!visiblePlanets || visiblePlanets.length === 0) {
       return (
         <Card className="panel-glass border-green/20">
           <CardContent className="pt-6 text-center">
@@ -670,21 +1409,36 @@ export function UniverseMap() {
       )
     }
 
+    const isDiscoverable = mapState.selectedQuadrant && mapState.selectedSector && mapState.selectedGalaxy
+      ? isGalaxyDiscoverable(mapState.selectedQuadrant, mapState.selectedSector, mapState.selectedGalaxy)
+      : false
+
     return (
       <div className="space-y-4">
         <Card className="panel-glass border-green/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Star className="w-5 h-5 text-purple-400" />
-              Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
+              Galaxy {mapState.selectedGalaxy} - {visiblePlanets.length} Visible Planets
+              {planets.length > visiblePlanets.length && (
+                <Badge variant="outline" className="ml-2">
+                  {planets.length - visiblePlanets.length} hidden
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Click on a planet to view details and perform actions
+              {isDiscoverable && (
+                <span className="block mt-2 text-yellow-400">
+                  <Telescope className="w-4 h-4 inline mr-1" />
+                  This galaxy can be discovered with a signal scan
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
         </Card>
         <PlanetView
-          planets={planets}
+          planets={visiblePlanets}
           onPlanetClick={handlePlanetClick}
         />
       </div>
@@ -703,7 +1457,11 @@ export function UniverseMap() {
     }
 
     const searchResultsAny: any = searchResults as any
-    const planets = searchResults?.planets || searchResultsAny?.data?.planets || []
+    let planets = searchResults?.planets || searchResultsAny?.data?.planets || []
+    
+    // Filter planets by visibility in search results too
+    planets = planets.filter((p: any) => p.visibility?.is_visible !== false)
+    
     if (!planets || planets.length === 0) {
       return (
         <Card className="panel-glass border-purple/20">
@@ -763,7 +1521,11 @@ export function UniverseMap() {
     }
 
     const nearbyAny: any = nearbyPlanets as any
-    const planets = nearbyPlanets?.planets || nearbyAny?.data?.planets || []
+    let planets = nearbyPlanets?.planets || nearbyAny?.data?.planets || []
+    
+    // Filter planets by visibility in nearby planets too
+    planets = planets.filter((p: any) => p.visibility?.is_visible !== false)
+    
     if (!planets || planets.length === 0) {
       return (
         <Card className="panel-glass border-cyan/20">
@@ -1002,10 +1764,12 @@ export function UniverseMap() {
                 <h1 className="text-5xl font-heading glow-cyan mb-2">Quadrant {mapState.selectedQuadrant}</h1>
                 <p className="text-lg text-muted-foreground">Select a sector to explore</p>
               </div>
-              <Button variant="outline" onClick={goBack} size="lg">
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back
-              </Button>
+              {!(visibilityData && visibilityData.visibility_level === 'galaxy') && (
+                <Button variant="outline" onClick={goBack} size="lg">
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back
+                </Button>
+              )}
             </div>
 
             {/* Sector view with orbital rings */}
@@ -1527,7 +2291,9 @@ export function UniverseMap() {
             <Search className="w-4 h-4 mr-2" />
             Search
           </Button>
-          {mapState.level !== 'quadrant' && (
+          {/* Hide back button if user only has galaxy-level visibility (their own system) */}
+          {mapState.level !== 'quadrant' && 
+           visibilityData?.visibility_level !== 'galaxy' && (
             <Button variant="outline" onClick={goBack}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back

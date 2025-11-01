@@ -5,12 +5,14 @@ import * as z from 'zod'
 import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { useCreateFleetMutation } from '@/api/endpoints/fleetsApi'
 import { useGetPlanetShipsQuery, useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
+import { useValidateFleetRangeMutation } from '@/api/endpoints/universeApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { formatCoordinate } from '@/lib/coordinates'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { calculateDistance } from '@/lib/coordinates'
 import { Ship, MapPin, Clock, Zap, AlertCircle, CheckCircle } from 'lucide-react'
@@ -35,6 +37,7 @@ interface FleetBuilderProps {
 export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
   const [ships, setShips] = useState<Record<string, number>>({})
   const [createFleet, { isLoading }] = useCreateFleetMutation()
+  const [validateRange, { data: rangeValidation, isLoading: isValidating }] = useValidateFleetRangeMutation()
   const { data: planetsData } = useGetPlanetsQuery()
   const { data: planetShipsData } = useGetPlanetShipsQuery(planetId || 0, { skip: !planetId })
   const { data: shipDefinitions } = useGetShipDefinitionsQuery()
@@ -75,11 +78,32 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
     }
   }, [planetId, form])
 
+  const planets: any[] = Array.isArray(planetsData) ? planetsData : (planetsData as any)?.planets || []
+
   const watchedOrigin = form.watch('origin_planet_id')
   const watchedDestination = form.watch('destination_coordinate')
-
-  const planets: any[] = Array.isArray(planetsData) ? planetsData : (planetsData as any)?.planets || []
   const originPlanet = planets?.find((p: any) => p.id === watchedOrigin)
+
+  // Validate fleet range when destination changes
+  useEffect(() => {
+    if (watchedDestination && watchedOrigin) {
+      const originPlanetForValidation = planets?.find((p: any) => p.id === watchedOrigin)
+      if (originPlanetForValidation) {
+        const origin = parseCoordinate(originPlanetForValidation.coordinate)
+        const destination = parseCoordinate(watchedDestination)
+        if (origin && destination) {
+          validateRange({
+            origin_quadrant: origin.quadrant,
+            origin_sector: origin.sector,
+            origin_galaxy: origin.galaxy,
+            destination_quadrant: destination.quadrant,
+            destination_sector: destination.sector,
+            destination_galaxy: destination.galaxy,
+          })
+        }
+      }
+    }
+  }, [watchedDestination, watchedOrigin, planets, validateRange])
   const destinationCoord = watchedDestination
 
   // Calculate travel time and costs
@@ -218,6 +242,27 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
                 </p>
               )}
             </div>
+
+            {/* Range Validation Alert */}
+            {watchedDestination && rangeValidation && !rangeValidation.can_reach && (
+              <Alert variant="destructive" className="border-red-500/50 bg-red-950/20">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Destination Out of Range</AlertTitle>
+                <AlertDescription>
+                  {rangeValidation.reason}
+                  {rangeValidation.required_research && rangeValidation.required_research.length > 0 && (
+                    <div className="mt-2 text-sm">
+                      <strong>Required Research:</strong>
+                      <ul className="list-disc list-inside ml-2 mt-1">
+                        {rangeValidation.required_research.map((r, idx) => (
+                          <li key={idx}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Order Type */}
             <div className="space-y-2">
@@ -380,7 +425,7 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading || totalShips === 0 || !canAfford}
+              disabled={isLoading || totalShips === 0 || !canAfford || (rangeValidation && !rangeValidation.can_reach)}
             >
               {isLoading ? 'Creating Fleet...' : 'Create Fleet'}
             </Button>

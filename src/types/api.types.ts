@@ -69,12 +69,20 @@ export interface Planet {
   facilities?: Record<string, number>
   defence_grid?: Record<string, number>
   // New: planet type for imagery
-  type?: { slug: 'arid' | 'oceanic' | 'volcanic' | 'ice'; name: string }
+  type?: { 
+    slug: 'arid' | 'oceanic' | 'volcanic' | 'ice' | 'asteroid' | 'barren' | 'temperate' | 'toxic' | 'crystalline' | 'gas_giant' | 'terran'; 
+    name: string 
+  }
   production?: {
     tellerium_per_tick: number
     krypton_per_tick: number
   }
   owner_empire_id?: number
+  visibility?: {
+    is_visible: boolean
+    discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
+  }
+  discovered?: boolean // Alternative field name
 }
 
 export interface Fleet {
@@ -382,18 +390,69 @@ export interface CombatLog {
   created_at: string
 }
 
+// Hierarchical visibility items from map endpoint
+export interface VisibilityItem {
+  visibility?: {
+    is_visible: boolean
+    discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
+  }
+  discovered?: boolean // Alternative field name
+}
+
+export interface VisibleQuadrant extends VisibilityItem {
+  quadrant: number
+}
+
+export interface VisibleSector extends VisibilityItem {
+  quadrant: number
+  sector: number
+}
+
+export interface VisibleGalaxy extends VisibilityItem {
+  quadrant: number
+  sector: number
+  galaxy: number
+}
+
 export interface UniverseMap {
-  quadrants: Array<{
+  // Hierarchical visibility arrays (NEW - from backend)
+  quadrants?: Array<VisibleQuadrant>
+  sectors?: Array<VisibleSector>
+  galaxies?: Array<VisibleGalaxy>
+  planets?: Array<Planet> // Flat array of planets
+  
+  // Nested structure (legacy - still supported)
+  quadrants_nested?: Array<{
     id: number
+    visibility?: {
+      is_visible: boolean
+      discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
+    }
+    discovered?: boolean // Alternative field name
     sectors: Array<{
       id: number
+      visibility?: {
+        is_visible: boolean
+        discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
+      }
+      discovered?: boolean // Alternative field name
       galaxies: Array<{
         id: number
+        visibility?: {
+          is_visible: boolean
+          discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
+        }
+        discovered?: boolean // Alternative field name
         planets: Array<{
           coordinate: string | Coordinate
           name: string
           owner_empire_id?: number
           state: string
+          visibility?: {
+            is_visible: boolean
+            discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
+          }
+          discovered?: boolean // Alternative field name
         }>
       }>
     }>
@@ -410,6 +469,25 @@ export interface Ranking {
   name?: string
   total_score?: number
   total_empires?: number
+}
+
+export interface ExplorationStatus {
+  current_level: 'homeworld' | 'sector' | 'quadrant' | 'full'
+  unlocks: {
+    sensor_technology: boolean
+    deep_space_scanning: boolean
+    propulsion_tech: boolean
+    warp_technology: boolean
+  }
+  homeworld_location: { quadrant: number; sector: number; galaxy: number }
+  max_fleet_range: 'same_galaxy' | 'cross_galaxy' | 'cross_sector' | 'cross_quadrant'
+}
+
+export interface FleetRangeValidation {
+  can_reach: boolean
+  reason?: string
+  required_research?: string[]
+  max_range: 'same_galaxy' | 'cross_galaxy' | 'cross_sector' | 'cross_quadrant'
 }
 
 // Request Types

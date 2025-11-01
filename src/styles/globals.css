@@ -1115,3 +1115,11 @@
   }
 }
 
+/* Locked exploration items */
+.locked-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.7) 100%);
+  pointer-events: none;
+  z-index: 1;
+}

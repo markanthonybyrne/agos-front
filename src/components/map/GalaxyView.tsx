@@ -6,6 +6,7 @@ import { Planet } from '@/types/api.types'
 import { formatCoordinate } from '@/lib/coordinates'
 import { useAuth } from '@/hooks/useAuth'
 import { Star, MapPin, Users } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface GalaxyViewProps {
   planets: Planet[]
@@ -79,11 +80,19 @@ export function GalaxyView({
               const isOwned = planet.owner_empire_id === empire?.id
               const isColonized = !!planet.owner_empire_id
               const isHovered = hoveredPlanet?.id === planet.id
+              const isDiscovered = planet.discovered !== false // Default to true if not specified
+              const isVisible = planet.visibility?.is_visible !== false
 
               return (
                 <div
                   key={planet.id}
-                  className={`planet-indicator ${isColonized ? 'colonized' : ''} ${isOwned ? 'owned' : ''}`}
+                  className={cn(
+                    "planet-indicator",
+                    isColonized && 'colonized',
+                    isOwned && 'owned',
+                    !isDiscovered && "opacity-50 grayscale",
+                    !isVisible && "border-dashed"
+                  )}
                   style={{
                     left: x,
                     top: y,
