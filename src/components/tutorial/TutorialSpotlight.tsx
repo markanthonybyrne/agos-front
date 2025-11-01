@@ -155,10 +155,10 @@ export function TutorialSpotlight({
   
   return (
     <>
-      {/* Dark overlay with cutout */}
+      {/* Dark overlay with cutout - higher z-index than panels */}
       <div
         ref={overlayRef}
-        className="fixed inset-0 z-[100] pointer-events-none"
+        className="fixed inset-0 z-[9998] pointer-events-none"
         style={{
           background: `radial-gradient(ellipse ${position.width + 40}px ${position.height + 40}px at ${position.x + position.width / 2}px ${position.y + position.height / 2}px, transparent 0%, transparent 60%, rgba(0, 0, 0, 0.85) 100%)`,
         }}
@@ -166,7 +166,7 @@ export function TutorialSpotlight({
       
       {/* Highlight border around element */}
       <div
-        className="fixed z-[101] pointer-events-none border-2 border-cyan-400 rounded-lg animate-pulse"
+        className="fixed z-[9999] pointer-events-none border-2 border-cyan-400 rounded-lg animate-pulse"
         style={{
           left: `${position.x - 4}px`,
           top: `${position.y - 4}px`,
@@ -179,7 +179,7 @@ export function TutorialSpotlight({
       {/* Annotation tooltip */}
       <div
         ref={annotationRef}
-        className="fixed z-[102] pointer-events-auto"
+        className="fixed z-[10000] pointer-events-auto"
         style={annotationStyle}
       >
         <div className="relative panel-glass surface-gradient border border-cyan-500/40 card-glow p-4 shadow-2xl max-w-xs">

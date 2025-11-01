@@ -28,6 +28,10 @@ const tutorialSlice = createSlice({
       state.isActive = true
       state.currentStep = 0
       state.completedSteps = []
+      // Clear completed flag when manually starting tutorial
+      state.isTutorialCompleted = false
+      // Also clear localStorage flag so tutorial detection doesn't block it
+      localStorage.removeItem('tutorial_completed')
     },
     nextStep: (state) => {
       if (!state.completedSteps.includes(state.currentStep)) {
@@ -62,6 +66,10 @@ const tutorialSlice = createSlice({
       state.completedSteps = []
       state.isTutorialCompleted = false
       localStorage.removeItem('tutorial_completed')
+      // Also clear session storage in case manual trigger was used
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('tutorial_manual_trigger')
+      }
     },
   },
 })

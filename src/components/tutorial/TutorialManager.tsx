@@ -17,22 +17,37 @@ export function TutorialManager() {
   const totalSteps = getTotalSteps()
   const currentStepData = getStepByOrder(currentStep)
   
+  // Mark body with tutorial active flag for other components to check
+  // This must be called before any conditional returns to satisfy React hooks rules
+  useEffect(() => {
+    if (isActive) {
+      document.body.setAttribute('data-tutorial-active', 'true')
+    } else {
+      document.body.removeAttribute('data-tutorial-active')
+    }
+    return () => {
+      document.body.removeAttribute('data-tutorial-active')
+    }
+  }, [isActive])
+  
   // Handle route requirements - must call before any conditional returns
   useEffect(() => {
-    if (!isActive || isTutorialCompleted || !currentStepData) {
+    if (!isActive || !currentStepData) {
       return
     }
     
     if (currentStepData.targetRoute) {
       const currentPath = window.location.pathname
       if (currentPath !== currentStepData.targetRoute) {
+        console.log('[Tutorial] Navigating to required route:', currentStepData.targetRoute)
         navigate(currentStepData.targetRoute, { replace: true })
       }
     }
-  }, [isActive, isTutorialCompleted, currentStepData, navigate])
+  }, [isActive, currentStepData, navigate])
   
-  // Don't render if tutorial is not active or already completed
-  if (!isActive || isTutorialCompleted) {
+  // Don't render if tutorial is not active
+  // Note: We allow rendering even if previously completed, since user might have manually restarted
+  if (!isActive) {
     return null
   }
   

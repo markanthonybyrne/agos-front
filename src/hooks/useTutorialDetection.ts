@@ -24,7 +24,19 @@ export function useTutorialDetection() {
     // Check localStorage first (fastest check)
     const tutorialCompletedFlag = localStorage.getItem('tutorial_completed')
     if (tutorialCompletedFlag === 'true') {
+      console.log('[Tutorial] Tutorial already completed (localStorage flag set)')
       return
+    }
+    
+    // Check for manual trigger flag (for testing/manual start)
+    const manualTrigger = sessionStorage.getItem('tutorial_manual_trigger')
+    if (manualTrigger === 'true') {
+      console.log('[Tutorial] Manual trigger detected - starting tutorial')
+      sessionStorage.removeItem('tutorial_manual_trigger')
+      const timer = setTimeout(() => {
+        dispatch(startTutorial())
+      }, 500)
+      return () => clearTimeout(timer)
     }
     
     // If we have user data, check creation date
@@ -37,14 +49,23 @@ export function useTutorialDetection() {
         const now = new Date()
         const hoursSinceCreation = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60)
         
+        console.log('[Tutorial] Checking user eligibility:', {
+          createdAt,
+          hoursSinceCreation,
+          eligible: hoursSinceCreation < 24
+        })
+        
         // Trigger tutorial if account was created within last 24 hours
         if (hoursSinceCreation < 24) {
+          console.log('[Tutorial] User eligible - starting tutorial in 1 second')
           // Small delay to ensure UI is ready
           const timer = setTimeout(() => {
             dispatch(startTutorial())
           }, 1000)
           
           return () => clearTimeout(timer)
+        } else {
+          console.log('[Tutorial] User account is older than 24 hours - tutorial will not auto-start')
         }
       }
     }

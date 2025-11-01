@@ -33,20 +33,37 @@ export function Holopad() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   
   // Fetch all data
-  const { data, isLoading, error } = useGetMeQuery(undefined, {
+  const { data, isLoading, error, refetch: refetchMe } = useGetMeQuery(undefined, {
     pollingInterval: 30000,
     skip: !isAuthenticated,
+    refetchOnMountOrArgChange: true,
   })
   
-  const { data: fleetsData, isLoading: fleetsLoading } = useGetFleetsQuery(undefined, {
+  const { data: fleetsData, isLoading: fleetsLoading, refetch: refetchFleets } = useGetFleetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
   const { data: researchData, isLoading: researchLoading } = useGetMyResearchQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
-  const { data: planetsData, isLoading: planetsLoading } = useGetPlanetsQuery(undefined, {
+  const { data: planetsData, isLoading: planetsLoading, refetch: refetchPlanets } = useGetPlanetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
+  
+  // Listen for tick processed events to immediately refetch data
+  useEffect(() => {
+    const handleTickProcessed = () => {
+      // Immediately refetch all data when tick processes
+      refetchMe()
+      refetchPlanets()
+      refetchFleets()
+    }
+    
+    window.addEventListener('tick:processed', handleTickProcessed)
+    
+    return () => {
+      window.removeEventListener('tick:processed', handleTickProcessed)
+    }
+  }, [refetchMe, refetchPlanets, refetchFleets])
 
   const allianceId = data?.empire?.alliance_id || empire?.alliance_id
   const { data: allianceHomepageData } = useGetAllianceHomepageQuery(allianceId!, {

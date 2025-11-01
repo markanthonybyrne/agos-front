@@ -110,7 +110,14 @@ export const authApi = apiSlice.injectEndpoints({
           // Error handling is done by the query itself
         }
       },
-      providesTags: ['Empire'],
+      providesTags: (result) => [
+        'Empire',
+        'Planet', // getMe includes planets
+        'Resource', // planets include resources
+        'Statistics', // empire includes score/statistics
+        ...(result?.empire?.id ? [{ type: 'Empire' as const, id: result.empire.id }] : []),
+        ...(result?.planets?.map((p: Planet) => ({ type: 'Planet' as const, id: p.id })) || []),
+      ],
     }),
     updateProfile: builder.mutation<
       { user: User; empire: Empire },

@@ -78,7 +78,15 @@ export function SlidingPanel({
         <div 
           ref={backdropRef}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300"
-          onClick={onClose}
+          onClick={(e) => {
+            // Check if tutorial is active - if so, don't close panel on backdrop click
+            const tutorialActive = document.querySelector('[data-tutorial-active="true"]')
+            if (tutorialActive) {
+              e.stopPropagation()
+              return
+            }
+            onClose()
+          }}
         />
       )}
       

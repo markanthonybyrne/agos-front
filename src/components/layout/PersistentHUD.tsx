@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { 
   Settings, 
   Map, 
@@ -10,6 +11,7 @@ import {
   Shield,
   Scan,
   Sword,
+  Trophy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +31,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Avatar } from '@/components/common/Avatar'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetQuantumCreditsQuery } from '@/api/endpoints/premiumApi'
+import { useGetTopQuery } from '@/api/endpoints/universeApi'
 import { BRAND } from '@/lib/brandImages'
 import { getUserAvatarUrl } from '@/lib/avatar'
 import { getQuantumCreditsImage } from '@/lib/quantumCreditsImages'
@@ -106,11 +109,37 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
   const notificationsCount = useAppSelector(state => 
     state.notifications.notifications.filter(n => !n.isRead).length
   )
-  const { data } = useGetMeQuery()
+  const { data, refetch: refetchMe } = useGetMeQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
   const { data: qcData } = useGetQuantumCreditsQuery(undefined, {
     pollingInterval: 60000, // Poll every minute
   })
   const empire = useAppSelector((state) => state.auth.empire)
+  
+  // Listen for tick/empire update events to immediately refetch and update display
+  useEffect(() => {
+    const handleTickProcessed = () => {
+      refetchMe()
+    }
+    const handleEmpireUpdated = () => {
+      refetchMe()
+    }
+    
+    window.addEventListener('tick:processed', handleTickProcessed)
+    window.addEventListener('empire:updated', handleEmpireUpdated)
+    
+    return () => {
+      window.removeEventListener('tick:processed', handleTickProcessed)
+      window.removeEventListener('empire:updated', handleEmpireUpdated)
+    }
+  }, [refetchMe])
+  
+  // Use query data for empire if available (more up-to-date), fallback to Redux state
+  const displayEmpire = data?.empire || empire
+  
+  // Get rank directly from the empire object (from /auth/me endpoint)
+  const rank = displayEmpire?.rank ?? null
 
   const handleButtonClick = (button: HUDButton) => {
     if (button.route) {
@@ -174,17 +203,27 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
 
         {/* Right side actions */}
         <div className="flex items-center gap-2">
-          {/* User Score */}
-          {empire && (
+          {/* User Score and Rank */}
+          {displayEmpire && (
             <div 
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 panel-glass surface-gradient card-glow vignette border border-border/50 text-xs"
+              className="hidden sm:flex items-center gap-3 px-3 py-1.5 panel-glass surface-gradient card-glow vignette border border-border/50 text-xs"
               style={{
                 clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
               }}
             >
+              {rank && (
+                <>
+                  <Trophy className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-muted-foreground">Rank:</span>
+                  <span className="font-mono font-semibold text-purple-400">
+                    #{rank}
+                  </span>
+                  <span className="text-muted-foreground/50">|</span>
+                </>
+              )}
               <span className="text-muted-foreground">Score:</span>
               <span className="font-mono font-semibold text-cyan-400">
-                {empire.score?.toLocaleString?.() || empire.score}
+                {displayEmpire.score?.toLocaleString?.() || displayEmpire.score}
               </span>
             </div>
           )}

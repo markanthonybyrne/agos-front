@@ -147,6 +147,9 @@ export function useWebSocket() {
       // Force refetch all active empire queries immediately
       dispatch(apiSlice.util.invalidateTags(tags))
       
+      // Dispatch custom event for components that need to know empire updated
+      window.dispatchEvent(new CustomEvent('empire:updated', { detail: data }))
+      
       // Also refetch specific queries that might be active
       dispatch(apiSlice.util.invalidateTags([{ type: 'Empire', id: 'LIST' }]))
     }
@@ -873,8 +876,29 @@ export function useWebSocket() {
       
       dispatch(setTickProcessing(false))
       
-      // Invalidate Signal tags when tick processes (signals are processed during ticks)
-      dispatch(apiSlice.util.invalidateTags(['Signal', 'Tick', 'Planet', 'Resource', 'Fleet', 'Empire']))
+      // Invalidate all relevant tags when tick processes - this triggers RTK Query to refetch active queries
+      dispatch(apiSlice.util.invalidateTags([
+        'Signal', 
+        'Tick', 
+        'Planet', 
+        'Resource', 
+        'Fleet', 
+        'Empire',
+        'Statistics', // For scores and stats
+        'ConstructionQueue', // Build queues update on tick
+        'Research', // Research might complete
+      ]))
+      
+      // Dispatch a custom event that components can listen to for immediate refetch
+      // This ensures components that need real-time updates can trigger their own refetches
+      window.dispatchEvent(new CustomEvent('tick:processed', { 
+        detail: { tickNumber } 
+      }))
+      
+      // Also invalidate tags again after a short delay to catch any queries that weren't active yet
+      setTimeout(() => {
+        dispatch(apiSlice.util.invalidateTags(['Empire', 'Planet', 'Resource', 'Statistics', 'ConstructionQueue']))
+      }, 200)
     }
     
     // Listen for multiple event name variations

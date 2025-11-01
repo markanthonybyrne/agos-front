@@ -102,6 +102,7 @@ export interface Empire {
   id: number
   name: string
   score: number
+  rank?: number
   planets_owned: number
   alliance_id?: number
   homeworld_planet_id: number
