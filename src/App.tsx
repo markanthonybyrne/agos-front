@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthGuard } from '@/components/common/AuthGuard'
 import { TickCountdownTimer } from '@/components/common/TickCountdownTimer'
+import { AuthTransitionOverlay } from '@/components/common/AuthTransitionOverlay'
 import { useAchievementNotifications } from '@/hooks/useAchievementNotifications'
 import { useGlobalTickData } from '@/hooks/useGlobalTickData'
 import { useTutorialDetection } from '@/hooks/useTutorialDetection'
@@ -110,6 +111,7 @@ function App() {
     <ErrorBoundary>
       <AppContent />
       <TickCountdownTimer />
+      <AuthTransitionOverlay />
       <Toaster 
         position="top-right" 
         theme="dark"

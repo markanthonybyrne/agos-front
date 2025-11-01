@@ -49,6 +49,8 @@ const authSlice = createSlice({
       localStorage.setItem('token', action.payload.token)
       localStorage.setItem('user', JSON.stringify(action.payload.user))
       localStorage.setItem('empire', JSON.stringify(action.payload.empire))
+      // Set flag to indicate fresh login
+      sessionStorage.setItem('auth_transition', 'true')
     },
     logout: (state) => {
       state.user = null

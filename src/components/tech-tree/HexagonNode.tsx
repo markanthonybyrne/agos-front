@@ -181,7 +181,10 @@ export function HexagonNode({
       {/* Debug: Log when COMPLETED status is received */}
       {status === HexagonStatus.COMPLETED && (
         <div style={{ display: 'none' }}>
-          {console.log('🔵 HexagonNode rendering COMPLETED status for:', name || 'unknown', 'Icon:', Icon?.name)}
+          {(() => {
+            console.log('🔵 HexagonNode rendering COMPLETED status for:', name || 'unknown', 'Icon:', Icon?.name)
+            return null
+          })()}
         </div>
       )}
 

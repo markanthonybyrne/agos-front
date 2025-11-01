@@ -12,6 +12,7 @@ import {
   Scan,
   Sword,
   Trophy,
+  Coins,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -86,15 +87,23 @@ const HUD_BUTTONS: HUDButton[] = [
     panelSize: PanelSize.XLARGE,
     color: 'text-red-400',
   },
-  {
-    id: 'politics',
-    icon: Shield,
-    label: 'Politics',
-    panelType: PanelType.POLITICS,
-    panelSize: PanelSize.XLARGE,
-    color: 'text-purple-400',
-  },
-]
+        {
+          id: 'politics',
+          icon: Shield,
+          label: 'Politics',
+          panelType: PanelType.POLITICS,
+          panelSize: PanelSize.XLARGE,
+          color: 'text-purple-400',
+        },
+        {
+          id: 'market',
+          icon: Coins,
+          label: 'Market',
+          panelType: PanelType.MARKET,
+          panelSize: PanelSize.XLARGE,
+          color: 'text-yellow-400',
+        },
+      ]
 
 interface PersistentHUDProps {
   className?: string

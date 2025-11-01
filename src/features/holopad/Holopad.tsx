@@ -14,7 +14,6 @@ import { toast } from 'sonner'
 import GridLayout from 'react-grid-layout'
 import { useNavigate } from 'react-router-dom'
 import { FleetDetails } from '@/types/api.types'
-import { EmpireWidget } from '@/components/holopad/EmpireWidget'
 import { FleetOperationsWidget } from '@/components/holopad/FleetOperationsWidget'
 import { ResourcesWidget } from '@/components/holopad/ResourcesWidget'
 import { PlanetsWidget } from '@/components/holopad/PlanetsWidget'
@@ -24,6 +23,7 @@ import { AnnouncementsWidget } from '@/components/holopad/AnnouncementsWidget'
 import { QuantumCreditsWidget } from '@/components/holopad/QuantumCreditsWidget'
 import { BoostersWidget } from '@/components/holopad/BoostersWidget'
 import { AchievementsWidget } from '@/components/holopad/AchievementsWidget'
+import { MarketTrendsWidget } from '@/components/holopad/MarketTrendsWidget'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -161,15 +161,15 @@ export function Holopad() {
       }
     }
     return [
-      { i: 'empire', x: 0, y: 0, w: 12, h: 3 },
-      { i: 'operations', x: 0, y: 3, w: 6, h: 4 },
-      { i: 'resources', x: 6, y: 3, w: 6, h: 4 },
-      { i: 'quantum_credits', x: 0, y: 7, w: 4, h: 4 },
-      { i: 'boosters', x: 4, y: 7, w: 4, h: 4 },
-      { i: 'achievements', x: 8, y: 7, w: 4, h: 4 },
-      { i: 'planets', x: 0, y: 11, w: 6, h: 5 },
-      { i: 'status', x: 6, y: 11, w: 6, h: 5 },
-      { i: 'announcements', x: 0, y: 16, w: 6, h: 6 },
+      { i: 'operations', x: 0, y: 0, w: 6, h: 4 },
+      { i: 'resources', x: 6, y: 0, w: 6, h: 4 },
+      { i: 'market_trends', x: 0, y: 4, w: 6, h: 4 },
+      { i: 'quantum_credits', x: 6, y: 4, w: 3, h: 4 },
+      { i: 'boosters', x: 9, y: 4, w: 3, h: 4 },
+      { i: 'achievements', x: 0, y: 8, w: 4, h: 4 },
+      { i: 'planets', x: 4, y: 8, w: 6, h: 5 },
+      { i: 'status', x: 10, y: 8, w: 2, h: 5 },
+      { i: 'announcements', x: 0, y: 13, w: 6, h: 6 },
     ]
   })
 
@@ -256,16 +256,6 @@ export function Holopad() {
         isResizable={true}
         margin={[16, 16]}
       >
-        {/* Empire Header Widget */}
-        <div key="empire">
-          <EmpireWidget
-            empireName={empireData?.name || 'Empire'}
-            user={data?.user}
-            currentTick={currentTick || 0}
-            nextTickETA={nextTickETA || ''}
-          />
-          </div>
-
         {/* Fleet Operations Widget */}
         <div key="operations">
           <FleetOperationsWidget
@@ -346,6 +336,15 @@ export function Holopad() {
             onMinimize={() => handleMinimizeWidget('announcements')}
             onClose={() => handleCloseWidget('announcements')}
             isMinimized={minimizedWidgets.has('announcements')}
+          />
+        </div>
+
+        {/* Market Trends Widget */}
+        <div key="market_trends">
+          <MarketTrendsWidget
+            onMinimize={() => handleMinimizeWidget('market_trends')}
+            onClose={() => handleCloseWidget('market_trends')}
+            isMinimized={minimizedWidgets.has('market_trends')}
           />
         </div>
       </GridLayout>

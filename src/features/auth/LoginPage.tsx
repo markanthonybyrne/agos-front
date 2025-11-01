@@ -97,10 +97,11 @@ export function LoginPage() {
         dispatch(setCredentials(credentials))
         toast.success('Welcome back, Commander!')
         
+        // Small delay to allow blur overlay to appear
         setTimeout(() => {
           const from = (location.state as any)?.from?.pathname || '/holopad'
           navigate(from, { replace: true })
-        }, 200)
+        }, 100)
       } else {
         toast.error('Login failed - invalid response')
       }
@@ -123,7 +124,10 @@ export function LoginPage() {
           token: result.token
         }))
         toast.success(`Welcome, ${result.empire.name}!`)
-        navigate('/holopad', { replace: true })
+        // Small delay to allow blur overlay to appear
+        setTimeout(() => {
+          navigate('/holopad', { replace: true })
+        }, 100)
       } else {
         toast.error('Registration failed - invalid response')
       }

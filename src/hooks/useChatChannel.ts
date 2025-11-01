@@ -131,7 +131,12 @@ export function useChatChannel({
           channelRef.current.stopListening('.chat.message.deleted')
           channelRef.current.stopListening('.chat.user.typing')
           channelRef.current.stopListening('.chat.presence.changed')
-          echo.leave(channelName)
+          // Unsubscribe from channel via Pusher (Echo doesn't have leave method)
+          const echoWithConnector = echo as any
+          if (echoWithConnector?.connector?.pusher) {
+            const pusher = echoWithConnector.connector.pusher
+            pusher.unsubscribe(channelName)
+          }
           console.log('[Chat] Unsubscribed from channel:', channelName)
         } catch (error) {
           console.error('[Chat] Error unsubscribing from channel:', error)

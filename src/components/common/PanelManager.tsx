@@ -37,6 +37,7 @@ import { SignalsPage } from '@/features/signals/SignalsPage'
 import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
 import { ComposeMailPanel } from '@/components/messaging/ComposeMailPanel'
 import { ChatPanel } from '@/features/chat/ChatPanel'
+import { MarketPanel } from '@/features/market/MarketPanel'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -136,6 +137,9 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     case PanelType.CHAT:
       return <ChatPanel />
     
+    case PanelType.MARKET:
+      return <MarketPanel />
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -192,6 +196,8 @@ export function PanelManager() {
       [PanelType.SIGNALS]: 'Tachyon Signals',
       [PanelType.COMBAT_LOGS]: 'Battle Reports',
       [PanelType.COMPOSE_MAIL]: 'Compose Message',
+      [PanelType.CHAT]: 'Chat',
+      [PanelType.MARKET]: 'Market',
     }
     
     return (titles[panel.type] as string) || 'Panel'

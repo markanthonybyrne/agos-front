@@ -32,13 +32,13 @@ export function ChatPanel() {
   
   // Set default channel if none selected
   useEffect(() => {
-    if (!activeChannelSlug && channelsData?.channels?.length > 0) {
+    if (!activeChannelSlug && channelsData?.channels && channelsData.channels.length > 0) {
       dispatch(setActiveChannel(channelsData.channels[0].slug))
     }
   }, [activeChannelSlug, channelsData, dispatch])
 
   // Determine effective active channel (use first channel if none selected but channels exist)
-  const effectiveChannelSlug = activeChannelSlug || (channelsData?.channels?.length > 0 ? channelsData.channels[0].slug : null)
+  const effectiveChannelSlug = activeChannelSlug || (channelsData?.channels && channelsData.channels.length > 0 ? channelsData.channels[0].slug : null)
 
   const currentChannel = channelsData?.channels?.find(c => c.slug === effectiveChannelSlug)
   const typingUsers = useAppSelector((state) => 
@@ -202,9 +202,12 @@ export function ChatPanel() {
     }
   }
 
-  const handleStartEdit = (message: ChatMessageType) => {
-    setEditingMessageId(message.id)
-    setEditText(message.message)
+  const handleStartEdit = (messageId: number) => {
+    const message = messages.find(m => m.id === messageId)
+    if (message) {
+      setEditingMessageId(message.id)
+      setEditText(message.message)
+    }
   }
 
   const handleChannelChange = (slug: string) => {
