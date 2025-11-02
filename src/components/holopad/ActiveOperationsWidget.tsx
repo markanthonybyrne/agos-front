@@ -30,7 +30,21 @@ export function ActiveOperationsWidget({ fleetsInTransit, activeResearch }: Acti
                   <p className="text-sm text-muted-foreground">Check fleet status</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/fleets')}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const { openPanel } = require('@/components/common/PanelManager').usePanel()
+                  const { PanelType, PanelSize } = require('@/app/slices/panelSlice')
+                  // Note: This requires a refactor to use the hook properly
+                  // For now, keeping navigation
+                  navigate('/fleets')
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                }}
+              >
                 View <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
@@ -44,7 +58,17 @@ export function ActiveOperationsWidget({ fleetsInTransit, activeResearch }: Acti
                   <p className="text-sm text-muted-foreground">Research in progress</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/planets')}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigate('/planets')
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                }}
+              >
                 View <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </div>

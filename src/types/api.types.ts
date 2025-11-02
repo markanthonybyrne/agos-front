@@ -11,9 +11,11 @@ export interface ApiResponse<T> {
 
 // Premium Currency Types
 export interface QuantumCreditsTransaction {
+  id?: number
   amount: number
-  type: 'earned' | 'purchased' | 'spent'
+  type: 'earned' | 'purchased' | 'spent' | 'granted' | 'adjusted'
   reason: string
+  metadata?: Record<string, any>
   created_at: string
 }
 
@@ -907,7 +909,7 @@ export interface MoveFleetRequest {
 }
 
 export interface TravelTimeRequest {
-  ships: Record<string, number> // Associative array: { "fighter": 10, "cruiser": 5 }
+  ships: Array<{ definition_id: number; quantity: number }>
   origin_quadrant: number
   origin_sector: number
   origin_galaxy: number
@@ -1196,6 +1198,10 @@ export interface AdminUser {
   created_at: string
   empire: Empire | null
   roles: Role[]
+  quantum_credits?: number
+  quantum_credits_purchased_total?: number
+  daily_login_streak?: number
+  last_daily_login_claim?: string | null
 }
 
 export interface AdminUserListResponse {
@@ -1244,6 +1250,56 @@ export interface UserActivityLogResponse {
     total: number
     pages: number
   }
+}
+
+// Admin Quantum Credits Types
+export interface GrantQuantumCreditsRequest {
+  amount: number
+  reason: string
+  metadata?: Record<string, any>
+}
+
+export interface AdjustQuantumCreditsRequest {
+  amount: number // Positive to add, negative to subtract
+  reason?: string
+  metadata?: Record<string, any>
+}
+
+export interface QuantumCreditsTransactionsResponse {
+  data: QuantumCreditsTransaction[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+  current_balance: number
+}
+
+// Admin Booster Types
+export interface AdminBooster {
+  id: number
+  type: 'production' | 'construction' | 'signal'
+  multiplier: string
+  started_at: string
+  expires_at: string
+  time_remaining?: number // seconds remaining
+  empire: {
+    id: number
+    name: string
+    user?: {
+      id: number
+      username: string
+    }
+  }
+}
+
+export interface AdminBoostersResponse {
+  boosters: AdminBooster[]
+}
+
+export interface DeleteBoosterRequest {
+  reason?: string
 }
 
 // Admin Empire Types

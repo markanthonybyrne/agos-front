@@ -164,25 +164,25 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
   }
 
   return (
-    <div className="fixed top-0 left-16 right-0 z-30">
-      <div className="w-full px-4 py-2 flex items-center justify-between">
+    <div className="fixed top-0 left-0 sm:left-16 right-0 z-30">
+      <div className="w-full px-2 sm:px-4 py-2 flex items-center justify-between gap-2">
         {/* Logo */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 hidden sm:block">
           <img 
             src={BRAND.logo} 
             alt="War For Galaxy" 
-            className="h-12 w-auto object-contain"
+            className="h-10 sm:h-12 w-auto object-contain"
           />
         </div>
 
         {/* HUD Buttons - Tab style with glass background */}
         <div 
-          className="panel-glass surface-gradient card-glow vignette border border-border/50"
+          className="panel-glass surface-gradient card-glow vignette border border-border/50 flex-1 min-w-0"
           style={{
             clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
           }}
         >
-          <div className="flex items-end gap-0">
+          <div className="flex items-end gap-0 overflow-x-auto scrollbar-hide">
             {HUD_BUTTONS.map((button) => {
               const Icon = button.icon
               const isActive = button.route ? location.pathname === button.route : false
@@ -192,7 +192,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                   data-tutorial={`${button.id}-button`}
                   onClick={() => handleButtonClick(button)}
                   className={cn(
-                    "relative flex items-center gap-2 px-4 py-2 transition-all duration-200",
+                    "relative flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 transition-all duration-200 flex-shrink-0",
                     "uppercase text-xs font-semibold tracking-wide",
                     isActive
                       ? "bg-background text-foreground"
@@ -202,8 +202,8 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                     clipPath: 'polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
                   } : {}}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{button.label}</span>
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">{button.label}</span>
                 </button>
               )
             })}
@@ -211,7 +211,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
         </div>
 
         {/* Right side actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {/* User Score and Rank */}
           {displayEmpire && (
             <div 
@@ -242,14 +242,14 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
             variant="ghost"
             size="sm"
             onClick={() => openPanel(PanelType.QUANTUM_CREDITS, PanelSize.MEDIUM)}
-            className="relative flex items-center gap-2"
+            className="relative flex items-center gap-1 sm:gap-2"
           >
             <img
               src={getQuantumCreditsImage()}
               alt="Quantum Credits"
-              className="w-4 h-4"
+              className="w-4 h-4 flex-shrink-0"
             />
-            <span className="font-mono text-cyan-400">
+            <span className="hidden md:inline font-mono text-cyan-400">
               {qcData?.balance ?? 0}
             </span>
           </Button>
@@ -259,7 +259,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
             variant="ghost"
             size="sm"
             onClick={() => openPanel(PanelType.NOTIFICATIONS, PanelSize.MEDIUM)}
-            className="relative"
+            className="relative flex-shrink-0"
           >
             <Bell className="w-4 h-4" />
             {notificationsCount > 0 && (
@@ -275,11 +275,11 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
           {/* User Avatar Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 p-0">
+              <Button variant="ghost" className="relative h-8 w-8 sm:h-10 sm:w-10 p-0 flex-shrink-0">
                 <Avatar
                   src={getUserAvatarUrl(data?.user)}
                   name={data?.user?.username || 'User'}
-                  size="md"
+                  size="sm"
                   className="border-2 border-cyan/50"
                 />
               </Button>
@@ -303,7 +303,7 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
               variant="ghost"
               size="sm"
               onClick={() => closeAllPanels()}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground flex-shrink-0"
             >
               <X className="w-4 h-4" />
             </Button>

@@ -61,8 +61,25 @@ function getWebSocketConfig() {
 }
 
 export function initializeEcho(token: string): Echo {
-  if (echo) {
+  // If Echo already exists, reuse it
+  // Laravel Echo handles authentication per-channel, so each private channel subscription
+  // will make its own auth request with the current token from the auth config.
+  // We only reinitialize if there's no token (logout scenario).
+  if (echo && token) {
+    // Update the auth config in case token changed, but don't disconnect
+    // Laravel Echo will use the updated auth headers for new channel subscriptions
+    const echoWithConnector = echo as any
+    if (echoWithConnector.options?.auth?.headers) {
+      echoWithConnector.options.auth.headers.Authorization = `Bearer ${token}`
+    }
     return echo
+  }
+  
+  // If token is missing or Echo doesn't exist, disconnect and clean up
+  if (echo && !token) {
+    console.log('[WebSocket] No token provided, disconnecting Echo...')
+    echo.disconnect()
+    echo = null
   }
 
   // Laravel Echo with Reverb still requires pusher-js library and window.Pusher
@@ -131,6 +148,20 @@ export function initializeEcho(token: string): Echo {
     pusher.connection.bind('failed', () => {
       console.error('[WebSocket] Connection failed - check WebSocket server and auth endpoint')
       console.error('[WebSocket] URL:', `${wsConfig.forceTLS ? 'wss' : 'ws'}://${wsConfig.host}:${finalPort}`)
+    })
+    
+    // Log subscription authorization attempts and errors
+    pusher.bind('pusher:subscription_error', (data: any) => {
+      console.error('[WebSocket] ❌ Channel subscription authorization error:', data)
+      console.error('[WebSocket] Channel:', data.channel)
+      console.error('[WebSocket] Status:', data.status)
+      console.error('[WebSocket] Auth endpoint:', authEndpoint)
+    })
+    
+    pusher.bind('pusher:subscription_succeeded', (data: any) => {
+      if (data.channel && data.channel.includes('App.Models.User')) {
+        console.log('[WebSocket] ✅ Private user channel authorized:', data.channel)
+      }
     })
   } else {
     console.error('[WebSocket] Reverb connector not available!')

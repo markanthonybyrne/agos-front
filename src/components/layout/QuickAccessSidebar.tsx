@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListChecks, MessageSquare, Mail, Trophy } from 'lucide-react'
+import { LayoutDashboard, ListChecks, MessageSquare, Mail, Trophy, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
@@ -153,6 +153,30 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             <div className="bg-background/95 backdrop-blur-sm border border-amber-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
               Rankings
+            </div>
+          </div>
+        </div>
+
+        {/* Achievements Button */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openPanel(PanelType.ACHIEVEMENTS, PanelSize.MEDIUM)}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-purple-500/20 hover:scale-110",
+              "hover:shadow-lg hover:shadow-purple-500/30",
+              "bg-transparent border border-purple-500/30 hover:border-purple-500/50"
+            )}
+            aria-label="Achievements"
+          >
+            <Award className="w-5 h-5 text-purple-400" />
+          </Button>
+          {/* Tooltip */}
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-purple-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Achievements
             </div>
           </div>
         </div>

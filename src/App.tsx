@@ -37,6 +37,9 @@ import { AnnouncementsPage } from '@/features/admin/routes/AnnouncementsPage'
 import { TicksPage } from '@/features/admin/routes/TicksPage'
 import { ResourcesPage } from '@/features/admin/routes/ResourcesPage'
 import { CombatsPage } from '@/features/admin/routes/CombatsPage'
+import { QuantumCreditsPage } from '@/features/admin/routes/QuantumCreditsPage'
+import { BoostersPage } from '@/features/admin/routes/BoostersPage'
+import { AdminPanelWrapper } from '@/features/admin/components/AdminPanelWrapper'
 
 function AppContent() {
   // Initialize achievement notifications
@@ -79,20 +82,24 @@ function AppContent() {
                     path="/admin/*"
                     element={
                       <AdminGuard>
-                        <Routes>
-                          <Route path="/" element={<AdminPage />} />
-                          <Route path="/users" element={<UsersPage />} />
-                          <Route path="/empires" element={<EmpiresPage />} />
-                          <Route path="/planets" element={<PlanetsPage />} />
-                          <Route path="/fleets" element={<AdminFleetsPage />} />
-                          <Route path="/alliances" element={<AdminAlliancesPage />} />
-                          <Route path="/mail" element={<MailPage />} />
-                          <Route path="/chat" element={<ChatPage />} />
-                          <Route path="/announcements" element={<AnnouncementsPage />} />
-                          <Route path="/ticks" element={<TicksPage />} />
-                          <Route path="/resources" element={<ResourcesPage />} />
-                          <Route path="/combats" element={<CombatsPage />} />
-                        </Routes>
+                        <AdminPanelWrapper>
+                          <Routes>
+                            <Route path="/" element={<AdminPage />} />
+                            <Route path="/users" element={<UsersPage />} />
+                            <Route path="/empires" element={<EmpiresPage />} />
+                            <Route path="/planets" element={<PlanetsPage />} />
+                            <Route path="/fleets" element={<AdminFleetsPage />} />
+                            <Route path="/alliances" element={<AdminAlliancesPage />} />
+                            <Route path="/mail" element={<MailPage />} />
+                            <Route path="/chat" element={<ChatPage />} />
+                            <Route path="/announcements" element={<AnnouncementsPage />} />
+                            <Route path="/ticks" element={<TicksPage />} />
+                            <Route path="/resources" element={<ResourcesPage />} />
+                            <Route path="/combats" element={<CombatsPage />} />
+                            <Route path="/quantum-credits" element={<QuantumCreditsPage />} />
+                            <Route path="/boosters" element={<BoostersPage />} />
+                          </Routes>
+                        </AdminPanelWrapper>
                       </AdminGuard>
                     }
                   />

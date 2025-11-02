@@ -18,9 +18,40 @@ interface NotificationState {
   isNotificationCenterOpen: boolean
 }
 
+// Load notifications from localStorage
+const loadNotificationsFromStorage = (): Notification[] => {
+  try {
+    const stored = localStorage.getItem('notifications')
+    if (!stored) return []
+    const parsed = JSON.parse(stored)
+    // Convert timestamp strings back to Date objects
+    return parsed.map((n: any) => ({
+      ...n,
+      timestamp: new Date(n.timestamp),
+    }))
+  } catch (error) {
+    console.error('Error loading notifications from localStorage:', error)
+    return []
+  }
+}
+
+// Save notifications to localStorage
+const saveNotificationsToStorage = (notifications: Notification[]) => {
+  try {
+    // Keep only last 100 notifications for storage
+    const toStore = notifications.slice(0, 100)
+    localStorage.setItem('notifications', JSON.stringify(toStore))
+  } catch (error) {
+    console.error('Error saving notifications to localStorage:', error)
+  }
+}
+
+const loadedNotifications = loadNotificationsFromStorage()
+const initialUnreadCount = loadedNotifications.filter(n => !n.isRead).length
+
 const initialState: NotificationState = {
-  notifications: [],
-  unreadCount: 0,
+  notifications: loadedNotifications,
+  unreadCount: initialUnreadCount,
   isNotificationCenterOpen: false,
 }
 
@@ -42,12 +73,17 @@ const notificationSlice = createSlice({
       if (state.notifications.length > 100) {
         state.notifications = state.notifications.slice(0, 100)
       }
+      
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     markAsRead: (state, action: PayloadAction<string>) => {
       const notification = state.notifications.find(n => n.id === action.payload)
       if (notification && !notification.isRead) {
         notification.isRead = true
         state.unreadCount -= 1
+        // Persist to localStorage
+        saveNotificationsToStorage(state.notifications)
       }
     },
     markAllAsRead: (state) => {
@@ -57,6 +93,8 @@ const notificationSlice = createSlice({
         }
       })
       state.unreadCount = 0
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     deleteNotification: (state, action: PayloadAction<string>) => {
       const notification = state.notifications.find(n => n.id === action.payload)
@@ -65,11 +103,15 @@ const notificationSlice = createSlice({
           state.unreadCount -= 1
         }
         state.notifications = state.notifications.filter(n => n.id !== action.payload)
+        // Persist to localStorage
+        saveNotificationsToStorage(state.notifications)
       }
     },
     clearAllNotifications: (state) => {
       state.notifications = []
       state.unreadCount = 0
+      // Clear from localStorage
+      localStorage.removeItem('notifications')
     },
     setNotificationCenterOpen: (state, action: PayloadAction<boolean>) => {
       state.isNotificationCenterOpen = action.payload
@@ -89,6 +131,8 @@ const notificationSlice = createSlice({
         data: { planetId, itemType, itemName }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleFleetArrived: (state, action: PayloadAction<{ fleetId: number; destination: string; fleetName: string }>) => {
       const { fleetId, destination, fleetName } = action.payload
@@ -104,6 +148,8 @@ const notificationSlice = createSlice({
         data: { fleetId, destination, fleetName }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleFleetAttacked: (state, action: PayloadAction<{ fleetId: number; attacker: string; location: string }>) => {
       const { fleetId, attacker, location } = action.payload
@@ -119,6 +165,8 @@ const notificationSlice = createSlice({
         data: { fleetId, attacker, location }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleEmpireAttacked: (state, action: PayloadAction<{ planetId: number; attacker: string; location: string }>) => {
       const { planetId, attacker, location } = action.payload
@@ -134,6 +182,8 @@ const notificationSlice = createSlice({
         data: { planetId, attacker, location }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleResearchCompleted: (state, action: PayloadAction<{ researchName: string; planetId: number }>) => {
       const { researchName, planetId } = action.payload
@@ -149,6 +199,8 @@ const notificationSlice = createSlice({
         data: { researchName, planetId }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleAllianceMessage: (state, action: PayloadAction<{ senderName: string; message: string; allianceId: number }>) => {
       const { senderName, message, allianceId } = action.payload
@@ -164,6 +216,8 @@ const notificationSlice = createSlice({
         data: { senderName, message, allianceId }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleTickProcessed: (state, action: PayloadAction<{ tickNumber: number; nextTickEta: string }>) => {
       const { tickNumber, nextTickEta } = action.payload
@@ -178,6 +232,8 @@ const notificationSlice = createSlice({
         data: { tickNumber, nextTickEta }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handleFleetLaunched: (state, action: PayloadAction<{ 
       isDefender: boolean
@@ -215,6 +271,8 @@ const notificationSlice = createSlice({
         })
       }
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handlePlanetCaptured: (state, action: PayloadAction<{ 
       isPreviousOwner: boolean
@@ -254,6 +312,8 @@ const notificationSlice = createSlice({
         })
       }
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
     handlePlanetColonized: (state, action: PayloadAction<{ 
       planet: { id: number; name: string; coordinate: any }
@@ -272,6 +332,8 @@ const notificationSlice = createSlice({
         data: { planet, empire }
       })
       state.unreadCount += 1
+      // Persist to localStorage
+      saveNotificationsToStorage(state.notifications)
     },
   },
 })

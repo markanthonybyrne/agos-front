@@ -12,7 +12,7 @@ export interface Column<T> {
   sortable?: boolean
 }
 
-interface DataTableProps<T> {
+interface DataTableProps<T extends { id?: number | string }> {
   data: T[]
   columns: Column<T>[]
   loading?: boolean
@@ -29,7 +29,7 @@ interface DataTableProps<T> {
   rowActions?: (row: T) => React.ReactNode
 }
 
-export function DataTable<T extends { id: number }>({
+export function DataTable<T extends { id?: number | string }>({
   data,
   columns,
   loading = false,
@@ -84,20 +84,20 @@ export function DataTable<T extends { id: number }>({
       )}
 
       {/* Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="panel-glass border-border/50 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-muted/50">
+            <thead className="bg-primary/5 border-b border-border/50">
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className="px-4 py-3 text-left text-sm font-semibold text-foreground"
+                    className="px-4 py-3 text-left text-sm font-semibold text-foreground glow-cyan"
                   >
                     {column.header}
                   </th>
                 ))}
-                {rowActions && <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Actions</th>}
+                {rowActions && <th className="px-4 py-3 text-right text-sm font-semibold text-foreground glow-cyan">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -111,10 +111,13 @@ export function DataTable<T extends { id: number }>({
                   </td>
                 </tr>
               ) : (
-                data.map((row) => (
-                  <tr key={row.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                data.map((row, index) => (
+                  <tr 
+                    key={row.id ?? `row-${index}`} 
+                    className="border-b border-border/30 hover:bg-primary/10 hover:border-cyan-400/20 transition-all group"
+                  >
                     {columns.map((column) => (
-                      <td key={column.key} className="px-4 py-3 text-sm">
+                      <td key={column.key} className="px-4 py-3 text-sm text-foreground">
                         {column.accessor(row)}
                       </td>
                     ))}
@@ -146,6 +149,7 @@ export function DataTable<T extends { id: number }>({
               size="sm"
               onClick={() => onPageChange(1)}
               disabled={meta.page === 1}
+              className="hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:text-cyan-400"
             >
               <ChevronsLeft className="w-4 h-4" />
             </Button>
@@ -154,10 +158,11 @@ export function DataTable<T extends { id: number }>({
               size="sm"
               onClick={() => onPageChange(meta.page - 1)}
               disabled={meta.page === 1}
+              className="hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:text-cyan-400"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <span className="text-sm px-4">
+            <span className="text-sm px-4 text-foreground">
               Page {meta.page} of {meta.pages}
             </span>
             <Button
@@ -165,6 +170,7 @@ export function DataTable<T extends { id: number }>({
               size="sm"
               onClick={() => onPageChange(meta.page + 1)}
               disabled={meta.page >= meta.pages}
+              className="hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:text-cyan-400"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -173,6 +179,7 @@ export function DataTable<T extends { id: number }>({
               size="sm"
               onClick={() => onPageChange(meta.pages)}
               disabled={meta.page >= meta.pages}
+              className="hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:text-cyan-400"
             >
               <ChevronsRight className="w-4 h-4" />
             </Button>

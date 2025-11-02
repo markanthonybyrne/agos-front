@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGetFacilityDefinitionsQuery, useBuildFacilityMutation } from '@/api/endpoints/facilitiesApi'
-import { useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
+import { useGetShipDefinitionsQuery, useBuildShipsMutation } from '@/api/endpoints/shipsApi'
 import { useGetDefenceDefinitionsQuery, useBuildDefencesMutation } from '@/api/endpoints/defencesApi'
 import { useGetResearchDefinitionsQuery, useStartResearchMutation } from '@/api/endpoints/researchApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -51,6 +51,7 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
   const [buildFacility, { isLoading: isBuilding }] = useBuildFacilityMutation()
   const [buildDefense, { isLoading: isBuildingDefense }] = useBuildDefencesMutation()
   const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation()
+  const [buildShips, { isLoading: isBuildingShips }] = useBuildShipsMutation()
 
   // Get the item definition
   const itemDef =
@@ -117,7 +118,10 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
         }).unwrap()
         toast.success('Facility queued for construction!')
         // Auto-close panel after successful queue
-        closePanelsByType(PanelType.BUILD_DETAIL)
+        // Small delay to ensure toast appears before panel closes
+        setTimeout(() => {
+          closePanelsByType(PanelType.BUILD_DETAIL)
+        }, 100)
       } else if (type === 'defense') {
         await buildDefense({
           planetId,
@@ -128,7 +132,10 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
         }).unwrap()
         toast.success('Defense built successfully!')
         // Auto-close panel after successful build
-        closePanelsByType(PanelType.BUILD_DETAIL)
+        // Small delay to ensure toast appears before panel closes
+        setTimeout(() => {
+          closePanelsByType(PanelType.BUILD_DETAIL)
+        }, 100)
       } else if (type === 'research') {
         await startResearch({
           planet_id: planetId,
@@ -136,16 +143,32 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
         }).unwrap()
         toast.success('Research queued successfully!')
         // Auto-close panel after successful queue
-        closePanelsByType(PanelType.BUILD_DETAIL)
+        // Small delay to ensure toast appears before panel closes
+        setTimeout(() => {
+          closePanelsByType(PanelType.BUILD_DETAIL)
+        }, 100)
+      } else if (type === 'ship') {
+        await buildShips({
+          planetId,
+          data: {
+            ship_slug: slug,
+            quantity,
+          },
+        }).unwrap()
+        toast.success(`Ship queued for construction!`)
+        // Auto-close panel after successful queue
+        // Small delay to ensure toast appears before panel closes
+        setTimeout(() => {
+          closePanelsByType(PanelType.BUILD_DETAIL)
+        }, 100)
       }
-      // Ships are built from fleet builder, not here
     } catch (error: any) {
       toast.error(error?.data?.message || `Failed to build ${type}`)
     }
   }
 
   const isLoading =
-    isBuilding || isBuildingDefense || isStartingResearch
+    isBuilding || isBuildingDefense || isStartingResearch || isBuildingShips
 
   return (
     <div className="space-y-6">

@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCoordinate } from '@/lib/coordinates'
 import { FleetDetails } from '@/types/api.types'
-import { useNavigate } from 'react-router-dom'
 import { WidgetWindow } from './WidgetWindow'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 
 interface FleetOperationsWidgetProps {
   fleetsInTransit: FleetDetails[]
@@ -21,7 +22,11 @@ export function FleetOperationsWidget({
   onClose,
   isMinimized 
 }: FleetOperationsWidgetProps) {
-  const navigate = useNavigate()
+  const { openPanel } = usePanel()
+  
+  const handleViewAll = () => {
+    openPanel(PanelType.FLEETS, PanelSize.LARGE)
+  }
 
   return (
     <WidgetWindow
@@ -67,14 +72,36 @@ export function FleetOperationsWidget({
               </div>
             ))}
             {fleetsInTransit.length > 3 && (
-              <Button variant="ghost" size="sm" className="w-full" onClick={() => navigate('/fleets')}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full" 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleViewAll()
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                }}
+              >
                 View {fleetsInTransit.length - 3} more... <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             )}
           </div>
         )}
         <div className="pt-4">
-          <Button variant="outline" size="sm" onClick={() => navigate('/fleets')} className="w-full">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={(e) => {
+              e.stopPropagation()
+              handleViewAll()
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+            }}
+            className="w-full"
+          >
             View All <ArrowRight className="w-4 h-4 ml-1" />
           </Button>
         </div>

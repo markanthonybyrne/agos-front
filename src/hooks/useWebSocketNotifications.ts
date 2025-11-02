@@ -91,9 +91,12 @@ export function useWebSocketNotifications({ enabled = true }: UseWebSocketNotifi
       }))
     })
 
-    // Listen for tick processed events
+    // NOTE: Tick processed events are now handled via private user channel (App.Models.User.{id})
+    // in useWebSocket hook. This listener on empire channel is kept for backward compatibility
+    // but may not receive tick events if backend only broadcasts to user channels.
+    // Tick events should be handled in useWebSocket.ts instead.
     privateChannel.listen('.tick.processed', (data: any) => {
-      console.log('Tick processed event:', data)
+      console.log('[useWebSocketNotifications] Tick processed event (legacy - may not receive):', data)
       dispatch(handleTickProcessed({
         tickNumber: data.tick_number,
         nextTickEta: data.next_tick_eta

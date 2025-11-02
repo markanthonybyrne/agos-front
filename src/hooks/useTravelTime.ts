@@ -23,49 +23,44 @@ export function useTravelTime() {
       throw new Error('Ship definitions are required to calculate travel time')
     }
 
-    // Convert ships from array format [{ definition_id, quantity }] to slug-based object { "fighter": 10, "cruiser": 5 }
-    const shipsBySlug: Record<string, number> = {}
-    
-    ships.forEach(ship => {
+    // API expects ships as array of { definition_id, quantity }
+    const shipsArray = ships.map(ship => {
       const definitionId = Number(ship.definition_id)
       const quantity = Number(ship.quantity)
       
-      if (!definitionId || !quantity || isNaN(definitionId) || isNaN(quantity)) {
+      if (!definitionId || !quantity || isNaN(definitionId) || isNaN(quantity) || quantity < 1) {
         throw new Error(`Invalid ship format: definition_id=${ship.definition_id}, quantity=${ship.quantity}`)
       }
       
-      // Find ship definition by ID to get the slug
-      const shipDef = shipDefinitions.find(def => def.id === definitionId)
-      if (!shipDef || !shipDef.slug) {
-        throw new Error(`Ship definition not found for definition_id=${definitionId}`)
-      }
-      
-      // Aggregate quantities if same ship appears multiple times
-      if (shipsBySlug[shipDef.slug]) {
-        shipsBySlug[shipDef.slug] += quantity
-      } else {
-        shipsBySlug[shipDef.slug] = quantity
+      return {
+        definition_id: definitionId,
+        quantity: quantity
       }
     })
 
-    if (Object.keys(shipsBySlug).length === 0) {
+    if (shipsArray.length === 0) {
       throw new Error('No valid ships found')
     }
 
-    const request: TravelTimeRequest = {
-      ships: shipsBySlug,
-      origin_quadrant: originCoord.quadrant,
-      origin_sector: originCoord.sector,
-      origin_galaxy: originCoord.galaxy,
-      origin_planet: originCoord.planet,
-      destination_quadrant: destCoord.quadrant,
-      destination_sector: destCoord.sector,
-      destination_galaxy: destCoord.galaxy,
-      destination_planet: destCoord.planet,
+    // Validate planet numbers (API expects 1-10)
+    if (originCoord.planet < 1 || originCoord.planet > 10) {
+      throw new Error(`Invalid origin planet number: ${originCoord.planet}. Must be between 1-10.`)
+    }
+    if (destCoord.planet < 1 || destCoord.planet > 10) {
+      throw new Error(`Invalid destination planet number: ${destCoord.planet}. Must be between 1-10.`)
     }
 
-    console.log('Travel time request:', JSON.stringify(request, null, 2))
-    console.log('Ships object:', JSON.stringify(request.ships, null, 2))
+    const request: TravelTimeRequest = {
+      ships: shipsArray,
+      origin_quadrant: Number(originCoord.quadrant),
+      origin_sector: Number(originCoord.sector),
+      origin_galaxy: Number(originCoord.galaxy),
+      origin_planet: Number(originCoord.planet),
+      destination_quadrant: Number(destCoord.quadrant),
+      destination_sector: Number(destCoord.sector),
+      destination_galaxy: Number(destCoord.galaxy),
+      destination_planet: Number(destCoord.planet),
+    }
 
     try {
       const result = await getTravelTime(request).unwrap()

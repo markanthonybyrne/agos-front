@@ -1,30 +1,21 @@
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { useGetConstructionQueueQuery } from '@/api/endpoints/planetsApi'
 import { useCancelFacilityConstructionMutation } from '@/api/endpoints/facilitiesApi'
 import { useCancelDefenceConstructionMutation } from '@/api/endpoints/defencesApi'
 import { useCancelShipConstructionMutation } from '@/api/endpoints/shipsApi'
 import { useCancelResearchMutation } from '@/api/endpoints/researchApi'
 import { ConstructionQueueItem } from '@/types/api.types'
-import { formatResource, formatDateTime } from '@/lib/formatters'
-import { 
-  Settings, 
-  Shield, 
-  Ship, 
-  FlaskConical, 
-  X, 
-  Clock,
-  RefreshCw
-} from 'lucide-react'
-import { Progress } from '@/components/ui/progress'
-import { getFacilityImage } from '@/lib/facilityImages'
-import { getDefenseImage } from '@/lib/defenseImages'
-import { getShipImage } from '@/lib/shipImages'
+import { formatResource } from '@/lib/formatters'
+import { Clock, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiSlice } from '@/api/apiSlice'
 import { useAppSelector } from '@/app/hooks'
+import { ConstructionCard } from './ConstructionCard'
+import { QueueStats } from './QueueStats'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface ConstructionQueueProps {
   planetId: number
@@ -41,8 +32,8 @@ export function ConstructionQueue({
   const { data: constructionData, isLoading, error, refetch } = useGetConstructionQueueQuery(planetId, {
     // Refetch when the component mounts or when planetId changes
     refetchOnMountOrArgChange: true,
-    // Poll for updates every 30 seconds as a fallback
-    pollingInterval: 30000,
+    // Remove polling - rely on WebSocket events instead
+    pollingInterval: 0,
   })
   const [cancelFacility] = useCancelFacilityConstructionMutation()
   const [cancelDefence] = useCancelDefenceConstructionMutation()
@@ -51,58 +42,49 @@ export function ConstructionQueue({
 
   const constructions = constructionData?.construction_queue || []
 
-  // Subscribe to WebSocket events for this planet's construction updates
+  // Subscribe to WebSocket events for real-time construction updates
   useEffect(() => {
     if (!empire) return
 
-    // RTK Query will automatically refetch when tags are invalidated
-    // But we can also manually refetch when planet.updated events occur
-    // The WebSocket hook already invalidates tags, so this should work automatically
-    // However, we'll keep the refetch capability for manual refresh button
-  }, [empire, planetId])
-
-  const getItemIcon = (type: string) => {
-    switch (type) {
-      case 'facility':
-        return Settings
-      case 'defence':
-        return Shield
-      case 'ship':
-        return Ship
-      case 'research':
-        return FlaskConical
-      default:
-        return Clock
+    // Listen for tick.processed events (items complete at tick time)
+    const handleTickProcessed = () => {
+      // Immediately refetch construction queue when tick processes
+      // This ensures items are marked as completed exactly when the tick completes
+      refetch()
+      
+      // Call optional callback if provided
+      if (onConstructionComplete) {
+        onConstructionComplete()
+      }
     }
-  }
 
-  const getItemColor = (type: string) => {
-    switch (type) {
-      case 'facility':
-        return 'text-purple-400'
-      case 'defence':
-        return 'text-red-400'
-      case 'ship':
-        return 'text-blue-400'
-      case 'research':
-        return 'text-green-400'
-      default:
-        return 'text-muted-foreground'
+    // Listen for construction.completed events (fired when specific items complete)
+    const handleConstructionUpdated = (event: CustomEvent) => {
+      const { planetId: eventPlanetId, completed } = event.detail
+      
+      // Only refetch if this event is for our planet
+      if (eventPlanetId === planetId) {
+        // Always refetch when construction updates (completion or progress change)
+        // This ensures progress and ticks_remaining are up-to-date
+        refetch()
+        
+        // Call optional callback if provided
+        if (completed && onConstructionComplete) {
+          onConstructionComplete()
+        }
+      }
     }
-  }
 
-  const getItemImage = (type: string, slug: string): string | undefined => {
-    switch (type) {
-      case 'facility':
-        return getFacilityImage(slug)
-      case 'defence':
-        return getDefenseImage(slug)
-      case 'ship':
-        return getShipImage(slug)
-      default:
-        return undefined
+    // Subscribe to custom events dispatched by WebSocket handlers
+    window.addEventListener('tick:processed', handleTickProcessed)
+    window.addEventListener('planet:construction:updated', handleConstructionUpdated as EventListener)
+
+    return () => {
+      window.removeEventListener('tick:processed', handleTickProcessed)
+      window.removeEventListener('planet:construction:updated', handleConstructionUpdated as EventListener)
     }
-  }
+  }, [empire, planetId, refetch, onConstructionComplete])
+
 
   const handleCancel = async (construction: ConstructionQueueItem) => {
     if (cancellingId === construction.id) return
@@ -159,14 +141,14 @@ export function ConstructionQueue({
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-cyan-400" />
+            <Sparkles className="w-5 h-5 text-cyan-400" />
             Construction Queue
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted/10 rounded-lg animate-pulse" />
+              <Skeleton key={i} className="h-32 w-full" />
             ))}
           </div>
         </CardContent>
@@ -179,7 +161,7 @@ export function ConstructionQueue({
       <Card className="panel-glass border-red/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-red-400" />
+            <Sparkles className="w-5 h-5 text-red-400" />
             Construction Queue
           </CardTitle>
         </CardHeader>
@@ -197,7 +179,7 @@ export function ConstructionQueue({
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-cyan-400" />
+            <Sparkles className="w-5 h-5 text-cyan-400" />
             Construction Queue
           </CardTitle>
           <CardDescription>
@@ -205,9 +187,28 @@ export function ConstructionQueue({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Start building facilities, defences, ships, or research to see them here.
-          </p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <motion.div
+              animate={{
+                scale: [1, 1.1, 1],
+                opacity: [0.5, 0.8, 0.5],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+              className="mb-4"
+            >
+              <Clock className="w-16 h-16 text-muted-foreground/30" />
+            </motion.div>
+            <p className="text-muted-foreground text-sm mb-2">
+              Queue is empty
+            </p>
+            <p className="text-muted-foreground/70 text-xs">
+              Start building facilities, defences, ships, or research to see them here.
+            </p>
+          </div>
         </CardContent>
       </Card>
     )
@@ -215,10 +216,10 @@ export function ConstructionQueue({
 
   return (
     <Card className="panel-glass border-cyan/20">
-      <CardHeader>
+      <CardHeader className="border-b border-border/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-cyan-400" />
+            <Sparkles className="w-5 h-5 text-cyan-400" />
             <CardTitle>Construction Queue</CardTitle>
           </div>
           <Button
@@ -230,92 +231,21 @@ export function ConstructionQueue({
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
-        <CardDescription>
-          {constructions.length} ongoing construction{constructions.length !== 1 ? 's' : ''}
-        </CardDescription>
+        <div className="mt-3">
+          <QueueStats constructions={constructions} />
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {constructions.map((construction) => {
-          const Icon = getItemIcon(construction.type)
-          const isCancelling = cancellingId === construction.id
-          const itemImage = getItemImage(construction.type, construction.item_slug)
-          const total = (construction as any).build_time_ticks ?? (construction as any).build_time ?? 0
-          const remaining = (construction as any).ticks_remaining ?? 0
-          const done = Math.max(0, total - remaining)
-          const progressPercent = total > 0 ? Math.min(100, (done / total) * 100) : 0
-
-          return (
-            <Card
+      <CardContent className="pt-6 space-y-4">
+        <AnimatePresence mode="popLayout">
+          {constructions.map((construction) => (
+            <ConstructionCard
               key={construction.id}
-              className="panel-glass border-border/50 hover:border-primary/30 transition-all"
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  {/* Large Image */}
-                  <div className="flex-shrink-0">
-                    {itemImage ? (
-                      <img
-                        src={itemImage}
-                        alt={construction.item_slug.replace(/_/g, ' ')}
-                        className="w-32 h-32 object-contain large-image-display"
-                        style={{ imageRendering: 'auto' }}
-                      />
-                    ) : (
-                      <div className="w-32 h-32 bg-muted/20 rounded-lg flex items-center justify-center">
-                        <Icon className={`w-16 h-16 ${getItemColor(construction.type)} opacity-50`} />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Info and Progress */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-lg font-semibold">
-                            {construction.item_slug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </h4>
-                          <Badge variant="outline" className="text-xs">
-                            {construction.type}
-                          </Badge>
-                          {construction.quantity > 1 && (
-                            <Badge variant="secondary" className="text-xs">
-                              x{construction.quantity}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="w-4 h-4" />
-                          <span>Completes: {formatDateTime(construction.completes_at)}</span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleCancel(construction)}
-                        disabled={isCancelling || construction.is_completed}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
-                      >
-                        <X className="w-5 h-5" />
-                      </Button>
-                    </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-mono">
-                          {done}/{total} {total ? 'ticks' : ''} ({Math.round(progressPercent)}%)
-                        </span>
-                      </div>
-                      <Progress value={progressPercent} className="h-3" />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+              construction={construction}
+              onCancel={handleCancel}
+              isCancelling={cancellingId === construction.id}
+            />
+          ))}
+        </AnimatePresence>
       </CardContent>
     </Card>
   )

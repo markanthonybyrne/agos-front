@@ -8,7 +8,7 @@ import { PanelSize, PanelState } from '@/app/slices/panelSlice'
 interface SlidingPanelProps {
   isOpen: boolean
   onClose: () => void
-  title: string
+  title: string | ReactNode
   description?: string
   children: ReactNode
   className?: string
@@ -27,6 +27,9 @@ const SIZE_MAP: Record<PanelSize, string> = {
   [PanelSize.XLARGE]: 'max-w-6xl',
   [PanelSize.FULL_HEIGHT]: 'max-w-full',
 }
+
+// Custom width override for admin panel (70% viewport width)
+const CUSTOM_WIDTH_CLASS = '!w-[70vw]'
 
 export function SlidingPanel({ 
   isOpen, 
@@ -97,10 +100,13 @@ export function SlidingPanel({
           'fixed right-0 h-full bg-card border-l border-border z-50 shadow-2xl',
           'transform transition-all duration-300 ease-out',
           'overflow-hidden',
-          SIZE_MAP[size],
+          className?.includes(CUSTOM_WIDTH_CLASS) ? '' : SIZE_MAP[size],
           className
         )}
-        style={{ zIndex }}
+        style={{ 
+          zIndex,
+          ...(className?.includes(CUSTOM_WIDTH_CLASS) ? { width: '70vw' } : {})
+        }}
       >
         <Card className="h-full rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
           {/* Sleek header with minimize/maximize */}
@@ -110,7 +116,12 @@ export function SlidingPanel({
           )}>
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <CardTitle className="truncate text-base font-semibold">{title}</CardTitle>
+                <CardTitle className={cn(
+                  "truncate text-base font-semibold",
+                  typeof title !== 'string' && "flex items-center gap-2"
+                )}>
+                  {title}
+                </CardTitle>
                 {description && (
                   <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>
                 )}

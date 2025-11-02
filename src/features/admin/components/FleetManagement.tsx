@@ -63,7 +63,10 @@ export function FleetManagement() {
   }
 
   const getTotalShips = (fleet: AdminFleet) => {
-    return fleet.ships.reduce((total, ship) => total + ship.quantity, 0)
+    if (!fleet.ships || !Array.isArray(fleet.ships)) {
+      return 0
+    }
+    return fleet.ships.reduce((total, ship) => total + (ship.quantity || 0), 0)
   }
 
   const getDestinationCoordinate = (fleet: AdminFleet) => {

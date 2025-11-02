@@ -255,6 +255,8 @@ export function Holopad() {
         isDraggable={true}
         isResizable={true}
         margin={[16, 16]}
+        compactType={null}
+        preventCollision={false}
       >
         {/* Fleet Operations Widget */}
         <div key="operations">

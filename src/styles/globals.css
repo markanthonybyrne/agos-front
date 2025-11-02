@@ -46,6 +46,112 @@
   }
 }
 
+/* Custom Scrollbar Styling */
+@layer utilities {
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  .custom-scrollbar::-webkit-scrollbar,
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.5);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.8);
+    background-clip: padding-box;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:active,
+  ::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--primary));
+    background-clip: padding-box;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-corner,
+  ::-webkit-scrollbar-corner {
+    background: hsl(var(--muted) / 0.3);
+  }
+
+  /* Firefox */
+  .custom-scrollbar,
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.3);
+  }
+
+  /* Apply custom scrollbar to common scrollable elements */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto,
+  [class*="overflow"] {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.3);
+  }
+
+  /* Panel-specific scrollbars with enhanced styling */
+  .panel-glass::-webkit-scrollbar,
+  [class*="panel-glass"]::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .panel-glass::-webkit-scrollbar-track,
+  [class*="panel-glass"]::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.2);
+    border-radius: 10px;
+    margin: 4px;
+  }
+
+  .panel-glass::-webkit-scrollbar-thumb,
+  [class*="panel-glass"]::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.6) 0%, hsl(var(--primary) / 0.4) 100%);
+    border-radius: 10px;
+    border: 2px solid hsl(var(--muted) / 0.2);
+    background-clip: padding-box;
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.3);
+    transition: all 0.2s ease;
+  }
+
+  .panel-glass::-webkit-scrollbar-thumb:hover,
+  [class*="panel-glass"]::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.9) 0%, hsl(var(--primary) / 0.7) 100%);
+    box-shadow: 0 0 12px hsl(var(--primary) / 0.5);
+    background-clip: padding-box;
+  }
+
+  .panel-glass::-webkit-scrollbar-thumb:active,
+  [class*="panel-glass"]::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--primary));
+    box-shadow: 0 0 16px hsl(var(--primary) / 0.8);
+    background-clip: padding-box;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -939,6 +1045,25 @@
 
   .react-grid-item > * {
     height: 100%;
+    pointer-events: auto !important;
+  }
+  
+  /* Ensure all interactive elements within grid items are clickable */
+  .react-grid-item button,
+  .react-grid-item a,
+  .react-grid-item input,
+  .react-grid-item select,
+  .react-grid-item textarea,
+  .react-grid-item [role="button"],
+  .react-grid-item [tabindex]:not([tabindex="-1"]) {
+    pointer-events: auto !important;
+    cursor: pointer;
+  }
+  
+  /* Prevent drag when clicking on interactive elements */
+  .react-grid-item button:active,
+  .react-grid-item a:active,
+  .react-grid-item [role="button"]:active {
     pointer-events: auto !important;
   }
   

@@ -121,6 +121,51 @@ export function UniverseStarMap({ className, planets = [], fleets = [] }: Univer
       if (!worldNow) return
       worldNow.addChild(bg)
 
+      // Central Star (sol.png) - positioned at center of galaxy, larger than planets
+      let starTexture: PIXI.Texture
+      try {
+        starTexture = await (PIXI.Assets as any).load('/assets/images/planets/sol.png')
+      } catch {
+        // Fallback: create a bright glowing circle texture for the star
+        const g = new PIXI.Graphics()
+        // Outer glow
+        g.beginFill(0xffffaa, 0.6)
+        g.drawCircle(0, 0, 60)
+        g.endFill()
+        // Inner core
+        g.beginFill(0xffffff, 1)
+        g.drawCircle(0, 0, 40)
+        g.endFill()
+        starTexture = app.renderer.generateTexture(g)
+        g.destroy()
+      }
+      if (cancelledRef.current || !worldNow) return
+      const star = new PIXI.Sprite(starTexture)
+      star.anchor.set(0.5)
+      
+      // Calculate center position based on planets (galaxy center)
+      // If no planets yet, use screen center - it will be updated when planets load
+      let centerX = app.renderer.width / 2
+      let centerY = app.renderer.height / 2
+      if (planets.length > 0) {
+        const avgX = planets.reduce((sum, p) => sum + p.x, 0) / planets.length
+        const avgY = planets.reduce((sum, p) => sum + p.y, 0) / planets.length
+        centerX = avgX
+        centerY = avgY
+      }
+      star.position.set(centerX, centerY)
+      
+      // Make star larger than planets (planets are ~2-6px radius depending on zoom, star should be ~80-120px)
+      const starSize = 120
+      star.width = starSize
+      star.height = starSize
+      star.zIndex = 1 // Behind planets layer but above background
+      
+      // Store star reference for updates when planets load
+      const starRef = { sprite: star, centerX, centerY }
+      ;(worldNow as any).starSprite = starRef
+      worldNow.addChild(star)
+
       // Layers
       const planetsLayer = new PIXI.Container()
       const fleetsLayer = new PIXI.Container()
@@ -293,7 +338,18 @@ export function UniverseStarMap({ className, planets = [], fleets = [] }: Univer
   useEffect(() => {
     const app = appRef.current
     const particles = planetsParticlesRef.current
-    if (!app || !particles) return
+    const world = worldRef.current
+    if (!app || !particles || !world) return
+
+    // Update star position to center of planets (galaxy center)
+    const starRef = (world as any).starSprite
+    if (starRef && starRef.sprite && planets.length > 0) {
+      const avgX = planets.reduce((sum, p) => sum + p.x, 0) / planets.length
+      const avgY = planets.reduce((sum, p) => sum + p.y, 0) / planets.length
+      starRef.sprite.position.set(avgX, avgY)
+      starRef.centerX = avgX
+      starRef.centerY = avgY
+    }
 
     // Rebuild sprites (ParticleContainer uses removeParticles in Pixi v8)
     const prevSprites = planetSpritesRef.current
@@ -319,7 +375,6 @@ export function UniverseStarMap({ className, planets = [], fleets = [] }: Univer
     planetSpritesRef.current = sprites
 
     // Apply LOD immediately
-    const world = worldRef.current
     if (world) {
       lastScaleRef.current = world.scale.x
       // mimic internal update function by recomputing sparsity/size

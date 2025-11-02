@@ -13,6 +13,8 @@ import {
   Shield,
   Megaphone,
   MessageSquare,
+  Gift,
+  Zap,
 } from 'lucide-react'
 
 const adminNavItems = [
@@ -28,6 +30,8 @@ const adminNavItems = [
   { path: '/admin/ticks', label: 'Ticks', icon: Clock },
   { path: '/admin/resources', label: 'Resources', icon: Coins },
   { path: '/admin/combats', label: 'Combats', icon: Sword },
+  { path: '/admin/quantum-credits', label: 'Quantum Credits', icon: Gift },
+  { path: '/admin/boosters', label: 'Boosters', icon: Zap },
 ]
 
 interface AdminLayoutProps {
@@ -37,19 +41,8 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading glow-cyan flex items-center gap-3">
-            <Shield className="w-8 h-8 text-primary" />
-            Admin Portal
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage game entities and systems</p>
-        </div>
-      </div>
-
       {/* Navigation Tabs */}
-      <div className="border-b border-border">
+      <div className="panel-glass border-border/50 rounded-lg p-2">
         <nav className="flex gap-1 overflow-x-auto">
           {adminNavItems.map((item) => {
             const Icon = item.icon
@@ -60,11 +53,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 end={item.exact}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2',
-                    'hover:text-foreground',
+                    'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all rounded-md',
+                    'hover:bg-primary/10 hover:text-cyan-400',
                     isActive
-                      ? 'border-primary text-foreground'
-                      : 'border-transparent text-muted-foreground'
+                      ? 'bg-primary/20 text-cyan-400 border border-cyan-400/30'
+                      : 'text-muted-foreground'
                   )
                 }
               >

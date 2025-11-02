@@ -90,7 +90,13 @@ export function QuantumCreditsWidget({
               </div>
             </div>
             <Button
-              onClick={handleClaimDaily}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleClaimDaily()
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+              }}
               disabled={!canClaim || isClaiming}
               size="sm"
               className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border-yellow-500/30"
@@ -104,7 +110,13 @@ export function QuantumCreditsWidget({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => openPanel(PanelType.BOOSTERS, PanelSize.MEDIUM)}
+              onClick={(e) => {
+                e.stopPropagation()
+                openPanel(PanelType.BOOSTERS, PanelSize.MEDIUM)
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+              }}
               className="flex-1"
             >
               Boosters
@@ -112,7 +124,13 @@ export function QuantumCreditsWidget({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => openPanel(PanelType.ACHIEVEMENTS, PanelSize.MEDIUM)}
+              onClick={(e) => {
+                e.stopPropagation()
+                openPanel(PanelType.ACHIEVEMENTS, PanelSize.MEDIUM)
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+              }}
               className="flex-1"
             >
               Achievements
@@ -123,7 +141,13 @@ export function QuantumCreditsWidget({
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleOpenFullPanel}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleOpenFullPanel()
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+            }}
             className="w-full text-cyan-400 hover:text-cyan-300"
           >
             View Full Panel

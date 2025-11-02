@@ -28,6 +28,7 @@ export enum PanelType {
   COMPOSE_MAIL = 'COMPOSE_MAIL',
   CHAT = 'CHAT',
   MARKET = 'MARKET',
+  FLEETS = 'FLEETS',
 }
 
 export enum PanelSize {

@@ -14,19 +14,53 @@ import { Clock, Rocket } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface TravelTimeCalculatorProps {
-  destinationPlanet: Planet
+  destinationPlanet: Planet | null | undefined
   onNavigateToFleet?: (destination: Planet) => void
 }
 
 export function TravelTimeCalculator({ destinationPlanet, onNavigateToFleet }: TravelTimeCalculatorProps) {
   const [originPlanetId, setOriginPlanetId] = useState<number | null>(null)
   const [travelTime, setTravelTime] = useState<any>(null)
-  const { data: planetsData, isLoading: isLoadingPlanets, error: planetsError } = useGetPlanetsQuery()
+  const { data: planetsData, isLoading: isLoadingPlanets, error: planetsError } = useGetPlanetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
   const { data: shipDefinitionsData } = useGetShipDefinitionsQuery()
   const { calculateTravelTime, isLoading } = useTravelTime()
   const { currentTick } = useTick()
+  
+  // Validate destinationPlanet
+  if (!destinationPlanet || !destinationPlanet.coordinate) {
+    return (
+      <Card className="panel-glass border-red/20">
+        <CardContent className="pt-6">
+          <div className="text-center text-red-400">
+            Invalid destination planet. Please select a valid planet.
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
-  const ownedPlanets = planetsData?.planets || []
+  // Get all planets from the API response
+  // The API returns { planets: Planet[] }
+  const allPlanets = planetsData?.planets || []
+  
+  // Filter to only include valid owned planets
+  // Coordinate can be an object { quadrant, sector, galaxy, planet } or a string
+  const ownedPlanets = allPlanets.filter((planet) => {
+    if (!planet || !planet.id || !planet.coordinate) return false
+    // If coordinate is an object, verify it has required fields
+    if (typeof planet.coordinate === 'object' && planet.coordinate !== null) {
+      const coord = planet.coordinate as any
+      if (coord.quadrant === undefined || coord.quadrant === null) return false
+    }
+    return true
+  }).filter(planet => {
+    // Exclude destination planet from origin list if it's owned
+    if (!destinationPlanet?.id) return true
+    return Number(planet.id) !== Number(destinationPlanet.id)
+  })
+  
   const shipDefinitions = shipDefinitionsData?.ships || []
 
   const handleCalculate = async () => {
@@ -52,6 +86,11 @@ export function TravelTimeCalculator({ destinationPlanet, onNavigateToFleet }: T
       const fighterDef = shipDefinitions.find(def => def.slug === 'fighter' || def.id === 1)
       if (!fighterDef) {
         toast.error('Fighter ship definition not found')
+        return
+      }
+      
+      if (!destinationPlanet || !destinationPlanet.coordinate) {
+        toast.error('Invalid destination planet')
         return
       }
       
@@ -87,47 +126,64 @@ export function TravelTimeCalculator({ destinationPlanet, onNavigateToFleet }: T
             <div className="p-3 bg-red-500/10 rounded-lg text-sm text-red-400">
               Failed to load planets
             </div>
-          ) : ownedPlanets.length === 0 ? (
-            <div className="p-3 bg-muted/20 rounded-lg text-sm text-muted-foreground">
-              No planets owned
-            </div>
           ) : (
-            <Select 
-              value={originPlanetId ? originPlanetId.toString() : undefined} 
-              onValueChange={(value) => {
-                if (value) {
-                  setOriginPlanetId(Number(value))
-                  setTravelTime(null) // Reset travel time when origin changes
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select origin planet" />
-              </SelectTrigger>
-              <SelectContent>
-                {ownedPlanets.map((planet) => (
-                  <SelectItem key={planet.id} value={planet.id.toString()}>
-                    {planet.name || `Planet ${formatCoordinate(planet.coordinate)}`} ({formatCoordinate(planet.coordinate)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <>
+              {ownedPlanets.length === 0 ? (
+                <div className="p-3 bg-muted/20 rounded-lg text-sm text-muted-foreground">
+                  No planets owned (Filtered: {allPlanets.length} total)
+                </div>
+              ) : (
+                <Select 
+                  value={originPlanetId ? originPlanetId.toString() : undefined} 
+                  onValueChange={(value) => {
+                    if (value) {
+                      const numValue = Number(value)
+                      if (!isNaN(numValue) && numValue > 0) {
+                        setOriginPlanetId(numValue)
+                        setTravelTime(null)
+                      }
+                    } else {
+                      setOriginPlanetId(null)
+                      setTravelTime(null)
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select origin planet" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[10000]">
+                    {ownedPlanets.map((planet) => {
+                      if (!planet || !planet.id || !planet.coordinate) return null
+                      const coordinateStr = formatCoordinate(planet.coordinate)
+                      const displayName = planet.name || `Planet ${coordinateStr}`
+                      return (
+                        <SelectItem key={planet.id} value={String(planet.id)}>
+                          {displayName} ({coordinateStr})
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
           )}
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Destination</label>
-          <div className="p-3 bg-muted/20 rounded-lg">
-            <div className="font-semibold">{destinationPlanet.name}</div>
-            <div className="text-sm text-muted-foreground font-mono">
-              {formatCoordinate(destinationPlanet.coordinate)}
+        {destinationPlanet && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Destination</label>
+            <div className="p-3 bg-muted/20 rounded-lg">
+              <div className="font-semibold">{destinationPlanet.name || 'Unknown Planet'}</div>
+              <div className="text-sm text-muted-foreground font-mono">
+                {destinationPlanet.coordinate ? formatCoordinate(destinationPlanet.coordinate) : 'N/A'}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <Button
           onClick={handleCalculate}
-          disabled={!originPlanetId || isLoading}
+          disabled={!originPlanetId || !destinationPlanet || isLoading}
           className="w-full"
         >
           {isLoading ? 'Calculating...' : 'Calculate Travel Time'}

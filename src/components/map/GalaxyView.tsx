@@ -3,8 +3,9 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Planet } from '@/types/api.types'
-import { formatCoordinate } from '@/lib/coordinates'
+import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
 import { useAuth } from '@/hooks/useAuth'
+import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { Star, MapPin, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,137 @@ export function GalaxyView({
 }: GalaxyViewProps) {
   const { empire } = useAuth()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
+
+  // Fetch fleets to get travel routes
+  // NOTE: This endpoint only returns the user's own fleets, not other players' fleets.
+  // To show all visible fleets in a galaxy, we would need an endpoint like:
+  // GET /universe/map/galaxies/{quadrant}/{sector}/{galaxy}/fleets
+  // that returns all visible fleets based on visibility/intelligence systems
+  const { data: fleetsData } = useGetFleetsQuery()
+
+  // Filter in-transit fleets within the current galaxy
+  // Currently only shows YOUR fleets, not other players' fleets
+  const relevantFleets = useMemo(() => {
+    if (!quadrantNumber || !sectorNumber || !galaxyNumber || !fleetsData?.fleets) {
+      console.log('[GalaxyView] No fleets data or missing coordinates:', {
+        quadrantNumber,
+        sectorNumber,
+        galaxyNumber,
+        hasFleets: !!fleetsData?.fleets,
+        fleetCount: fleetsData?.fleets?.length || 0
+      })
+      return []
+    }
+    
+    console.log('[GalaxyView] Processing fleets:', {
+      totalFleets: fleetsData.fleets.length,
+      currentGalaxy: `${quadrantNumber}:${sectorNumber}:${galaxyNumber}`
+    })
+    
+    const filtered = fleetsData.fleets.filter((fleet) => {
+      console.log('[GalaxyView] Checking fleet:', {
+        id: fleet.id,
+        status: fleet.status,
+        origin: (fleet as any).origin,
+        dest: (fleet as any).destination
+      })
+      
+      if (fleet.status !== 'in_transit') {
+        console.log(`[GalaxyView] Fleet ${fleet.id} filtered out - status: ${fleet.status}`)
+        return false
+      }
+      
+      // Handle both API response formats:
+      // Old format: { origin_coordinate: { quadrant, sector, galaxy, planet }, destination_coordinate: {...} }
+      // New format: { origin: { coordinate: "1:1:3:14" }, destination: { coordinate: "1:1:3:1" } }
+      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+      let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+      
+      // Try new format first (with origin/destination objects)
+      if ((fleet as any).origin?.coordinate) {
+        const parsed = parseCoordinate((fleet as any).origin.coordinate)
+        if (parsed) originCoord = parsed
+      } else if ((fleet as any).origin_coordinate) {
+        // Old format
+        originCoord = (fleet as any).origin_coordinate
+      }
+      
+      if ((fleet as any).destination?.coordinate) {
+        const parsed = parseCoordinate((fleet as any).destination.coordinate)
+        if (parsed) destCoord = parsed
+      } else if ((fleet as any).destination_coordinate) {
+        // Old format
+        destCoord = (fleet as any).destination_coordinate
+      }
+      
+      if (!originCoord || !destCoord) {
+        console.log(`[GalaxyView] Fleet ${fleet.id} filtered out - missing coordinates`, {
+          originCoord,
+          destCoord,
+          fleetFormat: {
+            hasOrigin: !!(fleet as any).origin,
+            hasDestination: !!(fleet as any).destination,
+            hasOriginCoord: !!(fleet as any).origin_coordinate,
+            hasDestCoord: !!(fleet as any).destination_coordinate
+          }
+        })
+        return false
+      }
+      
+      // Check if both origin and destination are in the current galaxy
+      const originInGalaxy = 
+        originCoord.quadrant === quadrantNumber &&
+        originCoord.sector === sectorNumber &&
+        originCoord.galaxy === galaxyNumber
+      
+      const destInGalaxy =
+        destCoord.quadrant === quadrantNumber &&
+        destCoord.sector === sectorNumber &&
+        destCoord.galaxy === galaxyNumber
+      
+      const isRelevant = originInGalaxy && destInGalaxy
+      
+      if (isRelevant) {
+        console.log(`[GalaxyView] ✅ Fleet ${fleet.id} is relevant - origin: ${originCoord.quadrant}:${originCoord.sector}:${originCoord.galaxy}:${originCoord.planet}, dest: ${destCoord.quadrant}:${destCoord.sector}:${destCoord.galaxy}:${destCoord.planet}`)
+      } else {
+        console.log(`[GalaxyView] ❌ Fleet ${fleet.id} filtered out - originInGalaxy: ${originInGalaxy}, destInGalaxy: ${destInGalaxy}`, {
+          originCoord,
+          destCoord,
+          targetGalaxy: `${quadrantNumber}:${sectorNumber}:${galaxyNumber}`
+        })
+      }
+      
+      return isRelevant
+    })
+    
+    // Transform filtered fleets to have consistent coordinate format
+    const transformedFleets = filtered.map((fleet) => {
+      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number }
+      let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number }
+      
+      if ((fleet as any).origin?.coordinate) {
+        originCoord = parseCoordinate((fleet as any).origin.coordinate)!
+        destCoord = parseCoordinate((fleet as any).destination.coordinate)!
+      } else {
+        originCoord = (fleet as any).origin_coordinate
+        destCoord = (fleet as any).destination_coordinate
+      }
+      
+      return {
+        ...fleet,
+        origin_coordinate: originCoord,
+        destination_coordinate: destCoord
+      }
+    })
+    
+    console.log('[GalaxyView] Relevant fleets after filtering:', transformedFleets.length, transformedFleets.map(f => ({ 
+      id: f.id, 
+      origin: f.origin_coordinate.planet, 
+      dest: f.destination_coordinate.planet 
+    })))
+    
+    return transformedFleets as typeof filtered
+  }, [fleetsData, quadrantNumber, sectorNumber, galaxyNumber])
 
   // Select galaxy image based on galaxy number
   const galaxyImage = useMemo(() => {
@@ -54,6 +186,19 @@ export function GalaxyView({
     })
   }, [planets])
 
+  // Helper to find planet ID from coordinate
+  const getPlanetIdFromCoordinate = (coord: { quadrant: number; sector: number; galaxy: number; planet: number }): number | null => {
+    const planet = planets.find((p) => {
+      const parsed = parseCoordinate(p.coordinate)
+      return parsed &&
+        parsed.quadrant === coord.quadrant &&
+        parsed.sector === coord.sector &&
+        parsed.galaxy === coord.galaxy &&
+        parsed.planet === coord.planet
+    })
+    return planet?.id || null
+  }
+
   // Calculate galaxy statistics
   const stats = useMemo(() => {
     const totalPlanets = planets.length
@@ -67,12 +212,138 @@ export function GalaxyView({
   return (
     <div className={`relative ${className}`}>
       <Card className="panel-glass border-cyan/20 contain-map">
-        <div className="galaxy-container min-h-[500px] p-8">
+        <div className="galaxy-container min-h-[500px] p-8 relative" style={{ overflow: 'visible' }}>
+          {/* ALWAYS render test SVG to verify rendering */}
+          <svg
+            className="absolute pointer-events-none"
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              zIndex: 9999,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              pointerEvents: 'none',
+              backgroundColor: 'rgba(255, 0, 0, 0.1)', // Red tint to see SVG area
+            }}
+          >
+            {/* Test line - bright green diagonal */}
+            <line
+              x1="5%"
+              y1="5%"
+              x2="95%"
+              y2="95%"
+              stroke="#00ff00"
+              strokeWidth="20"
+              strokeOpacity="1"
+            />
+            {/* Test line - bright red horizontal */}
+            <line
+              x1="0%"
+              y1="50%"
+              x2="100%"
+              y2="50%"
+              stroke="#ff0000"
+              strokeWidth="15"
+              strokeOpacity="1"
+            />
+            {/* Fleet travel lines */}
+            {relevantFleets.length > 0 && planetPositions.length > 0 && relevantFleets.map((fleet) => {
+                    // Use destination.id from API if available (more reliable), otherwise fallback to coordinate lookup
+                    const originPlanetId = (fleet as any).origin?.id || getPlanetIdFromCoordinate(fleet.origin_coordinate)
+                    const destPlanetId = (fleet as any).destination?.id || getPlanetIdFromCoordinate(fleet.destination_coordinate)
+                    
+                    console.log('[GalaxyView] Rendering line for fleet:', {
+                      fleetId: fleet.id,
+                      originPlanetId,
+                      destPlanetId,
+                      originFromAPI: (fleet as any).origin?.id,
+                      destFromAPI: (fleet as any).destination?.id,
+                      originCoord: fleet.origin_coordinate,
+                      destCoord: fleet.destination_coordinate
+                    })
+                    
+                    if (!originPlanetId || !destPlanetId) {
+                      console.log(`[GalaxyView] ❌ Cannot find planet IDs for fleet ${fleet.id} - origin: ${originPlanetId}, dest: ${destPlanetId}`)
+                      console.log('[GalaxyView] Available planets:', planets.map(p => {
+                        const coord = parseCoordinate(p.coordinate)
+                        return { id: p.id, coord }
+                      }))
+                      return null
+                    }
+                    
+                    const originPos = planetPositions.find(p => p.planet.id === originPlanetId)
+                    const destPos = planetPositions.find(p => p.planet.id === destPlanetId)
+                    
+                    if (!originPos || !destPos) {
+                      console.log(`[GalaxyView] ❌ Cannot find planet positions for fleet ${fleet.id} - originPos: ${!!originPos}, destPos: ${!!destPos}`)
+                      return null
+                    }
+                    
+                    // Convert percentage positions to pixel coordinates
+                    // For SVG, we need actual pixel values - we'll use viewBox and percentages
+                    const x1 = parseFloat(originPos.x.replace('%', ''))
+                    const y1 = parseFloat(originPos.y.replace('%', ''))
+                    const x2 = parseFloat(destPos.x.replace('%', ''))
+                    const y2 = parseFloat(destPos.y.replace('%', ''))
+                    
+                    // Determine line color based on order type
+                    const getLineColor = () => {
+                      switch (fleet.order_type) {
+                        case 'attack':
+                          return '#ef4444' // red-500
+                        case 'defend':
+                          return '#3b82f6' // blue-500
+                        case 'station':
+                          return '#10b981' // green-500
+                        case 'return':
+                          return '#f59e0b' // amber-500
+                        default:
+                          return '#06b6d4' // cyan-500 (default)
+                      }
+                    }
+                    
+                    const lineColor = getLineColor()
+                    
+                    console.log(`[GalaxyView] ✅ Rendering line for fleet ${fleet.id}:`, {
+                      x1: `${x1}%`,
+                      y1: `${y1}%`,
+                      x2: `${x2}%`,
+                      y2: `${y2}%`,
+                      color: lineColor,
+                      orderType: fleet.order_type
+                    })
+                    
+                    return (
+                      <line
+                        key={`fleet-${fleet.id}`}
+                        x1={`${x1}%`}
+                        y1={`${y1}%`}
+                        x2={`${x2}%`}
+                        y2={`${y2}%`}
+                        stroke={lineColor}
+                        strokeWidth="6"
+                        strokeOpacity="1"
+                        strokeDasharray="10,5"
+                        strokeLinecap="round"
+                        className="animate-pulse"
+                        style={{
+                          filter: `drop-shadow(0 0 8px ${lineColor}) drop-shadow(0 0 4px rgba(255, 255, 255, 0.8))`,
+                        }}
+                      />
+                    )
+                  })}
+          </svg>
+          
           {/* Animated galaxy spiral */}
           <div 
-            className="galaxy-spiral galaxy-animated"
+            className="galaxy-spiral galaxy-animated relative"
             style={{
               backgroundImage: `url(${galaxyImage})`,
+              zIndex: 1,
+              position: 'relative'
             }}
           >
             {/* Planet indicators positioned around the spiral */}
@@ -100,6 +371,8 @@ export function GalaxyView({
                       ? 'translate(-50%, -50%) scale(2)' 
                       : 'translate(-50%, -50%)',
                     transition: 'transform 0.2s ease',
+                    position: 'absolute',
+                    zIndex: 60, // Above SVG lines
                   }}
                   onMouseEnter={() => setHoveredPlanet(planet)}
                   onMouseLeave={() => setHoveredPlanet(null)}

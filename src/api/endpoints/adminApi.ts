@@ -43,6 +43,12 @@ import {
   AdminChatMessageListResponse,
   BanUserFromChatRequest,
   MuteUserFromChatRequest,
+  GrantQuantumCreditsRequest,
+  AdjustQuantumCreditsRequest,
+  QuantumCreditsTransactionsResponse,
+  AdminBooster,
+  AdminBoostersResponse,
+  DeleteBoosterRequest,
 } from '@/types/api.types'
 
 export const adminApi = apiSlice.injectEndpoints({
@@ -60,7 +66,10 @@ export const adminApi = apiSlice.injectEndpoints({
     }),
     getUser: builder.query<AdminUserDetailResponse, number>({
       query: (id) => `/admin/users/${id}`,
-      providesTags: (_result, _error, id) => [{ type: 'User', id }],
+      providesTags: (_result, _error, id) => [
+        { type: 'User', id },
+        { type: 'QuantumCredits', id },
+      ],
     }),
     updateUser: builder.mutation<
       { user: AdminUser; message?: string },
@@ -71,7 +80,11 @@ export const adminApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'User', id }, 'User'],
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'User', id },
+        'User',
+        { type: 'QuantumCredits', id },
+      ],
     }),
     deleteUser: builder.mutation<{ message: string }, number>({
       query: (id) => ({
@@ -119,6 +132,70 @@ export const adminApi = apiSlice.injectEndpoints({
         url: `/admin/users/${id}/activity`,
         params,
       }),
+    }),
+
+    // Quantum Credits Management
+    grantQuantumCredits: builder.mutation<
+      { message: string; new_balance: number },
+      { id: number; data: GrantQuantumCreditsRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/admin/users/${id}/quantum-credits/grant`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'User', id },
+        { type: 'QuantumCredits', id },
+        'QuantumCredits',
+      ],
+    }),
+    adjustQuantumCredits: builder.mutation<
+      { message: string; new_balance: number },
+      { id: number; data: AdjustQuantumCreditsRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/admin/users/${id}/quantum-credits/adjust`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'User', id },
+        { type: 'QuantumCredits', id },
+        'QuantumCredits',
+      ],
+    }),
+    getQuantumCreditsTransactions: builder.query<
+      QuantumCreditsTransactionsResponse,
+      { id: number; page?: number; per_page?: number; type?: string }
+    >({
+      query: ({ id, ...params }) => ({
+        url: `/admin/users/${id}/quantum-credits/transactions`,
+        params,
+      }),
+      providesTags: (_result, _error, { id }) => [
+        { type: 'QuantumCredits', id },
+      ],
+    }),
+
+    // Booster Management
+    getUserBoosters: builder.query<AdminBoostersResponse, number>({
+      query: (id) => `/admin/users/${id}/boosters`,
+      providesTags: (_result, _error, id) => [
+        { type: 'Booster', id },
+        'Booster',
+      ],
+    }),
+    deleteBooster: builder.mutation<
+      { message: string },
+      { id: number; data?: DeleteBoosterRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/admin/boosters/${id}`,
+        method: 'DELETE',
+        body: data,
+      }),
+      invalidatesTags: ['Booster'],
     }),
 
     // Empire Management
@@ -605,5 +682,12 @@ export const {
   useMuteUserFromChatMutation,
   useUnbanUserFromChatMutation,
   useUnmuteUserFromChatMutation,
+  // Quantum Credits
+  useGrantQuantumCreditsMutation,
+  useAdjustQuantumCreditsMutation,
+  useGetQuantumCreditsTransactionsQuery,
+  // Boosters
+  useGetUserBoostersQuery,
+  useDeleteBoosterMutation,
 } = adminApi
 

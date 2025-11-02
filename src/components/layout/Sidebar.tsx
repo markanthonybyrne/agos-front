@@ -1,10 +1,12 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAppSelector } from '@/app/hooks'
 import { useAppDispatch } from '@/app/hooks'
 import { toggleSidebar } from '@/app/slices/uiSlice'
 import { cn } from '@/lib/utils'
 import { useUnreadMailCount } from '@/hooks/useUnreadMailCount'
 import { useIsAdmin } from '@/hooks/useAdminPermission'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import {
   LayoutDashboard,
   Globe,
@@ -18,6 +20,7 @@ import {
   Menu,
   Sword,
   Shield,
+  Award,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +35,7 @@ const navItems = [
   { path: '/alliances', label: 'Politics', icon: Users },
   { path: '/mail', label: 'Mail', icon: Mail },
   { path: '/rankings', label: 'Rankings', icon: Trophy },
+  { path: '/achievements', label: 'Achievements', icon: Award },
   { path: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -42,6 +46,8 @@ export function Sidebar() {
   const dispatch = useAppDispatch()
   const { unreadCount } = useUnreadMailCount()
   const isAdmin = useIsAdmin()
+  const { openPanel } = usePanel()
+  const location = useLocation()
 
   return (
     <aside
@@ -65,6 +71,48 @@ export function Sidebar() {
           {navItems.map((item) => {
             const Icon = item.icon
             const showBadge = item.path === '/mail' && unreadCount > 0
+            const isActive = location.pathname === item.path || 
+                           (item.path === '/fleets' && location.pathname.startsWith('/fleets')) ||
+                           (item.path === '/achievements' && location.pathname === '/achievements')
+            
+            // Special handling for fleets - open panel instead of navigating
+            if (item.path === '/fleets') {
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => openPanel(PanelType.FLEETS, PanelSize.LARGE)}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-md transition-colors relative w-full text-left',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    isActive && 'bg-accent text-accent-foreground',
+                    !sidebarOpen && 'justify-center'
+                  )}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {sidebarOpen && <span className="text-sm">{item.label}</span>}
+                </button>
+              )
+            }
+            
+            // Special handling for achievements - open panel instead of navigating
+            if (item.path === '/achievements') {
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => openPanel(PanelType.ACHIEVEMENTS, PanelSize.MEDIUM)}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-md transition-colors relative w-full text-left',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    isActive && 'bg-accent text-accent-foreground',
+                    !sidebarOpen && 'justify-center'
+                  )}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {sidebarOpen && <span className="text-sm">{item.label}</span>}
+                </button>
+              )
+            }
+            
             return (
               <NavLink
                 key={item.path}

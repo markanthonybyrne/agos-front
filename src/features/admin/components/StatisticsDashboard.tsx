@@ -92,16 +92,21 @@ export function StatisticsDashboard() {
         {statCards.map((stat) => {
           const Icon = stat.icon
           return (
-            <Card key={stat.title} className="panel-glass border-primary/20">
+            <Card 
+              key={stat.title} 
+              className="panel-glass border-border/50 hover:border-cyan-400/30 transition-all group"
+            >
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Icon className={`w-5 h-5 ${stat.color}`} />
-                  {stat.title}
+                  <Icon className={`w-5 h-5 ${stat.color} group-hover:scale-110 transition-transform`} />
+                  <span className="glow-cyan">{stat.title}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold mb-1">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.subtitle}</div>
+                <div className="space-y-1">
+                  <p className="text-3xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-sm text-muted-foreground">{stat.subtitle}</p>
+                </div>
               </CardContent>
             </Card>
           )

@@ -33,4 +33,7 @@ export function getPlanetImage(slug?: string): string | undefined {
   return imageBySlug[slug] || imageBySlug[normalizedSlug] || aridImg
 }
 
+// Export asteroid image for use in other components
+export { asteroidImg }
+
 

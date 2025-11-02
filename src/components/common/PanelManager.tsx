@@ -23,7 +23,7 @@ import { UniverseMap } from '@/features/map/UniverseMap'
 import { ConstructionQueue } from '@/components/construction/ConstructionQueue'
 import { PlanetConsolePanel } from '@/components/planet/PlanetConsolePanel'
 import { PlanetImageDisplay } from '@/components/planet/PlanetImageDisplay'
-import { FleetsPage } from '@/features/fleets/FleetsPage'
+import { FleetsPanel } from '@/features/fleets/FleetsPanel'
 import { MessagingPage } from '@/features/messaging/MessagingPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -140,6 +140,9 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     case PanelType.MARKET:
       return <MarketPanel />
     
+    case PanelType.FLEETS:
+      return <FleetsPanel />
+    
     default:
       return <div>Panel content not implemented yet</div>
   }
@@ -198,6 +201,7 @@ export function PanelManager() {
       [PanelType.COMPOSE_MAIL]: 'Compose Message',
       [PanelType.CHAT]: 'Chat',
       [PanelType.MARKET]: 'Market',
+      [PanelType.FLEETS]: 'Fleet Command',
     }
     
     return (titles[panel.type] as string) || 'Panel'

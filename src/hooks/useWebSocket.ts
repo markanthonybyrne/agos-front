@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { setTick, setTickProcessing } from '@/app/slices/gameSlice'
@@ -10,24 +11,25 @@ import {
   handleEmpireAttacked,
   handleResearchCompleted,
   handleAllianceMessage,
-  handleTickProcessed,
   handleFleetLaunched,
   handlePlanetCaptured,
   handlePlanetColonized,
-  addNotification,
 } from '@/app/slices/notificationSlice'
 import { initializeTickCountdown, updateCountdownFromWebSocket } from '@/lib/tickService'
 import { initializeEcho, disconnectEcho, getEcho } from '@/lib/websocket'
 import { formatCoordinate } from '@/lib/coordinates'
-import { toast } from 'sonner'
 import { apiSlice } from '@/api/apiSlice'
 import { notifyWithToast } from '@/lib/notificationHelper'
 
 export function useWebSocket() {
   const dispatch = useAppDispatch()
+  const location = useLocation()
   const token = useAppSelector((state) => state.auth.token)
   const empire = useAppSelector((state) => state.auth.empire)
+  const user = useAppSelector((state) => state.auth.user)
   const { data: meData } = useGetMeQuery(undefined, { skip: !token })
+  // Get userId from meData first (most up-to-date), fallback to auth state
+  const userId = meData?.user?.id || user?.id
   
   // Use ref to prevent multiple subscriptions and track channel
   const subscribedRef = useRef<string | null>(null) // Track which empire ID we're subscribed to
@@ -35,19 +37,31 @@ export function useWebSocket() {
   const allianceChannelRef = useRef<any>(null)
   const initializedRef = useRef<boolean>(false)
   const subscriptionsRef = useRef<Array<{ channel: string; events: string[] }>>([])
+  const routeRef = useRef<string | null>(null) // Track current route
 
   useEffect(() => {
-    if (!token || !empire) {
+    if (!token || !empire || !userId) {
       if (channelRef.current) {
         channelRef.current = null
       }
       subscribedRef.current = null
       initializedRef.current = false
+      routeRef.current = null
       return
     }
     
-    // Prevent multiple subscriptions to the same channel
-    if (subscribedRef.current === `empire.${empire.id}` && initializedRef.current) {
+    // Check if route has changed - if so, reset initialization to allow re-subscription
+    const currentRoute = location.pathname
+    if (routeRef.current !== null && routeRef.current !== currentRoute) {
+      console.log('[WebSocket] 🔄 Route changed, resetting subscription state for re-subscription')
+      initializedRef.current = false
+      subscribedRef.current = null
+    }
+    routeRef.current = currentRoute
+    
+    // Prevent multiple subscriptions to the same channel on the same route
+    // But allow re-subscription if route changed or not yet initialized
+    if (subscribedRef.current === `empire.${empire.id}` && initializedRef.current && routeRef.current === currentRoute) {
       return
     }
 
@@ -212,13 +226,24 @@ export function useWebSocket() {
     const handleFleetArrivedEvent = (data: any) => {
       // Per spec: data.fleet.id, data.fleet.destination.coordinate
       const fleetData = data.fleet || data
-      dispatch(handleFleetArrived({
-        fleetId: fleetData.id || fleetData.fleet_id,
-        destination: fleetData.destination?.coordinate || fleetData.destination_coordinate || fleetData.destination,
-        fleetName: `Fleet ${fleetData.id || fleetData.fleet_id}`,
-      }))
       const destinationCoord = fleetData.destination?.coordinate || fleetData.destination_coordinate || 'destination'
-      toast.info(`Fleet arrived at ${destinationCoord}`)
+      const fleetId = fleetData.id || fleetData.fleet_id
+      
+      dispatch(handleFleetArrived({
+        fleetId,
+        destination: destinationCoord,
+        fleetName: `Fleet ${fleetId}`,
+      }))
+      
+      notifyWithToast(dispatch, {
+        type: 'success',
+        title: 'Fleet Arrived',
+        message: `Fleet ${fleetId} arrived at ${destinationCoord}`,
+        category: 'fleet',
+        actionUrl: fleetId ? `/fleets/${fleetId}` : '/fleets',
+        data: { fleetId, destinationCoordinate: destinationCoord },
+      })
+      
       dispatch(apiSlice.util.invalidateTags(['Fleet', 'Planet']))
     }
     
@@ -257,23 +282,49 @@ export function useWebSocket() {
     
     // Handle fleet attacked event
     const handleFleetAttackedEvent = (data: any) => {
+      const locationCoord = data.location_coordinate || data.coordinate || 'Unknown'
+      const attackerName = data.attacker_name || data.attacker || 'Unknown'
+      const fleetId = data.fleet_id
+      
       dispatch(handleFleetAttacked({
-        fleetId: data.fleet_id,
-        attacker: data.attacker_name || data.attacker || 'Unknown',
-        location: data.location_coordinate || data.coordinate || 'Unknown',
+        fleetId,
+        attacker: attackerName,
+        location: locationCoord,
       }))
-      toast.error(`Your fleet is under attack at ${data.location_coordinate || data.coordinate}!`)
+      
+      notifyWithToast(dispatch, {
+        type: 'error',
+        title: '⚠️ Fleet Under Attack!',
+        message: `Your fleet is under attack at ${locationCoord} by ${attackerName}`,
+        category: 'combat',
+        actionUrl: fleetId ? `/fleets/${fleetId}` : '/combat',
+        data: { fleetId, attackerName, locationCoordinate: locationCoord },
+      })
+      
       dispatch(apiSlice.util.invalidateTags(['Fleet', 'Planet']))
     }
     
     // Handle empire attacked event
     const handleEmpireAttackedEvent = (data: any) => {
+      const locationCoord = data.location_coordinate || data.coordinate || 'Unknown'
+      const attackerName = data.attacker_name || data.attacker || 'Unknown'
+      const planetId = data.planet_id
+      
       dispatch(handleEmpireAttacked({
-        planetId: data.planet_id,
-        attacker: data.attacker_name || data.attacker || 'Unknown',
-        location: data.location_coordinate || data.coordinate || 'Unknown',
+        planetId,
+        attacker: attackerName,
+        location: locationCoord,
       }))
-      toast.error(`Your empire is under attack at ${data.location_coordinate || data.coordinate}!`)
+      
+      notifyWithToast(dispatch, {
+        type: 'error',
+        title: '⚠️ Empire Under Attack!',
+        message: `Your empire is under attack at ${locationCoord} by ${attackerName}`,
+        category: 'combat',
+        actionUrl: planetId ? `/planets/${planetId}` : '/combat',
+        data: { planetId, attackerName, locationCoordinate: locationCoord },
+      })
+      
       dispatch(apiSlice.util.invalidateTags(['Empire', 'Planet', 'Fleet']))
     }
     
@@ -294,39 +345,36 @@ export function useWebSocket() {
           : data.combat_log.attacker_empire_name
         const planetCoord = data.combat_log.planet_coordinate || 'Unknown'
         const result = isWinner ? 'Victory' : 'Defeat'
+        const combatLogId = data.combat_log.id
+        const planetCaptured = data.combat_log.planet_captured
+        const message = `${result} against ${opponentName}${planetCaptured ? ' - Planet Captured!' : ''}`
         
-        // Add notification to notification center
-        dispatch(addNotification({
+        notifyWithToast(dispatch, {
           type: isWinner ? 'success' : 'error',
-          title: `Battle ${result} at ${planetCoord}`,
-          message: `${result} against ${opponentName}${data.combat_log.planet_captured ? ' - Planet Captured!' : ''}`,
+          title: `Battle ${result} at ${planetCoord}!`,
+          message,
           category: 'combat',
           actionUrl: '/combat',
           data: {
-            combat_log_id: data.combat_log.id,
+            combat_log_id: combatLogId,
             planet_coordinate: planetCoord,
             attacker_won: data.combat_log.attacker_won,
-            planet_captured: data.combat_log.planet_captured,
-          }
-        }))
-        
-        // Show toast notification
-        toast[isWinner ? 'success' : 'error'](
-          `Battle ${result} at ${planetCoord}!`,
-          {
+            planet_captured: planetCaptured,
+            opponent_name: opponentName,
+          },
+          toastOptions: {
             duration: 10000,
-            description: `${result} against ${opponentName}${data.combat_log.planet_captured ? ' - Planet Captured!' : ''}`,
-            action: {
-              label: 'View Report',
-              onClick: () => {
-                // Navigate to combat logs page
-                window.location.href = '/combat'
-              }
-            }
-          }
-        )
+            description: message,
+          },
+        })
       } else {
-        toast.info('Combat resolved! Check battle reports for details.')
+        notifyWithToast(dispatch, {
+          type: 'info',
+          title: 'Combat Resolved',
+          message: 'Combat resolved! Check battle reports for details.',
+          category: 'combat',
+          actionUrl: '/combat',
+        })
       }
     }
     
@@ -336,13 +384,21 @@ export function useWebSocket() {
         researchName: data.research_name || data.research_slug?.replace(/_/g, ' '),
         planetId: data.planet_id,
       }))
-      const tags: any[] = ['Research', 'Planet', 'Buildable', 'Empire']
+      const tags: any[] = ['Research', 'Planet', 'Buildable', 'Empire', 'Universe']
       if (data.planet_id) {
         tags.push({ type: 'Research', id: Number(data.planet_id) })
         tags.push({ type: 'Planet', id: Number(data.planet_id) })
         tags.push({ type: 'ConstructionQueue', id: Number(data.planet_id) })
       }
       dispatch(apiSlice.util.invalidateTags(tags))
+      
+      // Dispatch custom event for map to refetch visibility (research may unlock visibility)
+      window.dispatchEvent(new CustomEvent('research:completed', { 
+        detail: { 
+          researchSlug: data.research_slug,
+          planetId: data.planet_id,
+        } 
+      }))
     }
     
     // Handle construction completed event (enhanced per guide specs + real-time)
@@ -370,10 +426,24 @@ export function useWebSocket() {
         itemName: itemSlug?.replace(/_/g, ' ') || itemTypeName,
       }))
       
-      // Show toast notification
-      toast.success(`✅ ${itemTypeName} Complete`, {
-        description: `${quantity}x ${itemSlug?.replace(/_/g, ' ') || itemTypeName} completed on ${planetName}`,
-        duration: 5000,
+      // Show notification
+      notifyWithToast(dispatch, {
+        type: 'success',
+        title: `✅ ${itemTypeName} Complete`,
+        message: `${quantity}x ${itemSlug?.replace(/_/g, ' ') || itemTypeName} completed on ${planetName}`,
+        category: 'construction',
+        actionUrl: planetId ? `/planets/${planetId}` : '/planets',
+        data: {
+          planetId,
+          planetName,
+          itemType,
+          itemSlug,
+          quantity,
+        },
+        toastOptions: {
+          duration: 5000,
+          description: `${quantity}x ${itemSlug?.replace(/_/g, ' ') || itemTypeName} completed on ${planetName}`,
+        },
       })
       
       // Aggressively invalidate for real-time updates
@@ -434,16 +504,22 @@ export function useWebSocket() {
       
       if (isDefender) {
         // URGENT: Show prominent warning
-        toast.error('⚠️ Incoming Fleet Attack!', {
-          description: `${attacker?.name || 'Unknown'} has launched a fleet at your planet ${destinationName}`,
-          duration: 10000,
-          action: {
-            label: 'View Planet',
-            onClick: () => {
-              if (destinationPlanetId) {
-                window.location.href = `/planets/${destinationPlanetId}`
-              }
-            },
+        const attackerName = attacker?.name || 'Unknown'
+        notifyWithToast(dispatch, {
+          type: 'error',
+          title: '⚠️ Incoming Fleet Attack!',
+          message: `${attackerName} has launched a fleet at your planet ${destinationName}`,
+          category: 'combat',
+          actionUrl: destinationPlanetId ? `/planets/${destinationPlanetId}` : '/planets',
+          data: {
+            attackerName,
+            destinationPlanetId,
+            destinationName,
+            isDefender: true,
+          },
+          toastOptions: {
+            duration: 10000,
+            description: `${attackerName} has launched a fleet at your planet ${destinationName}`,
           },
         })
         
@@ -455,9 +531,22 @@ export function useWebSocket() {
         )
       } else {
         // Attacker confirmation
-        toast.info('Fleet Launched', {
-          description: `Your fleet will arrive at tick ${fleet?.arrival_tick || 'Unknown'}`,
-          duration: 5000,
+        const arrivalTick = fleet?.arrival_tick || 'Unknown'
+        notifyWithToast(dispatch, {
+          type: 'success',
+          title: 'Fleet Launched',
+          message: `Your fleet will arrive at tick ${arrivalTick}`,
+          category: 'fleet',
+          actionUrl: fleet?.id ? `/fleets/${fleet.id}` : '/fleets',
+          data: {
+            fleetId: fleet?.id,
+            arrivalTick,
+            destinationPlanetId,
+          },
+          toastOptions: {
+            duration: 5000,
+            description: `Your fleet will arrive at tick ${arrivalTick}`,
+          },
         })
       }
       
@@ -481,30 +570,46 @@ export function useWebSocket() {
       
       if (isPreviousOwner) {
         // Planet lost
-        toast.error('⚠️ Planet Lost!', {
-          description: `${planet?.name || 'Planet'} has been captured by ${new_owner?.name || 'Unknown'}`,
-          duration: 10000,
-          action: combat_log_id
-            ? {
-                label: 'View Combat Report',
-                onClick: () => {
-                  window.location.href = `/combat/${combat_log_id}`
-                },
-              }
-            : undefined,
+        const planetName = planet?.name || 'Planet'
+        const newOwnerName = new_owner?.name || 'Unknown'
+        notifyWithToast(dispatch, {
+          type: 'error',
+          title: '⚠️ Planet Lost!',
+          message: `${planetName} has been captured by ${newOwnerName}`,
+          category: 'capture',
+          actionUrl: combat_log_id ? `/combat/${combat_log_id}` : '/combat',
+          data: {
+            planetId: planet?.id,
+            planetName,
+            newOwnerName,
+            previousOwnerName: previous_owner?.name,
+            combatLogId: combat_log_id,
+            isPreviousOwner: true,
+          },
+          toastOptions: {
+            duration: 10000,
+            description: `${planetName} has been captured by ${newOwnerName}`,
+          },
         })
       } else if (isNewOwner) {
         // Planet captured
-        toast.success('🎯 Planet Captured!', {
-          description: `You have successfully captured ${planet?.name || 'Planet'}!`,
-          duration: 8000,
-          action: {
-            label: 'View Planet',
-            onClick: () => {
-              if (planet?.id) {
-                window.location.href = `/planets/${planet.id}`
-              }
-            },
+        const planetName = planet?.name || 'Planet'
+        notifyWithToast(dispatch, {
+          type: 'success',
+          title: '🎯 Planet Captured!',
+          message: `You have successfully captured ${planetName}!`,
+          category: 'capture',
+          actionUrl: planet?.id ? `/planets/${planet.id}` : '/planets',
+          data: {
+            planetId: planet?.id,
+            planetName,
+            previousOwnerName: previous_owner?.name,
+            combatLogId: combat_log_id,
+            isNewOwner: true,
+          },
+          toastOptions: {
+            duration: 8000,
+            description: `You have successfully captured ${planetName}!`,
           },
         })
       }
@@ -529,16 +634,22 @@ export function useWebSocket() {
       }))
       
       // Show success notification
-      toast.success('🎉 Planet Colonized!', {
-        description: `Successfully colonized ${planetName} at ${coordString}`,
-        duration: 8000,
-        action: {
-          label: 'View Planet',
-          onClick: () => {
-            if (planetId) {
-              window.location.href = `/planets/${planetId}`
-            }
-          },
+      notifyWithToast(dispatch, {
+        type: 'success',
+        title: '🎉 Planet Colonized!',
+        message: `Successfully colonized ${planetName} at ${coordString}`,
+        category: 'colonization',
+        actionUrl: planetId ? `/planets/${planetId}` : '/planets',
+        data: {
+          planetId,
+          planetName,
+          coordinate: coordString,
+          empireId: empire?.id,
+          empireName: empire?.name,
+        },
+        toastOptions: {
+          duration: 8000,
+          description: `Successfully colonized ${planetName} at ${coordString}`,
         },
       })
       
@@ -752,12 +863,29 @@ export function useWebSocket() {
 
       // Handle alliance message event
       privateChannel.listen('.alliance.message', (data: any) => {
+        const senderName = data.sender_name || data.sender || 'Unknown'
+        const messageText = data.message || data.content || ''
+        const allianceId = data.alliance_id
+        
         dispatch(handleAllianceMessage({
-          senderName: data.sender_name || data.sender,
-          message: data.message || data.content,
-          allianceId: data.alliance_id,
+          senderName,
+          message: messageText,
+          allianceId,
         }))
-        toast.info(`New alliance message from ${data.sender_name}`)
+        
+        notifyWithToast(dispatch, {
+          type: 'info',
+          title: 'Alliance Message',
+          message: `New message from ${senderName}: ${messageText.substring(0, 100)}${messageText.length > 100 ? '...' : ''}`,
+          category: 'alliance',
+          actionUrl: '/alliances',
+          data: {
+            senderName,
+            allianceId,
+            messageId: data.message_id || data.id,
+          },
+        })
+        
         dispatch(apiSlice.util.invalidateTags(['Alliance']))
       })
       privateChannelEvents.push('.alliance.message')
@@ -836,12 +964,24 @@ export function useWebSocket() {
     })
 
 
-    // Subscribe to public tick channel (use 'public.tick' as per guide)
-    const publicTickChannel = echo.channel('public.tick')
+    // Subscribe to private user tick channel (App.Models.User.{userId})
+    // This replaces the old public.tick channel to prevent duplicate notifications
+    // Note: Laravel Echo automatically prefixes private channels with "private-"
+    const privateTickChannelName = `App.Models.User.${userId}`
+    console.log(`[WebSocket] 🔐 Attempting to subscribe to private user tick channel: ${privateTickChannelName}`)
+    console.log(`[WebSocket] User ID: ${userId}, Token present: ${!!token}`)
+    
+    const privateTickChannel = echo.private(privateTickChannelName)
     const tickChannelEvents: string[] = []
     
-    publicTickChannel.error((error: any) => {
-      console.error('[WebSocket] Error subscribing to tick channel:', error)
+    // Handle subscription errors
+    privateTickChannel.error((error: any) => {
+      console.error('[WebSocket] ❌ Error subscribing to private tick channel:', error)
+      console.error('[WebSocket] Error details:', JSON.stringify(error, null, 2))
+      if (error?.status === 403 || error?.status === 401) {
+        console.error('[WebSocket] ⚠️ Authorization failed - check that /broadcasting/auth endpoint is accessible and user has access to this channel')
+        console.error('[WebSocket] Make sure routes/channels.php authorizes App.Models.User.{id} channels')
+      }
     })
     
     const handleTickProcessedEvent = (data: any) => {
@@ -862,16 +1002,21 @@ export function useWebSocket() {
         dispatch(setTick({ tick: tickNumber, nextTickETA: nextTickEta }))
       }
       
-      // Create notification (handleTickProcessed already adds to notification tray)
-      dispatch(handleTickProcessed({
-        tickNumber: tickNumber,
-        nextTickEta: nextTickEta || 'calculating...',
-      }))
-      
-      // Also show toast for immediate visibility
-      toast.info(`Tick ${tickNumber} Processed`, {
-        description: `Game tick ${tickNumber} has completed processing`,
-        duration: 5000,
+      // Show notification (using notifyWithToast to show toast AND save to tray)
+      const nextTickEtaText = nextTickEta || 'calculating...'
+      notifyWithToast(dispatch, {
+        type: 'info',
+        title: 'Tick Processed',
+        message: `Tick ${tickNumber} has been processed. Next tick in ${nextTickEtaText}`,
+        category: 'tick',
+        data: {
+          tickNumber,
+          nextTickEta: nextTickEtaText,
+        },
+        toastOptions: {
+          duration: 5000,
+          description: `Game tick ${tickNumber} has completed processing`,
+        },
       })
       
       dispatch(setTickProcessing(false))
@@ -907,27 +1052,51 @@ export function useWebSocket() {
     }
     
     // Register events FIRST, then set up subscription callback
-    publicTickChannel.listen('.tick.processed', wrappedTickHandler)
-    publicTickChannel.listen('tick.processed', wrappedTickHandler)
-    publicTickChannel.listen('TickProcessed', wrappedTickHandler)
-    publicTickChannel.listen('App\\Events\\TickProcessed', wrappedTickHandler)
-    publicTickChannel.listen('App.Events.TickProcessed', wrappedTickHandler)
+    privateTickChannel.listen('.tick.processed', wrappedTickHandler)
+    privateTickChannel.listen('tick.processed', wrappedTickHandler)
+    privateTickChannel.listen('TickProcessed', wrappedTickHandler)
+    privateTickChannel.listen('App\\Events\\TickProcessed', wrappedTickHandler)
+    privateTickChannel.listen('App.Events.TickProcessed', wrappedTickHandler)
     tickChannelEvents.push('.tick.processed', 'tick.processed', 'TickProcessed', 'App\\Events\\TickProcessed', 'App.Events.TickProcessed')
     
     // Now set up subscription callback AFTER events are registered
-    publicTickChannel.subscribed(() => {
-      console.log('[WebSocket] ✅ Successfully subscribed to public channel: public.tick')
-      trackSubscription('public.tick', tickChannelEvents)
+    privateTickChannel.subscribed(() => {
+      console.log(`[WebSocket] ✅ Successfully subscribed to private user tick channel: ${privateTickChannelName}`)
+      console.log(`[WebSocket] Channel name in Pusher: private-${privateTickChannelName}`)
+      // Track with the Pusher channel name (with private- prefix)
+      trackSubscription(`private-${privateTickChannelName}`, tickChannelEvents)
     })
     
     // Also check if already subscribed (in case it subscribed synchronously)
     const echoWithConnectorForTick = echo as any
     if (echoWithConnectorForTick.connector?.pusher) {
       const pusher = echoWithConnectorForTick.connector.pusher
-      const tickPusherChannel = pusher.channel('public.tick')
+      // Laravel Echo/Pusher automatically prefixes private channels with "private-"
+      const pusherChannelName = `private-${privateTickChannelName}`
+      const tickPusherChannel = pusher.channel(pusherChannelName)
+      console.log(`[WebSocket] Checking Pusher channel status: ${pusherChannelName}`)
+      console.log(`[WebSocket] Channel exists: ${!!tickPusherChannel}, Subscribed: ${!!(tickPusherChannel && (tickPusherChannel as any).subscribed)}`)
+      
       if (tickPusherChannel && (tickPusherChannel as any).subscribed) {
         // Already subscribed, track it now
-        setTimeout(() => trackSubscription('public.tick', tickChannelEvents), 100)
+        console.log(`[WebSocket] ✅ Channel already subscribed synchronously`)
+        setTimeout(() => trackSubscription(pusherChannelName, tickChannelEvents), 100)
+      } else {
+        // Log authorization attempt
+        pusher.bind('pusher:subscription_error', (data: any) => {
+          if (data.channel === pusherChannelName) {
+            console.error('[WebSocket] ❌ Subscription authorization error for tick channel:', data)
+            console.error('[WebSocket] Status code:', data.status)
+            console.error('[WebSocket] Error message:', data.error)
+          }
+        })
+        
+        pusher.bind('pusher:subscription_succeeded', (data: any) => {
+          if (data.channel === pusherChannelName) {
+            console.log('[WebSocket] ✅ Tick channel subscription authorized successfully')
+            trackSubscription(pusherChannelName, tickChannelEvents)
+          }
+        })
       }
     }
     
@@ -945,22 +1114,24 @@ export function useWebSocket() {
       const title = announcement.title || 'New announcement'
       const priority = announcement.priority || 'info'
       
-      // Show toast notification
-      toast.success(`New announcement: ${title}`, {
-        duration: 10000,
-        description: announcement.message || announcement.content || '',
-      })
+      // Show notification (using notifyWithToast to show toast AND save to tray)
+      const notificationType = priority === 'alert' ? 'error' : priority === 'warning' ? 'warning' : priority === 'success' ? 'success' : 'info'
+      const announcementMessage = announcement.message || announcement.content || 'A new announcement has been published'
       
-      // Add notification to notification tray
-      dispatch(addNotification({
-        type: priority === 'alert' ? 'error' : priority === 'warning' ? 'warning' : priority === 'success' ? 'success' : 'info',
+      notifyWithToast(dispatch, {
+        type: notificationType,
         title: `New Announcement: ${title}`,
-        message: announcement.message || announcement.content || 'A new announcement has been published',
+        message: announcementMessage,
         category: 'announcement',
         data: {
           announcement_id: announcement.id,
+          priority,
         },
-      }))
+        toastOptions: {
+          duration: 10000,
+          description: announcementMessage,
+        },
+      })
       
       // Invalidate announcement cache to refresh the list
       dispatch(apiSlice.util.invalidateTags(['Announcement']))
@@ -1001,8 +1172,17 @@ export function useWebSocket() {
         const channelName = event.channel || 'unknown'
         const eventName = event.event || 'unknown'
         
-        // Check if this is for the tick channel
-        if (channelName === 'public-tick' || channelName === 'public.tick' || channelName.includes('tick')) {
+        // Check if this is for the tick channel (both old public.tick and new private user channel)
+        // Laravel Echo prefixes private channels with "private-"
+        const privateTickChannelNameInPusher = `private-App.Models.User.${userId}`
+        const isTickChannel = channelName === 'public-tick' || 
+                             channelName === 'public.tick' || 
+                             channelName === privateTickChannelNameInPusher ||
+                             (channelName.includes('tick') && userId && channelName.includes(`App.Models.User.${userId}`)) ||
+                             (channelName.includes('App.Models.User') && channelName.includes(String(userId)))
+        
+        if (isTickChannel) {
+          console.log(`[WebSocket] 📨 Received message on tick channel: ${channelName}, Event: ${eventName}`)
           // If it's a tick.processed event, manually trigger handler
           if (eventName.includes('tick') && (eventName.includes('processed') || eventName.includes('Processed'))) {
             const eventData = typeof event.data === 'string' ? (() => {
@@ -1012,6 +1192,7 @@ export function useWebSocket() {
                 return event.data
               }
             })() : event.data
+            console.log('[WebSocket] ✅ Processing tick.processed event from private channel:', eventData)
             handleTickProcessedEvent(eventData)
           }
         }
@@ -1049,16 +1230,31 @@ export function useWebSocket() {
         const { message } = data
         const senderName = message?.sender_empire?.name || data.sender_name || 'Unknown'
         
+        const messageText = message?.message || data.message || ''
+        const allianceId = message?.alliance_id || empire.alliance_id || 0
+        
         dispatch(handleAllianceMessage({
           senderName,
-          message: message?.message || data.message || '',
-          allianceId: message?.alliance_id || empire.alliance_id || 0,
+          message: messageText,
+          allianceId,
         }))
         
-        // Show toast notification (only if chat window is not focused)
-        toast.info(`Alliance Message from ${senderName}`, {
-          description: message?.message?.substring(0, 100) || '',
-          duration: 5000,
+        // Show notification
+        notifyWithToast(dispatch, {
+          type: 'info',
+          title: `Alliance Message from ${senderName}`,
+          message: messageText.substring(0, 100) + (messageText.length > 100 ? '...' : ''),
+          category: 'alliance',
+          actionUrl: '/alliances',
+          data: {
+            senderName,
+            allianceId,
+            messageId: message?.id || data.id,
+          },
+          toastOptions: {
+            duration: 5000,
+            description: messageText.substring(0, 100) + (messageText.length > 100 ? '...' : ''),
+          },
         })
         
         // Invalidate alliance tags
@@ -1142,9 +1338,9 @@ export function useWebSocket() {
         }
         channelRef.current = null
       }
-      subscribedRef.current = null
+      // Don't reset subscribedRef or initializedRef here - let route change detection handle it
       // Don't disconnect Echo here as it might be used by other components
     }
-  }, [token, empire?.id, dispatch, meData?.planets]) // Include meData.planets to subscribe to galaxy channels when available
+  }, [token, empire?.id, userId, dispatch, meData?.planets, location.pathname]) // Include location.pathname to detect route changes and re-subscribe
 }
 

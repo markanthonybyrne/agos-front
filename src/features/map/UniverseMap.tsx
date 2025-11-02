@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useGetMapQuery, useGetUniverseStructureQuery, useGetVisibilityQuery, useGetDiscoverableQuery } from '@/api/endpoints/universeApi'
 import { useSearchPlanetsQuery, useFindNearbyPlanetsQuery, useDiscoverGalaxyMutation } from '@/api/endpoints/planetsApi'
+import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -83,12 +84,15 @@ export function UniverseMap() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   
+  // Ref to track actual rendered planet positions from DOM - ensures fleet lines originate from planets
+  const renderedPlanetPositionsRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  
   // Reset drag offset when changing map levels
   useEffect(() => {
     setDragOffset({ x: 0, y: 0 })
   }, [mapState.level])
 
-  const { data: mapData, isLoading, error } = useGetMapQuery({
+  const { data: mapData, isLoading, error, refetch: refetchMap } = useGetMapQuery({
     quadrant: mapState.selectedQuadrant,
     sector: mapState.selectedSector,
     galaxy: mapState.selectedGalaxy,
@@ -111,12 +115,62 @@ export function UniverseMap() {
     skip: mapState.level !== 'planet' || !mapState.selectedQuadrant || !mapState.selectedSector || !mapState.selectedGalaxy
   })
 
+  // Fetch fleets for travel lines
+  const { data: fleetsData } = useGetFleetsQuery(undefined, {
+    skip: mapState.level !== 'planet'
+  })
+
   const { data: nearbyPlanets, isLoading: isLoadingNearby } = useFindNearbyPlanetsQuery(undefined, {
     skip: false // Always fetch nearby planets so they're available when tab is opened
   })
 
-  const { data: visibilityData } = useGetVisibilityQuery()
+  const { data: visibilityData, refetch: refetchVisibility } = useGetVisibilityQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
   const { data: discoverableData } = useGetDiscoverableQuery()
+  
+  // Refetch visibility when research completes (player advances)
+  useEffect(() => {
+    const handleResearchCompleted = () => {
+      // Player may have unlocked new visibility - refetch visibility data
+      refetchVisibility()
+    }
+    
+    const handleTickProcessed = () => {
+      // Refetch visibility on tick to catch any changes
+      refetchVisibility()
+    }
+    
+    window.addEventListener('research:completed', handleResearchCompleted)
+    window.addEventListener('tick:processed', handleTickProcessed)
+    
+    return () => {
+      window.removeEventListener('research:completed', handleResearchCompleted)
+      window.removeEventListener('tick:processed', handleTickProcessed)
+    }
+  }, [refetchVisibility])
+  
+  // Refetch map data when visibility changes (player advances)
+  useEffect(() => {
+    if (visibilityData) {
+      // Refetch map data to get newly visible sectors/quadrants
+      refetchMap()
+    }
+  }, [visibilityData?.visibility_level, refetchMap])
+  
+  // Auto-set selectedQuadrant when navigating to sector view without one
+  useEffect(() => {
+    if (mapState.level === 'sector' && !mapState.selectedQuadrant && visibilityData?.visible_quadrants) {
+      // Get first visible quadrant (could be number or object)
+      const firstQuadrant = visibilityData.visible_quadrants[0]
+      const quadrantId = typeof firstQuadrant === 'number' ? firstQuadrant : firstQuadrant?.quadrant
+      
+      if (quadrantId) {
+        console.log('[Map] Auto-setting selectedQuadrant:', quadrantId)
+        setMapState(prev => ({ ...prev, selectedQuadrant: quadrantId }))
+      }
+    }
+  }, [mapState.level, mapState.selectedQuadrant, visibilityData?.visible_quadrants])
 
   const [discoverGalaxy, { isLoading: isDiscovering }] = useDiscoverGalaxyMutation()
   
@@ -341,16 +395,24 @@ export function UniverseMap() {
       
       switch (level) {
         case 'sector':
-          newState.selectedQuadrant = data?.id || prev.selectedQuadrant
+          // data?.id might be the quadrant ID, or data might be a quadrant object
+          newState.selectedQuadrant = data?.id || data?.quadrant || prev.selectedQuadrant
+          // Clear sector/galaxy when going to sector view
+          newState.selectedSector = undefined
+          newState.selectedGalaxy = undefined
           break
         case 'galaxy':
           newState.selectedQuadrant = prev.selectedQuadrant
-          newState.selectedSector = data?.id || prev.selectedSector
+          // data?.id might be the sector ID, or data might be a sector object
+          newState.selectedSector = data?.id || data?.sector || prev.selectedSector
+          // Clear galaxy when going to galaxy view
+          newState.selectedGalaxy = undefined
           break
         case 'planet':
           newState.selectedQuadrant = prev.selectedQuadrant
           newState.selectedSector = prev.selectedSector
-          newState.selectedGalaxy = data?.id || prev.selectedGalaxy
+          // data?.id might be the galaxy ID, or data might be a galaxy object
+          newState.selectedGalaxy = data?.id || data?.galaxy || prev.selectedGalaxy
           break
       }
       
@@ -461,15 +523,68 @@ export function UniverseMap() {
   }
 
   const renderQuadrantView = () => {
-    // NEW: Try hierarchical visibility arrays first (from backend)
+    // Priority 1: Build quadrants from visibilityData (most reliable after player advances)
+    let quadrantsFromVisibility: any[] = []
+    if (visibilityData?.visible_quadrants && Array.isArray(visibilityData.visible_quadrants)) {
+      quadrantsFromVisibility = visibilityData.visible_quadrants.map((q: any) => {
+        const qId = typeof q === 'number' ? q : q.quadrant
+        // Count sectors and galaxies for this quadrant from visibilityData
+        const sectorsInQuadrant = visibilityData.visible_sectors?.filter(
+          (s: any) => s.quadrant === qId
+        ) || []
+        const galaxiesInQuadrant = visibilityData.visible_galaxies?.filter(
+          (g: any) => g.quadrant === qId
+        ) || []
+        
+        return {
+          quadrant: qId,
+          visibility: { is_visible: true },
+          sectors: sectorsInQuadrant.map((s: any) => ({
+            id: s.sector,
+            quadrant: s.quadrant,
+            sector: s.sector,
+            visibility: { is_visible: true }
+          })),
+          _galaxyCount: galaxiesInQuadrant.length,
+          _sectorCount: sectorsInQuadrant.length
+        }
+      })
+    }
+    
+    // Priority 2: Try hierarchical visibility arrays from backend
     const hierarchicalQuadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
     const hierarchicalGalaxies = mapData?.galaxies || mapDataAny?.data?.galaxies || []
     
+    // Use visibility quadrants as primary source (most reliable after advances)
+    let visibleQuadrants: any[] = []
+    if (quadrantsFromVisibility.length > 0) {
+      visibleQuadrants = quadrantsFromVisibility
+      // Try to enrich with mapData details if available
     if (hierarchicalQuadrants.length > 0) {
-      // Filter to only visible quadrants
-      const visibleQuadrants = hierarchicalQuadrants.filter(
+        visibleQuadrants = quadrantsFromVisibility.map((visQuad: any) => {
+          const mapQuad = hierarchicalQuadrants.find((q: any) => 
+            (q.quadrant || q.id) === visQuad.quadrant && q.visibility?.is_visible === true
+          )
+          if (mapQuad) {
+            // Use mapData structure but keep visibility counts
+            return {
+              ...mapQuad,
+              quadrant: visQuad.quadrant,
+              _galaxyCount: visQuad._galaxyCount,
+              _sectorCount: visQuad._sectorCount,
+            }
+          }
+          return visQuad
+        })
+      }
+    } else if (hierarchicalQuadrants.length > 0) {
+      // Fallback to mapData if no visibility data
+      visibleQuadrants = hierarchicalQuadrants.filter(
         (q: any) => q.visibility?.is_visible === true
       )
+    }
+    
+    if (visibleQuadrants.length > 0 || hierarchicalQuadrants.length > 0) {
       
       // If visibility level is "galaxy", show galaxies directly from quadrant level
       const shouldShowGalaxiesDirectly = visibilityData?.visibility_level === 'galaxy'
@@ -605,20 +720,73 @@ export function UniverseMap() {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {visibleQuadrants.map((quadrant: any) => {
+              const quadrantId = quadrant.quadrant || quadrant.id
               const isVisible = quadrant.visibility?.is_visible === true
+              
+              // Get sectors from visibilityData first (most reliable), then mapData
+              let sectorCount = quadrant._sectorCount || 0
+              let galaxyCount = quadrant._galaxyCount || 0
+              
+              // Priority 1: Use visibilityData for counts (most accurate after player advances)
+              if (sectorCount === 0 && visibilityData?.visible_sectors) {
+                sectorCount = visibilityData.visible_sectors.filter((s: any) => 
+                  s.quadrant === quadrantId
+                ).length
+              }
+              
+              if (galaxyCount === 0 && visibilityData?.visible_galaxies) {
+                galaxyCount = visibilityData.visible_galaxies.filter((g: any) => 
+                  g.quadrant === quadrantId
+                ).length
+              }
+              
+              // Fallback to mapData if visibilityData counts are 0
+              if (sectorCount === 0) {
+                if (mapData?.sectors && Array.isArray(mapData.sectors)) {
+                  // Try flat sectors array first
+                  sectorCount = mapData.sectors.filter((s: any) => 
+                    s.quadrant === quadrantId && s.visibility?.is_visible === true
+                  ).length
+                } else if (quadrant.sectors && Array.isArray(quadrant.sectors)) {
+                  // Fallback to nested sectors in quadrant object
+                  sectorCount = quadrant.sectors.filter((s: any) => 
+                    s.visibility?.is_visible !== false // Default to visible if not specified
+                  ).length
+                }
+              }
+              
+              if (galaxyCount === 0) {
+                if (mapData?.galaxies && Array.isArray(mapData.galaxies)) {
+                  // Try flat galaxies array first
+                  galaxyCount = mapData.galaxies.filter((g: any) => 
+                    g.quadrant === quadrantId && g.visibility?.is_visible === true
+                  ).length
+                } else if (quadrant.sectors && Array.isArray(quadrant.sectors)) {
+                  // Count galaxies from nested structure
+                  galaxyCount = quadrant.sectors.reduce((total: number, sector: any) => {
+                    if (sector.galaxies && Array.isArray(sector.galaxies)) {
+                      return total + sector.galaxies.filter((g: any) => 
+                        g.visibility?.is_visible !== false
+                      ).length
+                    }
+                    return total
+                  }, 0)
+                }
+              }
+              
               return (
                 <Card 
-                  key={quadrant.quadrant} 
+                  key={quadrantId} 
                   className={cn(
                     "panel-glass cursor-pointer hover:border-cyan/40 transition-colors",
                     isVisible ? "border-cyan/20" : "border-yellow/20 opacity-50"
                   )}
-                  onClick={() => navigateToLevel('sector', { id: quadrant.quadrant })}
+                  onClick={() => navigateToLevel('sector', { id: quadrantId })}
                 >
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Globe className="w-5 h-5 text-cyan-400" />
-                      Quadrant {quadrant.quadrant}
+                      Quadrant {quadrantId}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -626,13 +794,13 @@ export function UniverseMap() {
                       <div className="flex justify-between">
                         <span>Sectors:</span>
                         <span className="font-mono">
-                          {mapData?.sectors?.filter((s: any) => s.quadrant === quadrant.quadrant && s.visibility?.is_visible === true).length || 0}
+                          {sectorCount}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Galaxies:</span>
                         <span className="font-mono">
-                          {mapData?.galaxies?.filter((g: any) => g.quadrant === quadrant.quadrant && g.visibility?.is_visible === true).length || 0}
+                          {galaxyCount}
                         </span>
                       </div>
                     </div>
@@ -695,7 +863,7 @@ export function UniverseMap() {
                       "panel-glass cursor-pointer hover:border-cyan/40 transition-colors",
                       isVisible ? "border-cyan/20" : "border-yellow/20 opacity-50"
                     )}
-                    onClick={() => navigateToLevel('sector', quadrant)}
+                    onClick={() => navigateToLevel('sector', { id: quadrant.id || quadrant.quadrant })}
                   >
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -762,7 +930,7 @@ export function UniverseMap() {
                     "panel-glass cursor-pointer hover:border-cyan/40 transition-colors",
                     isVisible ? "border-cyan/20" : "border-yellow/20 opacity-50"
                   )}
-                  onClick={() => navigateToLevel('sector', quadrant)}
+                  onClick={() => navigateToLevel('sector', { id: quadrant.id || quadrant.quadrant })}
                 >
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -881,7 +1049,128 @@ export function UniverseMap() {
   }
 
   const renderSectorView = () => {
-    // NEW: Try hierarchical visibility arrays first (from backend)
+    // Priority 1: Use visibilityData.visible_sectors as source of truth (most reliable after player advances)
+    let sectorsFromVisibility: any[] = []
+    
+    // If no selectedQuadrant, use the first visible quadrant from visibilityData
+    // visible_quadrants can be: [1] (array of numbers) or [{quadrant: 1}] (array of objects)
+    let defaultQuadrant: number | undefined
+    if (visibilityData?.visible_quadrants && visibilityData.visible_quadrants.length > 0) {
+      const firstQuadrant = visibilityData.visible_quadrants[0]
+      defaultQuadrant = typeof firstQuadrant === 'number' ? firstQuadrant : firstQuadrant?.quadrant
+    }
+    const effectiveQuadrant = mapState.selectedQuadrant || defaultQuadrant
+    
+    if (visibilityData?.visible_sectors && effectiveQuadrant) {
+      const visibleSectorsForQuadrant = visibilityData.visible_sectors.filter(
+        (s: any) => s.quadrant === effectiveQuadrant
+      )
+      
+      if (visibleSectorsForQuadrant.length > 0) {
+        sectorsFromVisibility = visibleSectorsForQuadrant.map((s: any) => {
+          // Count galaxies in this sector from visibilityData
+          const galaxiesInSector = visibilityData.visible_galaxies?.filter(
+            (g: any) => g.quadrant === s.quadrant && g.sector === s.sector
+          ) || []
+          
+          return {
+            id: s.sector,
+            quadrant: s.quadrant,
+            sector: s.sector,
+            galaxies: galaxiesInSector.map((g: any) => ({
+              id: g.galaxy,
+              quadrant: g.quadrant,
+              sector: g.sector,
+              galaxy: g.galaxy,
+              planets: [] // Visibility data doesn't include planet details
+            })),
+            visibility: { is_visible: true } // These are visible by definition
+          }
+        })
+      }
+    }
+    
+    // DEBUG: Log what we're working with
+    console.log('[Map] renderSectorView:', {
+      selectedQuadrant: mapState.selectedQuadrant,
+      defaultQuadrant,
+      effectiveQuadrant,
+      hasVisibilityData: !!visibilityData,
+      visibleSectorsCount: visibilityData?.visible_sectors?.length || 0,
+      sectorsFromVisibilityCount: sectorsFromVisibility.length,
+      hasMapData: !!mapData,
+    })
+    
+    // If we have visibility sectors, use them directly (this is the most reliable source)
+    if (sectorsFromVisibility.length > 0) {
+      return (
+        <div className="space-y-4">
+          {/* Visibility unlock message */}
+          {visibilityData && visibilityData.visibility_level === 'galaxy' && mapState.selectedQuadrant && (
+            <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-400">
+                      Research Sensor Technology to unlock sector visibility
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {sectorsFromVisibility.map((sector: any) => {
+              const isVisible = sector.visibility?.is_visible !== false
+              const galaxyCount = sector.galaxies?.length || visibilityData?.visible_galaxies?.filter(
+                (g: any) => g.quadrant === sector.quadrant && g.sector === sector.sector
+              ).length || 0
+              
+              return (
+                <Card 
+                  key={`${sector.quadrant || mapState.selectedQuadrant}:${sector.sector || sector.id}`} 
+                  className={cn(
+                    "panel-glass cursor-pointer hover:border-blue/40 transition-colors",
+                    isVisible ? "border-blue/20" : "border-yellow/20 opacity-50"
+                  )}
+                  onClick={() => navigateToLevel('galaxy', { id: sector.sector || sector.id })}
+                >
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Layers className="w-5 h-5 text-blue-400" />
+                      Sector {sector.sector || sector.id}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Galaxies:</span>
+                        <span className="font-mono">{galaxyCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Planets:</span>
+                        <span className="font-mono">
+                          {mapData?.planets?.filter((p: any) => {
+                            const coord = parseCoordinate(p.coordinate)
+                            return coord && coord.quadrant === (sector.quadrant || mapState.selectedQuadrant) && coord.sector === (sector.sector || sector.id)
+                          }).length || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
+    
+    // Priority 2: Try hierarchical visibility arrays from mapData (from backend)
     const hierarchicalSectors = mapData?.sectors || mapDataAny?.data?.sectors || []
     
     if (hierarchicalSectors.length > 0 && mapState.selectedQuadrant) {
@@ -889,6 +1178,162 @@ export function UniverseMap() {
       const visibleSectors = hierarchicalSectors.filter(
         (s: any) => s.quadrant === mapState.selectedQuadrant && s.visibility?.is_visible === true
       )
+      
+      if (visibleSectors.length > 0) {
+        // Use visibility sectors as primary source
+        const finalSectors = sectorsFromVisibility.map((visSector: any) => {
+          // Try to enrich with mapData if available
+          const mapSector = visibleSectors.find((s: any) => s.sector === visSector.sector)
+          if (mapSector) {
+            // Merge: use mapData for details, but keep visibility structure
+            return {
+              ...mapSector,
+              galaxies: visSector.galaxies.length > 0 ? visSector.galaxies : mapSector.galaxies || [],
+            }
+          }
+          return visSector
+        })
+        
+        return (
+          <div className="space-y-4">
+            {/* Visibility unlock message */}
+            {visibilityData && visibilityData.visibility_level === 'galaxy' && mapState.selectedQuadrant && (
+              <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-400">
+                        Research Sensor Technology to unlock sector visibility
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {finalSectors.map((sector: any) => {
+                const isVisible = sector.visibility?.is_visible !== false
+                const galaxyCount = sector.galaxies?.length || visibilityData?.visible_galaxies?.filter(
+                  (g: any) => g.quadrant === sector.quadrant && g.sector === sector.sector
+                ).length || 0
+                
+                return (
+                  <Card 
+                    key={`${sector.quadrant || mapState.selectedQuadrant}:${sector.sector || sector.id}`} 
+                    className={cn(
+                      "panel-glass cursor-pointer hover:border-blue/40 transition-colors",
+                      isVisible ? "border-blue/20" : "border-yellow/20 opacity-50"
+                    )}
+                    onClick={() => navigateToLevel('galaxy', { id: sector.sector || sector.id })}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Layers className="w-5 h-5 text-blue-400" />
+                        Sector {sector.sector || sector.id}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Galaxies:</span>
+                          <span className="font-mono">{galaxyCount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Planets:</span>
+                          <span className="font-mono">
+                            {mapData?.planets?.filter((p: any) => {
+                              const coord = parseCoordinate(p.coordinate)
+                              return coord && coord.quadrant === (sector.quadrant || mapState.selectedQuadrant) && coord.sector === (sector.sector || sector.id)
+                            }).length || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )
+      }
+      
+      // If we have both, merge them (prefer mapData, but include visibility-only sectors)
+      if (visibleSectors.length > 0 && sectorsFromVisibility.length > 0) {
+        // Merge: use mapData sectors, but ensure all visible sectors from visibilityData are included
+        const mapSectorIds = new Set(visibleSectors.map((s: any) => s.sector))
+        const additionalSectors = sectorsFromVisibility.filter((s: any) => !mapSectorIds.has(s.sector))
+        const mergedSectors = [...visibleSectors, ...additionalSectors]
+        
+        return (
+          <div className="space-y-4">
+            {/* Visibility unlock message */}
+            {visibilityData && visibilityData.visibility_level === 'galaxy' && mapState.selectedQuadrant && (
+              <Card className="panel-glass border-yellow/20 bg-yellow-950/10">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-400">
+                        Research Sensor Technology to unlock sector visibility
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Currently only showing {visibilityData.visible_galaxies?.length || 0} visible galaxy(ies)
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {mergedSectors.map((sector: any) => {
+                const isVisible = sector.visibility?.is_visible === true
+                const galaxyCount = sector.galaxies?.length || mapData?.galaxies?.filter(
+                  (g: any) => g.quadrant === sector.quadrant && g.sector === sector.sector
+                ).length || 0
+                
+                return (
+                  <Card 
+                    key={`${sector.quadrant || mapState.selectedQuadrant}:${sector.sector || sector.id}`} 
+                    className={cn(
+                      "panel-glass cursor-pointer hover:border-blue/40 transition-colors",
+                      isVisible ? "border-blue/20" : "border-yellow/20 opacity-50"
+                    )}
+                    onClick={() => navigateToLevel('galaxy', { id: sector.sector || sector.id })}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Layers className="w-5 h-5 text-blue-400" />
+                        Sector {sector.sector || sector.id}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Galaxies:</span>
+                          <span className="font-mono">{galaxyCount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Planets:</span>
+                          <span className="font-mono">
+                            {mapData?.planets?.filter((p: any) => {
+                              const coord = parseCoordinate(p.coordinate)
+                              return coord && coord.quadrant === (sector.quadrant || mapState.selectedQuadrant) && coord.sector === (sector.sector || sector.id)
+                            }).length || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )
+      }
       
       return (
         <div className="space-y-4">
@@ -933,8 +1378,10 @@ export function UniverseMap() {
                       <div className="flex justify-between">
                         <span>Galaxies:</span>
                         <span className="font-mono">
-                          {mapData?.galaxies?.filter(
-                            (g: any) => g.quadrant === sector.quadrant && g.sector === sector.sector
+                          {sector.galaxies?.length || visibilityData?.visible_galaxies?.filter(
+                            (g: any) => g.quadrant === sector.quadrant && g.sector === (sector.sector || sector.id)
+                          ).length || mapData?.galaxies?.filter(
+                            (g: any) => g.quadrant === (sector.quadrant || mapState.selectedQuadrant) && g.sector === (sector.sector || sector.id)
                           ).length || 0}
                         </span>
                       </div>
@@ -943,7 +1390,7 @@ export function UniverseMap() {
                         <span className="font-mono">
                           {mapData?.planets?.filter((p: any) => {
                             const coord = parseCoordinate(p.coordinate)
-                            return coord && coord.quadrant === sector.quadrant && coord.sector === sector.sector
+                            return coord && coord.quadrant === (sector.quadrant || mapState.selectedQuadrant) && coord.sector === (sector.sector || sector.id)
                           }).length || 0}
                         </span>
                       </div>
@@ -976,6 +1423,21 @@ export function UniverseMap() {
       }
     }
     
+    // Fallback: Use sectors built from visibilityData if mapData doesn't have them
+    // (This handles cases where player just advanced and mapData hasn't updated yet)
+    if ((!sectors || sectors.length === 0) && sectorsFromVisibility.length > 0) {
+      sectors = sectorsFromVisibility
+    } else if (sectorsFromVisibility.length > 0) {
+      // If we have both, merge them - prefer visibilityData as source of truth
+      const existingSectorIds = new Set(sectors.map((s: any) => s.id || s.sector))
+      const additionalSectors = sectorsFromVisibility.filter((s: any) => 
+        !existingSectorIds.has(s.sector || s.id)
+      )
+      if (additionalSectors.length > 0) {
+        sectors = [...sectors, ...additionalSectors]
+      }
+    }
+    
     if (!sectors || sectors.length === 0) {
       return (
         <Card className="panel-glass border-blue/20">
@@ -987,6 +1449,28 @@ export function UniverseMap() {
             </p>
             {isLoadingStructure && (
               <p className="text-sm text-muted-foreground mt-2">Loading structure data...</p>
+            )}
+            {visibilityData && visibilityData.visibility_level === 'galaxy' && (
+              <div className="mt-4">
+                <p className="text-sm text-yellow-400 mb-2">
+                  <AlertCircle className="w-4 h-4 inline mr-1" />
+                  Your current visibility level only shows galaxies. Research Sensor Technology to unlock sector view.
+                </p>
+                {visibilityData.visible_galaxies && visibilityData.visible_galaxies.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Navigate back to quadrant view where galaxies are shown
+                      setMapState({ level: 'quadrant' })
+                    }}
+                    className="mt-2"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Quadrant View
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1648,6 +2132,247 @@ export function UniverseMap() {
     )
   }
 
+  // Calculate planets for planet view (before any early returns)
+  const planetsForView = useMemo(() => {
+    if (mapState.level !== 'planet' || !mapState.selectedQuadrant || !mapState.selectedSector || !mapState.selectedGalaxy) {
+      return []
+    }
+    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
+    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
+    const sectors = quadrant?.sectors || []
+    const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
+    const galaxies = sector?.galaxies || []
+    const galaxy = galaxies.find((g: any) => g.id === mapState.selectedGalaxy) || galaxies[0]
+    let planets: Planet[] = galaxy?.planets || []
+    
+    if (planets.length === 0 && mapDataAny?.planets) {
+      planets = mapDataAny.planets.filter((p: any) => {
+        const coord = parseCoordinate(p.coordinate)
+        return coord && 
+          coord.quadrant === mapState.selectedQuadrant &&
+          coord.sector === mapState.selectedSector &&
+          coord.galaxy === mapState.selectedGalaxy
+      })
+    }
+    
+    if (planets.length === 0 && galaxyPlanetsData?.planets) {
+      planets = galaxyPlanetsData.planets
+    }
+    
+    return planets
+  }, [mapData, mapDataAny, galaxyPlanetsData, mapState.level, mapState.selectedQuadrant, mapState.selectedSector, mapState.selectedGalaxy])
+
+  // Calculate planet positions for fleet line rendering
+  // Uses the same orbital layout calculation as the planet rendering
+  const planetPositions = useMemo(() => {
+    const positions = new Map<number, { x: number; y: number }>()
+    planetsForView.forEach((planet, index) => {
+      // Match the exact orbital calculation used in planet rendering
+      const coord = parseCoordinate(planet.coordinate)
+      const planetNum = coord?.planet || (index + 1)
+      
+      // Use the same calculation as the planet rendering:
+      // radius = 300 + (index * 150)
+      // angle = (index * 137.5) * (Math.PI / 180)
+      const radius = 300 + (index * 150)
+      const angle = (index * 137.5) * (Math.PI / 180)
+      const centerX = 50
+      const centerY = 50
+      const x = centerX + (radius * Math.cos(angle)) / 25
+      const y = centerY + (radius * Math.sin(angle)) / 25
+      positions.set(planet.id, { x, y })
+      
+      // Also store by planet number for coordinate-based lookup
+      if (coord?.planet) {
+        positions.set(coord.planet * 10000, { x, y }) // Use high multiplier to avoid ID conflicts
+      }
+    })
+    return positions
+}, [planetsForView])
+
+  // Filter fleets for this galaxy and calculate positions
+  const relevantFleets = useMemo(() => {
+    if (!fleetsData?.fleets || !mapState.selectedQuadrant || !mapState.selectedSector || !mapState.selectedGalaxy) {
+      console.log('[UniverseMap] relevantFleets: Early return', {
+        hasFleetsData: !!fleetsData?.fleets,
+        fleetsCount: fleetsData?.fleets?.length || 0,
+        selectedQuadrant: mapState.selectedQuadrant,
+        selectedSector: mapState.selectedSector,
+        selectedGalaxy: mapState.selectedGalaxy
+      })
+      return []
+    }
+
+    console.log('[UniverseMap] Processing fleets:', {
+      totalFleets: fleetsData.fleets.length,
+      inTransitFleets: fleetsData.fleets.filter(f => f.status === 'in_transit').length,
+      currentGalaxy: `${mapState.selectedQuadrant}:${mapState.selectedSector}:${mapState.selectedGalaxy}`
+    })
+
+    return fleetsData.fleets.filter((fleet) => {
+      if (fleet.status !== 'in_transit') return false
+
+      // Handle both API response formats
+      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+      let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+
+      if ((fleet as any).origin?.coordinate) {
+        const parsed = parseCoordinate((fleet as any).origin.coordinate)
+        if (parsed) originCoord = parsed
+      } else if ((fleet as any).origin_coordinate) {
+        originCoord = (fleet as any).origin_coordinate
+      }
+
+      if ((fleet as any).destination?.coordinate) {
+        const parsed = parseCoordinate((fleet as any).destination.coordinate)
+        if (parsed) destCoord = parsed
+      } else if ((fleet as any).destination_coordinate) {
+        destCoord = (fleet as any).destination_coordinate
+      }
+
+      if (!originCoord || !destCoord) return false
+
+      // Check if origin is in the current galaxy (we'll render lines from planets in this galaxy)
+      const originInGalaxy =
+        originCoord.quadrant === mapState.selectedQuadrant &&
+        originCoord.sector === mapState.selectedSector &&
+        originCoord.galaxy === mapState.selectedGalaxy
+
+      // Only include fleets where origin is in current galaxy
+      // Destination can be anywhere (we'll handle off-screen rendering)
+      return originInGalaxy
+    }).map((fleet) => {
+      // Parse coordinates to consistent format
+      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number }
+      let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number }
+
+      if ((fleet as any).origin?.coordinate) {
+        originCoord = parseCoordinate((fleet as any).origin.coordinate)!
+        destCoord = parseCoordinate((fleet as any).destination.coordinate)!
+      } else {
+        originCoord = (fleet as any).origin_coordinate
+        destCoord = (fleet as any).destination_coordinate
+      }
+
+      // Find planet IDs - prioritize direct IDs from API, fallback to coordinate matching
+      let originPlanetId: number | undefined
+      let destPlanetId: number | undefined
+      
+      // Try direct ID lookup first (most reliable) - use IDs from fleet API response
+      if ((fleet as any).origin?.id) {
+        const foundPlanet = planetsForView.find((p) => p.id === (fleet as any).origin.id)
+        if (foundPlanet) {
+          originPlanetId = foundPlanet.id
+        }
+      }
+      if ((fleet as any).destination?.id) {
+        const foundPlanet = planetsForView.find((p) => p.id === (fleet as any).destination.id)
+        if (foundPlanet) {
+          destPlanetId = foundPlanet.id
+        }
+      }
+      
+      // Fallback to coordinate matching if ID lookup failed
+      if (!originPlanetId) {
+        const originPlanet = planetsForView.find((p) => {
+          const coord = parseCoordinate(p.coordinate)
+          return coord &&
+            coord.quadrant === originCoord.quadrant &&
+            coord.sector === originCoord.sector &&
+            coord.galaxy === originCoord.galaxy &&
+            coord.planet === originCoord.planet
+        })
+        originPlanetId = originPlanet?.id
+      }
+      if (!destPlanetId) {
+        const destPlanet = planetsForView.find((p) => {
+          const coord = parseCoordinate(p.coordinate)
+          return coord &&
+            coord.quadrant === destCoord.quadrant &&
+            coord.sector === destCoord.sector &&
+            coord.galaxy === destCoord.galaxy &&
+            coord.planet === destCoord.planet
+        })
+        destPlanetId = destPlanet?.id
+      }
+      
+      // Debug logging for missing planets
+      if (!originPlanetId || !destPlanetId) {
+        console.log('[UniverseMap] Planet lookup failed for fleet:', {
+          fleetId: fleet.id,
+          originIdFromAPI: (fleet as any).origin?.id,
+          destIdFromAPI: (fleet as any).destination?.id,
+          originPlanetId,
+          destPlanetId,
+          originCoord: `${originCoord.quadrant}:${originCoord.sector}:${originCoord.galaxy}:${originCoord.planet}`,
+          destCoord: `${destCoord.quadrant}:${destCoord.sector}:${destCoord.galaxy}:${destCoord.planet}`,
+          planetsForViewCount: planetsForView.length,
+          planetsForViewIds: planetsForView.map(p => p.id),
+          planetsForViewCoords: planetsForView.map(p => formatCoordinate(p.coordinate)),
+          // Check if origin/dest are in current galaxy
+          originInCurrentGalaxy: originCoord.galaxy === mapState.selectedGalaxy,
+          destInCurrentGalaxy: destCoord.galaxy === mapState.selectedGalaxy,
+          currentGalaxy: `${mapState.selectedQuadrant}:${mapState.selectedSector}:${mapState.selectedGalaxy}`
+        })
+      }
+
+      // Check if origin/destination are in the current galaxy
+      const originInGalaxy = originCoord.galaxy === mapState.selectedGalaxy &&
+                            originCoord.sector === mapState.selectedSector &&
+                            originCoord.quadrant === mapState.selectedQuadrant
+      const destInGalaxy = destCoord.galaxy === mapState.selectedGalaxy &&
+                          destCoord.sector === mapState.selectedSector &&
+                          destCoord.quadrant === mapState.selectedQuadrant
+
+      return {
+        ...fleet,
+        originPlanetId: originPlanetId || undefined, // Use undefined if not found, but still include for off-screen rendering
+        destPlanetId: destPlanetId || undefined,
+        origin_coordinate: originCoord,
+        destination_coordinate: destCoord,
+        originInCurrentGalaxy: originInGalaxy,
+        destInCurrentGalaxy: destInGalaxy,
+      }
+    }).filter((fleet: any) => {
+      // Only include fleets where origin is in the current galaxy
+      // This ensures we only show lines from planets in this system
+      const hasOriginInGalaxy = fleet.originInCurrentGalaxy
+      
+      if (!hasOriginInGalaxy) {
+        return false
+      }
+      
+      return true
+    })
+  }, [fleetsData, mapState.selectedQuadrant, mapState.selectedSector, mapState.selectedGalaxy, planetsForView])
+
+  // Debug: Log relevant fleets and planet positions
+  useEffect(() => {
+    if (mapState.level === 'planet' && mapState.selectedGalaxy) {
+      console.log('[UniverseMap] 🔍 Debug Info:', {
+        relevantFleetsCount: relevantFleets.length,
+        planetsForViewCount: planetsForView.length,
+        planetPositionsCount: planetPositions.size,
+        planetIds: planetsForView.map(p => p.id),
+        planetPositionKeys: Array.from(planetPositions.keys()),
+        selectedGalaxy: `${mapState.selectedQuadrant}:${mapState.selectedSector}:${mapState.selectedGalaxy}`,
+        totalFleets: fleetsData?.fleets?.length || 0,
+        inTransitFleets: fleetsData?.fleets?.filter((f: any) => f.status === 'in_transit').length || 0,
+        relevantFleets: relevantFleets.map((f: any) => ({
+          fleetId: f.id,
+          originPlanetId: f.originPlanetId,
+          destPlanetId: f.destPlanetId,
+          orderType: f.order_type,
+          status: f.status,
+          hasOriginPos: planetPositions.has(f.originPlanetId),
+          hasDestPos: planetPositions.has(f.destPlanetId),
+          originIdFromAPI: (f as any).origin?.id,
+          destIdFromAPI: (f as any).destination?.id
+        }))
+      })
+    }
+  }, [relevantFleets, mapState.level, mapState.selectedGalaxy, planetsForView, planetPositions, fleetsData])
+
   const renderCurrentView = () => {
     switch (viewMode) {
       case 'search':
@@ -1716,7 +2441,7 @@ export function UniverseMap() {
                     <div
                       key={quadrant.id}
                       className="group cursor-pointer relative"
-                      onClick={() => navigateToLevel('sector', quadrant)}
+                      onClick={() => navigateToLevel('sector', { id: quadrant.id || quadrant.quadrant })}
                     >
                       <img
                         src={getQuadrantImage(quadrant.id)}
@@ -1764,12 +2489,55 @@ export function UniverseMap() {
 
   // Early return for immersive sector view
   if (viewMode === 'explore' && mapState.level === 'sector' && !isLoading) {
+    // Priority 1: Use visibilityData.visible_sectors as source of truth (most reliable after player advances)
+    let sectorsFromVisibility: any[] = []
+    
+    // If no selectedQuadrant, use the first visible quadrant from visibilityData
+    // visible_quadrants can be: [1] (array of numbers) or [{quadrant: 1}] (array of objects)
+    let defaultQuadrant: number | undefined
+    if (visibilityData?.visible_quadrants && visibilityData.visible_quadrants.length > 0) {
+      const firstQuadrant = visibilityData.visible_quadrants[0]
+      defaultQuadrant = typeof firstQuadrant === 'number' ? firstQuadrant : firstQuadrant?.quadrant
+    }
+    const effectiveQuadrant = mapState.selectedQuadrant || defaultQuadrant
+    
+    if (visibilityData?.visible_sectors && effectiveQuadrant) {
+      const visibleSectorsForQuadrant = visibilityData.visible_sectors.filter(
+        (s: any) => s.quadrant === effectiveQuadrant
+      )
+      
+      if (visibleSectorsForQuadrant.length > 0) {
+        sectorsFromVisibility = visibleSectorsForQuadrant.map((s: any) => {
+          // Count galaxies in this sector from visibilityData
+          const galaxiesInSector = visibilityData.visible_galaxies?.filter(
+            (g: any) => g.quadrant === s.quadrant && g.sector === s.sector
+          ) || []
+          
+          return {
+            id: s.sector,
+            quadrant: s.quadrant,
+            sector: s.sector,
+            galaxies: galaxiesInSector.map((g: any) => ({
+              id: g.galaxy,
+              quadrant: g.quadrant,
+              sector: g.sector,
+              galaxy: g.galaxy,
+              planets: [] // Visibility data doesn't include planet details
+            })),
+            visibility: { is_visible: true } // These are visible by definition
+          }
+        })
+      }
+    }
+    
+    // Priority 2: Try mapData quadrants structure
     const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
-    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
+    const quadrant = quadrants.find((q: any) => (q.id || q.quadrant) === effectiveQuadrant) || quadrants[0]
     let sectors = quadrant?.sectors || []
     
-    if ((!sectors || sectors.length === 0) && universeStructure?.structure && mapState.selectedQuadrant) {
-      const structureQuadrant = universeStructure.structure.find((q: any) => q.quadrant === mapState.selectedQuadrant)
+    // Priority 3: Try universeStructure
+    if ((!sectors || sectors.length === 0) && universeStructure?.structure && effectiveQuadrant) {
+      const structureQuadrant = universeStructure.structure.find((q: any) => q.quadrant === effectiveQuadrant)
       if (structureQuadrant) {
         sectors = structureQuadrant.sectors.map((s: any) => ({
           id: s.sector,
@@ -1779,6 +2547,14 @@ export function UniverseMap() {
           }))
         }))
       }
+    }
+    
+    // Use visibility sectors as primary source if available
+    if (sectorsFromVisibility.length > 0) {
+      sectors = sectorsFromVisibility
+    } else if (sectors && sectors.length === 0) {
+      // Still no sectors - try visibility one more time as absolute fallback
+      sectors = sectorsFromVisibility
     }
     
     if (sectors && sectors.length > 0) {
@@ -1820,13 +2596,16 @@ export function UniverseMap() {
                     const startAngle = index * anglePerSector
                     const endAngle = (index + 1) * anglePerSector
                     
-                    const radius = 400
-                    const x1 = 50 + radius * Math.cos((startAngle - 90) * Math.PI / 180)
-                    const y1 = 50 + radius * Math.sin((startAngle - 90) * Math.PI / 180)
-                    const x2 = 50 + radius * Math.cos((endAngle - 90) * Math.PI / 180)
-                    const y2 = 50 + radius * Math.sin((endAngle - 90) * Math.PI / 180)
+                    // Use percentage-based coordinates (all values as percentages)
+                    const radius = 40 // Percentage radius
+                    const centerX = 50 // Percentage center
+                    const centerY = 50 // Percentage center
+                    const x1 = centerX + radius * Math.cos((startAngle - 90) * Math.PI / 180)
+                    const y1 = centerY + radius * Math.sin((startAngle - 90) * Math.PI / 180)
+                    const x2 = centerX + radius * Math.cos((endAngle - 90) * Math.PI / 180)
+                    const y2 = centerY + radius * Math.sin((endAngle - 90) * Math.PI / 180)
                     const largeArc = anglePerSector > 180 ? 1 : 0
-                    const pathData = `M 50%,50% L ${x1}%,${y1}% A ${radius},${radius} 0 ${largeArc},1 ${x2}%,${y2}% Z`
+                    const pathData = `M ${centerX}%,${centerY}% L ${x1}%,${y1}% A ${radius}%,${radius}% 0 ${largeArc},1 ${x2}%,${y2}% Z`
                     
                     return (
                       <path
@@ -1951,8 +2730,206 @@ export function UniverseMap() {
             {/* Galaxy view with spiral positioning */}
             <div className="absolute inset-0 flex items-center justify-center pt-24">
               <div className="relative w-full h-full" style={{ transform: `scale(${zoomLevel})`, transformOrigin: '50% 50%' }}>
-                {/* Travel route lines */}
-                <svg className="absolute w-full h-full pointer-events-none">
+                {/* Grid underlay for galaxy-level fleet line positioning */}
+                <svg className="absolute w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                  {/* Optional DEBUG grid - set to true to see grid */}
+                  {false && (
+                    <g opacity="0.15" stroke="#00ffff" strokeWidth="0.5">
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <g key={`galaxy-grid-${i}`}>
+                          <line
+                            x1={`${(i + 1) * 10}%`}
+                            y1="0%"
+                            x2={`${(i + 1) * 10}%`}
+                            y2="100%"
+                          />
+                          <line
+                            x1="0%"
+                            y1={`${(i + 1) * 10}%`}
+                            x2="100%"
+                            y2={`${(i + 1) * 10}%`}
+                          />
+                        </g>
+                      ))}
+                    </g>
+                  )}
+                </svg>
+                
+                {/* Fleet travel lines between galaxies */}
+                <svg className="absolute w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
+                  {(() => {
+                    // Filter fleets for this sector - only show inter-galaxy fleets
+                    const relevantFleetsForGalaxy = (fleetsData?.fleets || []).filter((fleet: any) => {
+                      if (fleet.status !== 'in_transit') return false
+                      
+                      // Parse coordinates
+                      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+                      let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+                      
+                      if ((fleet as any).origin?.coordinate) {
+                        originCoord = parseCoordinate((fleet as any).origin.coordinate) || null
+                      } else if ((fleet as any).origin_coordinate) {
+                        originCoord = (fleet as any).origin_coordinate
+                      }
+                      
+                      if ((fleet as any).destination?.coordinate) {
+                        destCoord = parseCoordinate((fleet as any).destination.coordinate) || null
+                      } else if ((fleet as any).destination_coordinate) {
+                        destCoord = (fleet as any).destination_coordinate
+                      }
+                      
+                      if (!originCoord || !destCoord) return false
+                      
+                      // Check if both origin and destination are in current sector
+                      const originInSector = originCoord.quadrant === mapState.selectedQuadrant &&
+                                           originCoord.sector === mapState.selectedSector
+                      const destInSector = destCoord.quadrant === mapState.selectedQuadrant &&
+                                          destCoord.sector === mapState.selectedSector
+                      
+                      // Only show if both are in sector and in different galaxies
+                      return originInSector && destInSector && originCoord.galaxy !== destCoord.galaxy
+                    })
+                    
+                    // Helper to get galaxy grid position
+                    const getGalaxyGridPosition = (galaxyNum: number) => {
+                      // Find galaxy in the list
+                      const galaxyIndex = galaxies.findIndex((g: any) => g.id === galaxyNum)
+                      if (galaxyIndex < 0) return null
+                      
+                      // Use the same positioning as galaxy rendering
+                      const goldenAngle = 137.508 * (galaxyIndex * 0.8)
+                      const radius = 15 + (galaxyIndex * 8)
+                      const angle = goldenAngle * (Math.PI / 180)
+                      const centerX = 50
+                      const centerY = 50
+                      const offsetX = radius * Math.cos(angle)
+                      const offsetY = radius * Math.sin(angle)
+                      const x = centerX + offsetX
+                      const y = centerY + offsetY
+                      
+                      return { x, y }
+                    }
+                    
+                    return relevantFleetsForGalaxy.map((fleet: any) => {
+                      // Parse coordinates
+                      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+                      let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
+                      
+                      if ((fleet as any).origin?.coordinate) {
+                        originCoord = parseCoordinate((fleet as any).origin.coordinate) || null
+                      } else if ((fleet as any).origin_coordinate) {
+                        originCoord = (fleet as any).origin_coordinate
+                      }
+                      
+                      if ((fleet as any).destination?.coordinate) {
+                        destCoord = parseCoordinate((fleet as any).destination.coordinate) || null
+                      } else if ((fleet as any).destination_coordinate) {
+                        destCoord = (fleet as any).destination_coordinate
+                      }
+                      
+                      if (!originCoord || !destCoord) return null
+                      
+                      const originPos = getGalaxyGridPosition(originCoord.galaxy)
+                      const destPos = getGalaxyGridPosition(destCoord.galaxy)
+                      
+                      if (!originPos || !destPos) return null
+                      
+                      // Determine line color based on order type
+                      const getLineColor = () => {
+                        switch (fleet.order_type) {
+                          case 'attack':
+                            return '#ef4444'
+                          case 'defend':
+                            return '#3b82f6'
+                          case 'station':
+                            return '#10b981'
+                          case 'return':
+                            return '#f59e0b'
+                          default:
+                            return '#06b6d4'
+                        }
+                      }
+                      
+                      const lineColor = getLineColor()
+                      const midX = (originPos.x + destPos.x) / 2
+                      const midY = (originPos.y + destPos.y) / 2
+                      
+                      // Get galaxy names
+                      const originGalaxy = galaxies.find((g: any) => g.id === originCoord!.galaxy)
+                      const destGalaxy = galaxies.find((g: any) => g.id === destCoord!.galaxy)
+                      const originName = originGalaxy ? `G${originCoord!.galaxy}` : `G${originCoord!.galaxy}`
+                      const destName = destGalaxy ? `G${destCoord!.galaxy}` : `G${destCoord!.galaxy}`
+                      
+                      return (
+                        <g key={`galaxy-fleet-${fleet.id}`}>
+                          <line
+                            x1={`${originPos.x}%`}
+                            y1={`${originPos.y}%`}
+                            x2={`${destPos.x}%`}
+                            y2={`${destPos.y}%`}
+                            stroke={lineColor}
+                            strokeWidth="2"
+                            strokeOpacity="0.8"
+                            strokeDasharray="4,6"
+                            strokeLinecap="round"
+                            style={{
+                              filter: `drop-shadow(0 0 6px ${lineColor})`,
+                            }}
+                          />
+                          
+                          {/* Fleet label */}
+                          <foreignObject
+                            x={`${midX - 1.75}%`}
+                            y={`${midY - 1.4}%`}
+                            width="3.5%"
+                            height="2.8%"
+                          >
+                            <div
+                              className="flex flex-col items-center justify-center"
+                              style={{
+                                background: 'rgba(0, 0, 0, 0.85)',
+                                border: `1px solid ${lineColor}`,
+                                borderRadius: '4px',
+                                padding: '3px 6px',
+                                backdropFilter: 'blur(4px)',
+                                boxShadow: `0 0 8px rgba(0, 0, 0, 0.8), 0 0 4px ${lineColor}`,
+                                pointerEvents: 'none',
+                                width: 'auto',
+                                minWidth: '70px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  color: lineColor,
+                                  fontSize: '9px',
+                                  fontWeight: '600',
+                                  fontFamily: 'monospace',
+                                  textShadow: `0 0 4px ${lineColor}`,
+                                }}
+                              >
+                                Fleet #{fleet.id}
+                              </div>
+                              <div
+                                style={{
+                                  color: '#a0a0a0',
+                                  fontSize: '7px',
+                                  fontFamily: 'sans-serif',
+                                  marginTop: '1px',
+                                }}
+                              >
+                                {originName} → {destName}
+                              </div>
+                            </div>
+                          </foreignObject>
+                        </g>
+                      )
+                    })
+                  })()}
+                </svg>
+                
+                {/* Travel route lines (existing decorative lines) */}
+                <svg className="absolute w-full h-full pointer-events-none" style={{ zIndex: 2 }}>
                   {galaxies.map((galaxy: any, index: number) => {
                     const goldenAngle = 137.508 * (index * 0.8)
                     const radius = 15 + (index * 8)
@@ -2053,28 +3030,6 @@ export function UniverseMap() {
 
   // Early return for immersive planet view
   if (viewMode === 'explore' && mapState.level === 'planet' && !isLoading) {
-    const quadrants = mapData?.quadrants || mapDataAny?.data?.quadrants || []
-    const quadrant = quadrants.find((q: any) => q.id === mapState.selectedQuadrant) || quadrants[0]
-    const sectors = quadrant?.sectors || []
-    const sector = sectors.find((s: any) => s.id === mapState.selectedSector) || sectors[0]
-    const galaxies = sector?.galaxies || []
-    const galaxy = galaxies.find((g: any) => g.id === mapState.selectedGalaxy) || galaxies[0]
-    let planets: Planet[] = galaxy?.planets || []
-    
-    if (planets.length === 0 && mapDataAny?.planets) {
-      planets = mapDataAny.planets.filter((p: any) => {
-        const coord = parseCoordinate(p.coordinate)
-        return coord && 
-          coord.quadrant === mapState.selectedQuadrant &&
-          coord.sector === mapState.selectedSector &&
-          coord.galaxy === mapState.selectedGalaxy
-      })
-    }
-    
-    if (planets.length === 0 && galaxyPlanetsData?.planets) {
-      planets = galaxyPlanetsData.planets
-    }
-    
     // Generate random asteroid clusters for this galaxy
     const generateAsteroids = (count: number) => {
       const asteroids: Array<{ clusterX: number; clusterY: number; asteroids: Array<{ x: number; y: number; size: number; rotation: number }> }> = []
@@ -2097,7 +3052,7 @@ export function UniverseMap() {
     }
     const asteroids = generateAsteroids(12)
     
-    if (planets && planets.length > 0) {
+    if (planetsForView && planetsForView.length > 0) {
       return (
         <>
           <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden">
@@ -2105,7 +3060,7 @@ export function UniverseMap() {
             <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
               <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
                 <h1 className="text-2xl font-heading glow-cyan mb-2">
-                  Galaxy {mapState.selectedGalaxy} - {planets.length} Planets
+                  Galaxy {mapState.selectedGalaxy} - {planetsForView.length} Planets
                 </h1>
                 <p className="text-lg text-muted-foreground">Select a planet to view details</p>
               </div>
@@ -2128,8 +3083,390 @@ export function UniverseMap() {
 
             {/* Planets with orbital rings */}
             <div className="absolute inset-0 flex items-center justify-center">
+              {/* Separate SVG for fleet lines - NOT animated */}
               <svg 
-                className="absolute w-[250%] h-[250%]" 
+                className="absolute pointer-events-none" 
+                style={{ 
+                  width: '100%',
+                  height: '100%',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  overflow: 'visible',
+                  zIndex: 50,
+                }}
+              >
+                {/* Fleet travel lines - static, not orbiting */}
+                {relevantFleets.map((fleet: any) => {
+                  // CRITICAL: Origin must be in current galaxy to render line
+                  if (!fleet.originInCurrentGalaxy) {
+                    console.log('[UniverseMap] Fleet skipped - origin not in galaxy:', fleet.id)
+                    return null
+                  }
+                  
+                  // Grid-based coordinate system: Map planet numbers to grid squares
+                  // Helper function to convert planet number (1-10) to grid position (percentage)
+                  const getGridPositionFromPlanetNum = (planetNum: number): { x: number; y: number } => {
+                    const gridCols = 4 // 4 columns
+                    const gridRow = Math.floor((planetNum - 1) / gridCols)
+                    const gridCol = (planetNum - 1) % gridCols
+                    
+                    // Grid positioning with padding
+                    const gridPadding = 15 // Percentage from edges
+                    const gridWidth = 100 - (gridPadding * 2) // 70% usable width
+                    const gridHeight = 100 - (gridPadding * 2) // 70% usable height
+                    
+                    // Calculate rows needed based on planet count
+                    const rows = Math.ceil(planetsForView.length / gridCols)
+                    const cellWidth = gridWidth / gridCols // ~17.5% per cell
+                    const cellHeight = gridHeight / rows
+                    
+                    // Center of grid cell
+                    const x = gridPadding + (gridCol * cellWidth) + (cellWidth / 2)
+                    const y = gridPadding + (gridRow * cellHeight) + (cellHeight / 2)
+                    
+                    return { x, y }
+                  }
+                  
+                  // Get planet positions, or calculate positions for planets in current galaxy
+                  let originPos: { x: number; y: number } | undefined
+                  let destPos: { x: number; y: number } | undefined
+                  
+                  // Get origin position - use actual rendered planet position from orbital layout
+                  // ALWAYS calculate a position - prioritize: rendered DOM > orbital calc > grid fallback
+                  // Ensure we have origin_coordinate or originPlanetId
+                  if (!fleet.origin_coordinate && !fleet.originPlanetId) {
+                    console.error('[UniverseMap] ❌ Fleet has no origin data:', fleet.id)
+                    return null
+                  }
+                  
+                  // Find the actual planet in planetsForView that matches the fleet's origin
+                  let originPlanet: Planet | undefined
+                  
+                  // Try by ID first (most reliable)
+                  if (fleet.originPlanetId) {
+                    originPlanet = planetsForView.find(p => p.id === fleet.originPlanetId)
+                  }
+                  
+                  // If not found by ID, try by coordinate
+                  if (!originPlanet && fleet.origin_coordinate) {
+                    originPlanet = planetsForView.find((p) => {
+                      const coord = parseCoordinate(p.coordinate)
+                      return coord &&
+                        coord.quadrant === fleet.origin_coordinate.quadrant &&
+                        coord.sector === fleet.origin_coordinate.sector &&
+                        coord.galaxy === fleet.origin_coordinate.galaxy &&
+                        coord.planet === fleet.origin_coordinate.planet
+                    })
+                  }
+                  
+                  // Calculate position from planet
+                  if (originPlanet) {
+                    // Try to use rendered position from DOM (most accurate)
+                    const renderedPos = renderedPlanetPositionsRef.current.get(originPlanet.id)
+                    if (renderedPos) {
+                      originPos = renderedPos
+                      console.log('[UniverseMap] ✅ Using rendered origin position:', { fleetId: fleet.id, planetId: originPlanet.id, originPos })
+                    } else {
+                      // Calculate from orbital layout (matches planet rendering) - ALWAYS works
+                      const planetIndex = planetsForView.findIndex(p => p.id === originPlanet.id)
+                      if (planetIndex >= 0) {
+                        const radius = 300 + (planetIndex * 150)
+                        const angle = (planetIndex * 137.5) * (Math.PI / 180)
+                        const centerX = 50
+                        const centerY = 50
+                        originPos = {
+                          x: centerX + (radius * Math.cos(angle)) / 25,
+                          y: centerY + (radius * Math.sin(angle)) / 25
+                        }
+                        console.log('[UniverseMap] ✅ Calculated origin from orbital layout:', { fleetId: fleet.id, planetId: originPlanet.id, planetIndex, originPos })
+                      }
+                    }
+                  }
+                  
+                  // Final fallback: use grid position based on planet number
+                  if (!originPos && fleet.origin_coordinate?.planet) {
+                    const planetNum = fleet.origin_coordinate.planet
+                    originPos = getGridPositionFromPlanetNum(planetNum)
+                    console.warn('[UniverseMap] ⚠️ Using grid fallback for origin:', {
+                      fleetId: fleet.id,
+                      coord: `${fleet.origin_coordinate.quadrant}:${fleet.origin_coordinate.sector}:${fleet.origin_coordinate.galaxy}:${fleet.origin_coordinate.planet}`,
+                      planetNum,
+                      originPos,
+                      availablePlanets: planetsForView.map(p => `${p.id}:${formatCoordinate(p.coordinate)}`)
+                    })
+                  }
+                  
+                  // Get destination position - use actual rendered planet position from orbital layout
+                  if (fleet.destInCurrentGalaxy && fleet.destination_coordinate) {
+                    // Find the actual planet in planetsForView that matches the fleet's destination coordinate
+                    let destPlanet = planetsForView.find((p) => {
+                      if (fleet.destPlanetId && p.id === fleet.destPlanetId) return true
+                      const coord = parseCoordinate(p.coordinate)
+                      return coord &&
+                        coord.quadrant === fleet.destination_coordinate.quadrant &&
+                        coord.sector === fleet.destination_coordinate.sector &&
+                        coord.galaxy === fleet.destination_coordinate.galaxy &&
+                        coord.planet === fleet.destination_coordinate.planet
+                    })
+                    
+                    // If not found by coordinate, try by ID
+                    if (!destPlanet && fleet.destPlanetId) {
+                      destPlanet = planetsForView.find(p => p.id === fleet.destPlanetId)
+                    }
+                    
+                    if (destPlanet) {
+                      // Try to use rendered position from DOM (most accurate)
+                      const renderedPos = renderedPlanetPositionsRef.current.get(destPlanet.id)
+                      if (renderedPos) {
+                        destPos = renderedPos
+                        console.log('[UniverseMap] ✅ Using rendered destination position:', { fleetId: fleet.id, planetId: destPlanet.id, destPos })
+                      } else {
+                        // Calculate from orbital layout (matches planet rendering) - ALWAYS works
+                        const planetIndex = planetsForView.findIndex(p => p.id === destPlanet.id)
+                        if (planetIndex >= 0) {
+                          const radius = 300 + (planetIndex * 150)
+                          const angle = (planetIndex * 137.5) * (Math.PI / 180)
+                          const centerX = 50
+                          const centerY = 50
+                          destPos = {
+                            x: centerX + (radius * Math.cos(angle)) / 25,
+                            y: centerY + (radius * Math.sin(angle)) / 25
+                          }
+                          console.log('[UniverseMap] ✅ Calculated destination from orbital layout:', { fleetId: fleet.id, planetId: destPlanet.id, planetIndex, destPos })
+                        } else {
+                          // Planet found but index not found - use grid as fallback
+                          const planetNum = fleet.destination_coordinate.planet || 1
+                          destPos = getGridPositionFromPlanetNum(planetNum)
+                          console.warn('[UniverseMap] ⚠️ Destination planet found but index not found, using grid:', { fleetId: fleet.id, planetId: destPlanet.id, planetNum, destPos })
+                        }
+                      }
+                    } else if (fleet.destination_coordinate) {
+                      // Planet not found in view - use grid position
+                      const planetNum = fleet.destination_coordinate.planet || 1
+                      destPos = getGridPositionFromPlanetNum(planetNum)
+                      console.warn('[UniverseMap] ⚠️ Destination planet not found in view, using grid fallback:', {
+                        fleetId: fleet.id,
+                        coord: `${fleet.destination_coordinate.quadrant}:${fleet.destination_coordinate.sector}:${fleet.destination_coordinate.galaxy}:${fleet.destination_coordinate.planet}`,
+                        planetNum,
+                        destPos,
+                        availablePlanets: planetsForView.map(p => `${p.id}:${formatCoordinate(p.coordinate)}`)
+                      })
+                    }
+                  }
+                  
+                  // If destination is outside current galaxy, calculate off-screen position
+                  if (!destPos && !fleet.destInCurrentGalaxy && fleet.destination_coordinate && originPos) {
+                    // Calculate direction to destination based on relative galaxy position
+                    const deltaSector = fleet.destination_coordinate.sector - fleet.origin_coordinate.sector
+                    const deltaGalaxy = fleet.destination_coordinate.galaxy - fleet.origin_coordinate.galaxy
+                    const angle = Math.atan2(deltaGalaxy, deltaSector)
+                    // Extend line to edge of viewport (can exceed 100% for off-screen)
+                    const maxDist = 150 // Allow extending beyond viewport
+                    destPos = { 
+                      x: originPos.x + Math.cos(angle) * maxDist,
+                      y: originPos.y + Math.sin(angle) * maxDist
+                    }
+                  }
+                  
+                  // Must have origin position - this should ALWAYS be set by now
+                  if (!originPos) {
+                    console.error('[UniverseMap] ❌ Fleet line skipped - no origin position:', {
+                      fleetId: fleet.id,
+                      originCoord: fleet.origin_coordinate,
+                      originPlanetId: fleet.originPlanetId,
+                      planetsInView: planetsForView.length,
+                      planetsForViewIds: planetsForView.map(p => p.id)
+                    })
+                    return null
+                  }
+                  
+                  // Must have destination position (either planet or off-screen)
+                  if (!destPos) {
+                    console.error('[UniverseMap] ❌ Fleet line skipped - no destination position:', {
+                      fleetId: fleet.id,
+                      destCoord: fleet.destination_coordinate,
+                      destPlanetId: fleet.destPlanetId,
+                      destInCurrentGalaxy: fleet.destInCurrentGalaxy
+                    })
+                    return null
+                  }
+                  
+                  // Ensure coordinates are valid numbers (allow values outside 0-100 for off-screen lines)
+                  if (isNaN(originPos.x) || isNaN(originPos.y) || isNaN(destPos.x) || isNaN(destPos.y)) {
+                    console.error('[UniverseMap] ❌ Fleet line skipped - NaN coordinates:', {
+                      fleetId: fleet.id,
+                      originPos,
+                      destPos
+                    })
+                    return null
+                  }
+
+                  // Determine line color based on order type
+                  const getLineColor = () => {
+                    switch (fleet.order_type) {
+                      case 'attack':
+                        return '#ef4444' // red-500
+                      case 'defend':
+                        return '#3b82f6' // blue-500
+                      case 'station':
+                        return '#10b981' // green-500
+                      case 'return':
+                        return '#f59e0b' // amber-500
+                      default:
+                        return '#06b6d4' // cyan-500 (default)
+                    }
+                  }
+
+                  const lineColor = getLineColor()
+
+                  // Determine if this is an off-screen line (destination outside current galaxy)
+                  const isOffScreen = !fleet.destInCurrentGalaxy
+                  
+                  // Debug: Log the actual coordinate values to verify they're reasonable
+                  if (originPos && destPos) {
+                    console.log('[UniverseMap] ✅ Rendering fleet line:', {
+                      fleetId: fleet.id,
+                      originPos: `(${originPos.x.toFixed(2)}, ${originPos.y.toFixed(2)})`,
+                      destPos: `(${destPos.x.toFixed(2)}, ${destPos.y.toFixed(2)})`,
+                      orderType: fleet.order_type,
+                      lineColor,
+                      isOffScreen,
+                      originPlanetId: fleet.originPlanetId,
+                      destPlanetId: fleet.destPlanetId
+                    })
+                  }
+                  
+                  // Calculate midpoint for label positioning
+                  const midX = (originPos.x + destPos.x) / 2
+                  const midY = (originPos.y + destPos.y) / 2
+                  
+                  // Get origin and destination planet names (for labels)
+                  // Re-find originPlanet for label display (already found above, but need for label)
+                  const originPlanetForLabel = planetsForView.find((p) => {
+                    if (fleet.originPlanetId && p.id === fleet.originPlanetId) return true
+                    const coord = parseCoordinate(p.coordinate)
+                    return coord &&
+                      coord.quadrant === fleet.origin_coordinate?.quadrant &&
+                      coord.sector === fleet.origin_coordinate?.sector &&
+                      coord.galaxy === fleet.origin_coordinate?.galaxy &&
+                      coord.planet === fleet.origin_coordinate?.planet
+                  })
+                  
+                  const destPlanet = fleet.destInCurrentGalaxy ? planetsForView.find((p) => {
+                    if (fleet.destPlanetId && p.id === fleet.destPlanetId) return true
+                    const coord = parseCoordinate(p.coordinate)
+                    return coord &&
+                      coord.quadrant === fleet.destination_coordinate.quadrant &&
+                      coord.sector === fleet.destination_coordinate.sector &&
+                      coord.galaxy === fleet.destination_coordinate.galaxy &&
+                      coord.planet === fleet.destination_coordinate.planet
+                  }) : null
+                  
+                  const originName = originPlanetForLabel?.name || formatCoordinate(fleet.origin_coordinate ? `${fleet.origin_coordinate.quadrant}:${fleet.origin_coordinate.sector}:${fleet.origin_coordinate.galaxy}:${fleet.origin_coordinate.planet}` : '')
+                  const destName = destPlanet?.name || (fleet.destination_coordinate ? formatCoordinate(`${fleet.destination_coordinate.quadrant}:${fleet.destination_coordinate.sector}:${fleet.destination_coordinate.galaxy}:${fleet.destination_coordinate.planet}`) : 'External')
+                  
+                  // For off-screen lines, extend to edge properly
+                  let finalDestX = destPos.x
+                  let finalDestY = destPos.y
+                  
+                  if (isOffScreen && originPos) {
+                    // Calculate angle and extend to viewport edge
+                    const angle = Math.atan2(destPos.y - originPos.y, destPos.x - originPos.x)
+                    // Extend to edge of viewport (considering padding)
+                    const maxDist = 100 // Full viewport
+                    finalDestX = originPos.x + Math.cos(angle) * maxDist
+                    finalDestY = originPos.y + Math.sin(angle) * maxDist
+                  }
+                  
+                  // Style matches galaxy layer mock travel lines: dashed, subtle, matching colors
+                  return (
+                    <g key={`fleet-${fleet.id}`}>
+                      {/* Fleet travel line */}
+                      <line
+                        x1={`${originPos.x}%`}
+                        y1={`${originPos.y}%`}
+                        x2={`${finalDestX}%`}
+                        y2={`${finalDestY}%`}
+                        stroke={lineColor}
+                        strokeWidth="2"
+                        strokeOpacity={isOffScreen ? "0.6" : "0.8"}
+                        strokeDasharray="4,6"
+                        strokeLinecap="round"
+                        style={{
+                          filter: `drop-shadow(0 0 6px ${lineColor})`,
+                        }}
+                      />
+                      
+                      {/* Fleet label at midpoint - using foreignObject for proper text rendering */}
+                      <foreignObject
+                        x={`${midX - 2}%`}
+                        y={`${midY - 1.5}%`}
+                        width="4%"
+                        height="3%"
+                      >
+                        <div
+                          className="flex flex-col items-center justify-center"
+                          style={{
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            border: `1px solid ${lineColor}`,
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            backdropFilter: 'blur(4px)',
+                            boxShadow: `0 0 8px rgba(0, 0, 0, 0.8), 0 0 4px ${lineColor}`,
+                            pointerEvents: 'none',
+                            width: 'auto',
+                            minWidth: '80px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <div
+                            style={{
+                              color: lineColor,
+                              fontSize: '10px',
+                              fontWeight: '600',
+                              fontFamily: 'monospace',
+                              textShadow: `0 0 4px ${lineColor}`,
+                            }}
+                          >
+                            Fleet #{fleet.id}
+                          </div>
+                          <div
+                            style={{
+                              color: '#a0a0a0',
+                              fontSize: '8px',
+                              fontFamily: 'sans-serif',
+                              marginTop: '2px',
+                            }}
+                          >
+                            {originName.length > 12 ? `${originName.substring(0, 12)}...` : originName} → {destName.length > 12 ? `${destName.substring(0, 12)}...` : destName}
+                          </div>
+                        </div>
+                      </foreignObject>
+                      
+                      {/* Direction indicator arrow at end */}
+                      {isOffScreen && (
+                        <g transform={`translate(${finalDestX}%, ${finalDestY}%)`}>
+                          <polygon
+                            points="0,-6 -8,6 8,6"
+                            fill={lineColor}
+                            fillOpacity="0.8"
+                            transform={`rotate(${(Math.atan2(finalDestY - originPos.y, finalDestX - originPos.x) * 180 / Math.PI)})`}
+                            style={{
+                              filter: `drop-shadow(0 0 4px ${lineColor})`,
+                            }}
+                          />
+                        </g>
+                      )}
+                    </g>
+                  )
+                })}
+              </svg>
+
+              {/* Separate SVG for orbital rings - animated */}
+              <svg 
+                className="absolute w-[250%] h-[250%] pointer-events-none z-10" 
                 style={{ 
                   left: '-75%',
                   top: '-75%',
@@ -2139,7 +3476,8 @@ export function UniverseMap() {
                   transformOrigin: '50% 50%',
                 }}
               >
-                {planets.map((_, index) => {
+                {/* Orbital rings */}
+                {planetsForView.map((_, index) => {
                   const radius = 300 + (index * 150)
                   return (
                     <circle
@@ -2156,8 +3494,38 @@ export function UniverseMap() {
                 })}
               </svg>
 
+              {/* Central Star */}
+              <div 
+                className="absolute"
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: '240px',
+                  height: '240px',
+                  zIndex: 5,
+                  pointerEvents: 'none',
+                }}
+              >
+                <img
+                  src="/assets/images/planets/sol.png"
+                  alt="Star"
+                  className="w-full h-full object-contain animate-pulse"
+                  style={{
+                    filter: 'drop-shadow(0 0 40px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 80px rgba(255, 255, 255, 0.6))',
+                  }}
+                  onLoad={() => {
+                    console.log('[UniverseMap] ✅ Star image loaded successfully')
+                  }}
+                  onError={(e) => {
+                    console.error('[UniverseMap] ❌ Failed to load star image:', e)
+                  }}
+                />
+              </div>
+
               <div className="absolute inset-0" style={{ transform: `scale(${zoomLevel})`, transformOrigin: '50% 50%' }}>
-                {planets.map((planet, index) => {
+                {planetsForView.map((planet, index) => {
+                  // Calculate planet position - MUST match planetPositions calculation exactly
                   const radius = 300 + (index * 150)
                   const angle = (index * 137.5) * (Math.PI / 180)
                   const centerX = 50
@@ -2165,10 +3533,29 @@ export function UniverseMap() {
                   const x = centerX + (radius * Math.cos(angle)) / 25
                   const y = centerY + (radius * Math.sin(angle)) / 25
                   
+                  // Store rendered position in ref for fleet line rendering
+                  renderedPlanetPositionsRef.current.set(planet.id, { x, y })
+                  
                   return (
                     <div
                       key={planet.id || formatCoordinate(planet.coordinate) || index}
+                      ref={(el) => {
+                        // Update position from actual DOM element if available
+                        if (el) {
+                          const container = el.closest('.absolute.inset-0')
+                          if (container) {
+                            const containerRect = container.getBoundingClientRect()
+                            const elRect = el.getBoundingClientRect()
+                            const relativeX = ((elRect.left + elRect.width / 2 - containerRect.left) / containerRect.width) * 100
+                            const relativeY = ((elRect.top + elRect.height / 2 - containerRect.top) / containerRect.height) * 100
+                            renderedPlanetPositionsRef.current.set(planet.id, { x: relativeX, y: relativeY })
+                          }
+                        }
+                      }}
                       className="absolute group cursor-pointer"
+                      data-planet-id={planet.id}
+                      data-planet-x={x}
+                      data-planet-y={y}
                       style={{
                         left: `${x}%`,
                         top: `${y}%`,
