@@ -97,6 +97,7 @@ export function PlanetImageDisplay({
             height: `${planetSize}px`,
             maxWidth: '100%',
             maxHeight: '100%',
+            transform: 'translateX(60px)', // Move to the right
           }}
           onError={(e) => {
             console.error('Planet image failed to load:', planetSlug)
@@ -111,7 +112,7 @@ export function PlanetImageDisplay({
           height: `${planetSize}px`,
           left: '50%',
           top: '50%',
-          transform: 'translate(-50%, -50%)',
+          transform: 'translate(calc(-50% + 60px), -50%)', // Move to the right
         }} />
         {/* Geodesic grid overlay */}
         <GeodesicGrid planetId={planetId} planetSize={planetSize} />

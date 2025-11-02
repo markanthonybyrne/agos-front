@@ -1,13 +1,10 @@
 import { useEffect } from 'react'
 import { 
-  Settings, 
   Map, 
   Bell,
   X,
   Building2,
   Rocket,
-  LogOut,
-  ChevronDown,
   Shield,
   Scan,
   Sword,
@@ -16,30 +13,19 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
-import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { logout } from '@/app/slices/authSlice'
+import { useAppSelector } from '@/app/hooks'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Avatar } from '@/components/common/Avatar'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetQuantumCreditsQuery } from '@/api/endpoints/premiumApi'
-import { useGetTopQuery } from '@/api/endpoints/universeApi'
 import { BRAND } from '@/lib/brandImages'
-import { getUserAvatarUrl } from '@/lib/avatar'
 import { getQuantumCreditsImage } from '@/lib/quantumCreditsImages'
 
 interface HUDButton {
   id: string
-  icon: typeof Settings
+  icon: typeof Building2
   label: string
   panelType?: PanelType
   panelSize?: PanelSize
@@ -112,7 +98,6 @@ interface PersistentHUDProps {
 
 export function PersistentHUD({ className, showClose = false }: PersistentHUDProps) {
   const { openPanel, backdropVisible, closeAllPanels } = usePanel()
-  const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const location = useLocation()
   const notificationsCount = useAppSelector(state => 
@@ -156,11 +141,6 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
     } else if (button.panelType && button.panelSize) {
       openPanel(button.panelType, button.panelSize)
     }
-  }
-
-  const handleLogout = () => {
-    dispatch(logout())
-    navigate('/login')
   }
 
   return (
@@ -272,30 +252,6 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
             )}
           </Button>
 
-          {/* User Avatar Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 sm:h-10 sm:w-10 p-0 flex-shrink-0">
-                <Avatar
-                  src={getUserAvatarUrl(data?.user)}
-                  name={data?.user?.username || 'User'}
-                  size="sm"
-                  className="border-2 border-cyan/50"
-                />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 panel-glass">
-              <DropdownMenuItem onClick={() => openPanel(PanelType.SETTINGS, PanelSize.LARGE)}>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-400">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           {/* Close all panels */}
           {showClose && backdropVisible && (

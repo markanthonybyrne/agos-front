@@ -41,6 +41,138 @@ import { MarketPanel } from '@/features/market/MarketPanel'
 import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
+import { useState, useEffect } from 'react'
+import { cn } from '@/lib/utils'
+
+// Get panel title helper function
+function getPanelTitle(panel: Panel): string {
+  if (panel.type === PanelType.COMPOSE_MAIL && panel.data?.replyToMail) {
+    return 'Reply to Message'
+  }
+  
+  const titles: Record<PanelType, string> = {
+    [PanelType.TECH_TREE_FACILITIES]: 'Facility Tech Tree',
+    [PanelType.TECH_TREE_SHIPS]: 'Ship Tech Tree',
+    [PanelType.TECH_TREE_DEFENSES]: 'Defense Tech Tree',
+    [PanelType.TECH_TREE_RESEARCH]: 'Research Tech Tree',
+    [PanelType.BUILD_DETAIL]: 'Build Item',
+    [PanelType.FLEET_COMMAND]: 'Fleet Command',
+    [PanelType.VISUAL_COORDINATE]: 'Select Destination',
+    [PanelType.SHIP_SELECTOR]: 'Select Ships',
+    [PanelType.RESEARCH_DETAIL]: 'Research Details',
+    [PanelType.PLANET_VIEW]: 'Planet View',
+    [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
+    [PanelType.GALAXY_MAP]: 'Galaxy Map',
+    [PanelType.MESSAGING]: 'Messages',
+    [PanelType.NOTIFICATIONS]: 'Notifications',
+    [PanelType.RANKINGS]: 'Rankings',
+    [PanelType.SETTINGS]: 'Settings',
+    [PanelType.POLITICS]: 'Politics & Alliances',
+    [PanelType.CREATE_ALLIANCE_REQUEST]: 'Create Alliance Request',
+    [PanelType.MAP_PLANET_INFO]: 'Planet Information',
+    [PanelType.QUANTUM_CREDITS]: 'Quantum Credits',
+    [PanelType.BOOSTERS]: 'Boosters',
+    [PanelType.ACHIEVEMENTS]: 'Achievements',
+    [PanelType.SIGNALS]: 'Signals',
+    [PanelType.COMBAT_LOGS]: 'Combat Logs',
+    [PanelType.CHAT]: 'Global Chat',
+    [PanelType.MARKET]: 'Market',
+    [PanelType.FLEETS]: 'Fleet Command',
+  }
+  
+  return titles[panel.type] || 'Panel'
+}
+
+// Planet view with opening/closing animations
+function PlanetViewWithAnimation({ 
+  panel, 
+  onClose, 
+  onMinimize, 
+  onMaximize,
+  onContentClose 
+}: { 
+  panel: any
+  onClose: () => void
+  onMinimize: () => void
+  onMaximize: () => void
+  onContentClose: () => void
+}) {
+  const [isClosing, setIsClosing] = useState(false)
+  const [isOpening, setIsOpening] = useState(true)
+  
+  // Trigger opening animation on mount
+  useEffect(() => {
+    // Small delay to trigger CSS transition
+    const timer = setTimeout(() => {
+      setIsOpening(false)
+    }, 10)
+    return () => clearTimeout(timer)
+  }, [])
+  
+  const handleClose = () => {
+    setIsClosing(true)
+    // Wait for animation to complete before actually closing
+    setTimeout(() => {
+      onClose()
+    }, 500) // Match animation duration
+  }
+
+  return (
+    <div 
+      className={cn(
+        "fixed inset-0 z-40 transition-opacity duration-500",
+        isClosing ? "opacity-0" : isOpening ? "opacity-0" : "opacity-100"
+      )}
+      style={{ zIndex: panel.zIndex - 1 }}
+    >
+      {/* Full screen backdrop for split layout */}
+      <div 
+        className={cn(
+          "fixed inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto transition-opacity duration-500",
+          isClosing ? "opacity-0" : isOpening ? "opacity-0" : "opacity-100"
+        )}
+        onClick={handleClose} 
+      />
+      
+      <PlanetImageDisplay
+        planetId={panel.data?.planetId}
+        className={cn(
+          "fixed left-0 top-0 h-full w-[50%] flex items-center justify-center pointer-events-none transition-all duration-500",
+          isClosing 
+            ? "opacity-0 scale-50" 
+            : isOpening 
+            ? "opacity-0 scale-75" 
+            : "opacity-100 scale-100"
+        )}
+      />
+      <div 
+        className={cn(
+          "fixed right-0 top-0 h-full w-[50%] pointer-events-none transition-all duration-500",
+          isClosing 
+            ? "translate-x-full opacity-0" 
+            : isOpening 
+            ? "translate-x-full opacity-0" 
+            : "translate-x-0 opacity-100"
+        )}
+      >
+        <SlidingPanel
+          isOpen={true}
+          onClose={handleClose}
+          onMinimize={onMinimize}
+          onMaximize={onMaximize}
+          title={getPanelTitle(panel)}
+          size={PanelSize.FULL_HEIGHT}
+          panelState={panel.state}
+          zIndex={panel.zIndex}
+          className="pointer-events-auto"
+          hideBackdrop={true}
+        >
+          <PanelContent panel={panel} onClose={onContentClose} />
+        </SlidingPanel>
+      </div>
+    </div>
+  )
+}
 
 // Render panel content based on type
 function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
@@ -167,45 +299,6 @@ export function PanelManager() {
   // Render panels from state
   const minimizedPanels = panels.filter(p => p.state === PanelState.MINIMIZED)
   const normalPanels = panels.filter(p => p.state !== PanelState.MINIMIZED)
-  
-  const getPanelTitle = (panel: Panel): string => {
-    if (panel.type === PanelType.COMPOSE_MAIL && panel.data?.replyToMail) {
-      return 'Reply to Message'
-    }
-    
-    const titles: Record<PanelType, string> = {
-      [PanelType.TECH_TREE_FACILITIES]: 'Facility Tech Tree',
-      [PanelType.TECH_TREE_SHIPS]: 'Ship Tech Tree',
-      [PanelType.TECH_TREE_DEFENSES]: 'Defense Tech Tree',
-      [PanelType.TECH_TREE_RESEARCH]: 'Research Tech Tree',
-      [PanelType.BUILD_DETAIL]: 'Build Item',
-      [PanelType.FLEET_COMMAND]: 'Fleet Command',
-      [PanelType.VISUAL_COORDINATE]: 'Select Destination',
-      [PanelType.SHIP_SELECTOR]: 'Select Ships',
-      [PanelType.RESEARCH_DETAIL]: 'Research Details',
-      [PanelType.PLANET_VIEW]: 'Planet View',
-      [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
-      [PanelType.GALAXY_MAP]: 'Galaxy Map',
-      [PanelType.MESSAGING]: 'Messages',
-      [PanelType.NOTIFICATIONS]: 'Notifications',
-      [PanelType.RANKINGS]: 'Rankings',
-      [PanelType.SETTINGS]: 'Settings',
-      [PanelType.POLITICS]: 'Politics & Alliances',
-      [PanelType.CREATE_ALLIANCE_REQUEST]: 'Create Alliance Request',
-      [PanelType.MAP_PLANET_INFO]: 'Planet Information',
-      [PanelType.QUANTUM_CREDITS]: 'Quantum Credits',
-      [PanelType.BOOSTERS]: 'Boosters',
-      [PanelType.ACHIEVEMENTS]: 'Achievements',
-      [PanelType.SIGNALS]: 'Tachyon Signals',
-      [PanelType.COMBAT_LOGS]: 'Battle Reports',
-      [PanelType.COMPOSE_MAIL]: 'Compose Message',
-      [PanelType.CHAT]: 'Chat',
-      [PanelType.MARKET]: 'Market',
-      [PanelType.FLEETS]: 'Fleet Command',
-    }
-    
-    return (titles[panel.type] as string) || 'Panel'
-  }
 
   return (
     <>
@@ -214,31 +307,14 @@ export function PanelManager() {
         // Special handling for PLANET_VIEW with split layout
         if (panel.type === PanelType.PLANET_VIEW && panel.size === PanelSize.FULL_HEIGHT) {
           return (
-            <div key={panel.id} className="fixed inset-0 z-40" style={{ zIndex: panel.zIndex - 1 }}>
-              {/* Full screen backdrop for split layout */}
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto" onClick={() => handleClose(panel.id)} />
-              
-              <PlanetImageDisplay
-                planetId={panel.data?.planetId}
-                className="fixed left-0 top-0 h-full w-[50%] flex items-center justify-center pointer-events-none"
-              />
-              <div className="fixed right-0 top-0 h-full w-[50%] pointer-events-none">
-                <SlidingPanel
-                  isOpen={true}
-                  onClose={() => handleClose(panel.id)}
-                  onMinimize={() => handleMinimize(panel.id)}
-                  onMaximize={() => handleMaximize(panel.id)}
-                  title={getPanelTitle(panel)}
-                  size={PanelSize.FULL_HEIGHT}
-                  panelState={panel.state}
-                  zIndex={panel.zIndex}
-                  className="pointer-events-auto"
-                  hideBackdrop={true}
-                >
-                  <PanelContent panel={panel} onClose={() => handleClose(panel.id)} />
-                </SlidingPanel>
-              </div>
-            </div>
+            <PlanetViewWithAnimation 
+              key={panel.id}
+              panel={panel}
+              onClose={() => handleClose(panel.id)}
+              onMinimize={() => handleMinimize(panel.id)}
+              onMaximize={() => handleMaximize(panel.id)}
+              onContentClose={() => handleClose(panel.id)}
+            />
           )
         }
 
