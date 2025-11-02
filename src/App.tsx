@@ -37,6 +37,9 @@ import { AnnouncementsPage } from '@/features/admin/routes/AnnouncementsPage'
 import { TicksPage } from '@/features/admin/routes/TicksPage'
 import { ResourcesPage } from '@/features/admin/routes/ResourcesPage'
 import { CombatsPage } from '@/features/admin/routes/CombatsPage'
+import { SimulationsPage } from '@/features/admin/routes/SimulationsPage'
+import { TickTestingPage } from '@/features/admin/routes/TickTestingPage'
+import { GameDefinitionsPage } from '@/features/admin/routes/GameDefinitionsPage'
 import { QuantumCreditsPage } from '@/features/admin/routes/QuantumCreditsPage'
 import { BoostersPage } from '@/features/admin/routes/BoostersPage'
 import { AdminPanelWrapper } from '@/features/admin/components/AdminPanelWrapper'
@@ -96,6 +99,9 @@ function AppContent() {
                             <Route path="/ticks" element={<TicksPage />} />
                             <Route path="/resources" element={<ResourcesPage />} />
                             <Route path="/combats" element={<CombatsPage />} />
+                            <Route path="/simulations" element={<SimulationsPage />} />
+                            <Route path="/tick-testing" element={<TickTestingPage />} />
+                            <Route path="/definitions" element={<GameDefinitionsPage />} />
                             <Route path="/quantum-credits" element={<QuantumCreditsPage />} />
                             <Route path="/boosters" element={<BoostersPage />} />
                           </Routes>

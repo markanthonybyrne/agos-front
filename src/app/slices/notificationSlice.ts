@@ -5,7 +5,7 @@ export interface Notification {
   type: 'success' | 'error' | 'warning' | 'info'
   title: string
   message: string
-  timestamp: Date
+  timestamp: string // ISO string for Redux serialization
   isRead: boolean
   category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack' | 'colonization' | 'capture' | 'announcement'
   actionUrl?: string
@@ -24,10 +24,11 @@ const loadNotificationsFromStorage = (): Notification[] => {
     const stored = localStorage.getItem('notifications')
     if (!stored) return []
     const parsed = JSON.parse(stored)
-    // Convert timestamp strings back to Date objects
+    // Timestamps are already stored as ISO strings, no conversion needed
     return parsed.map((n: any) => ({
       ...n,
-      timestamp: new Date(n.timestamp),
+      // Ensure timestamp is a string (in case old data has Date objects)
+      timestamp: typeof n.timestamp === 'string' ? n.timestamp : new Date(n.timestamp).toISOString(),
     }))
   } catch (error) {
     console.error('Error loading notifications from localStorage:', error)
@@ -63,7 +64,7 @@ const notificationSlice = createSlice({
       const notification: Notification = {
         ...action.payload,
         id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
       }
       state.notifications.unshift(notification) // Add to beginning
@@ -124,7 +125,7 @@ const notificationSlice = createSlice({
         type: 'success',
         title: 'Construction Completed',
         message: `${itemName} has been completed on Planet ${planetId}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'construction',
         actionUrl: `/planets/${planetId}`,
@@ -141,7 +142,7 @@ const notificationSlice = createSlice({
         type: 'info',
         title: 'Fleet Arrived',
         message: `${fleetName} has arrived at ${destination}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'fleet',
         actionUrl: `/fleets/${fleetId}`,
@@ -158,7 +159,7 @@ const notificationSlice = createSlice({
         type: 'warning',
         title: 'Fleet Under Attack',
         message: `Your fleet at ${location} is under attack by ${attacker}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'combat',
         actionUrl: `/fleets/${fleetId}`,
@@ -175,7 +176,7 @@ const notificationSlice = createSlice({
         type: 'error',
         title: 'Empire Under Attack',
         message: `Your planet at ${location} is under attack by ${attacker}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'attack',
         actionUrl: `/planets/${planetId}`,
@@ -192,7 +193,7 @@ const notificationSlice = createSlice({
         type: 'success',
         title: 'Research Completed',
         message: `${researchName} research has been completed`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'research',
         actionUrl: `/planets/${planetId}`,
@@ -209,7 +210,7 @@ const notificationSlice = createSlice({
         type: 'info',
         title: 'Alliance Message',
         message: `${senderName}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'alliance',
         actionUrl: `/alliances/${allianceId}`,
@@ -226,7 +227,7 @@ const notificationSlice = createSlice({
         type: 'info',
         title: 'Tick Processed',
         message: `Tick ${tickNumber} has been processed. Next tick in ${nextTickEta}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'tick',
         data: { tickNumber, nextTickEta }
@@ -250,7 +251,7 @@ const notificationSlice = createSlice({
           type: 'error',
           title: '⚠️ Incoming Fleet Attack!',
           message: `${attacker?.name || 'Unknown'} has launched a fleet at your planet ${fleet.destination.planet_name || fleet.destination.coordinate || 'Unknown'}`,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           isRead: false,
           category: 'attack',
           actionUrl: destinationPlanetId ? `/planets/${destinationPlanetId}` : undefined,
@@ -263,7 +264,7 @@ const notificationSlice = createSlice({
           type: 'info',
           title: 'Fleet Launched',
           message: `Your fleet has been launched and will arrive at tick ${fleet.arrival_tick}`,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           isRead: false,
           category: 'fleet',
           actionUrl: `/fleets/${fleet.id}`,
@@ -291,7 +292,7 @@ const notificationSlice = createSlice({
           type: 'error',
           title: '⚠️ Planet Lost!',
           message: `${planet.name} has been captured by ${newOwner.name}`,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           isRead: false,
           category: 'capture',
           actionUrl: combatLogId ? `/combat/${combatLogId}` : `/planets/${planet.id}`,
@@ -304,7 +305,7 @@ const notificationSlice = createSlice({
           type: 'success',
           title: '🎯 Planet Captured!',
           message: `You have successfully captured ${planet.name}!`,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           isRead: false,
           category: 'capture',
           actionUrl: `/planets/${planet.id}`,
@@ -325,7 +326,7 @@ const notificationSlice = createSlice({
         type: 'success',
         title: '🎉 Planet Colonized!',
         message: `Successfully colonized ${planet.name} at ${planet.coordinate?.quadrant}:${planet.coordinate?.sector}:${planet.coordinate?.galaxy}:${planet.coordinate?.planet}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isRead: false,
         category: 'colonization',
         actionUrl: `/planets/${planet.id}`,

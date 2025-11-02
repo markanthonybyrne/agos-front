@@ -15,6 +15,9 @@ import {
   MessageSquare,
   Gift,
   Zap,
+  Beaker,
+  TestTube,
+  Settings,
 } from 'lucide-react'
 
 const adminNavItems = [
@@ -30,6 +33,9 @@ const adminNavItems = [
   { path: '/admin/ticks', label: 'Ticks', icon: Clock },
   { path: '/admin/resources', label: 'Resources', icon: Coins },
   { path: '/admin/combats', label: 'Combats', icon: Sword },
+  { path: '/admin/simulations', label: 'Simulations', icon: Beaker },
+  { path: '/admin/tick-testing', label: 'Tick Testing', icon: TestTube },
+  { path: '/admin/definitions', label: 'Game Definitions', icon: Settings },
   { path: '/admin/quantum-credits', label: 'Quantum Credits', icon: Gift },
   { path: '/admin/boosters', label: 'Boosters', icon: Zap },
 ]

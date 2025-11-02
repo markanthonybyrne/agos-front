@@ -76,6 +76,7 @@ export interface Role {
   id: number
   name: string
   slug: string
+  permissions?: string[]
 }
 
 export interface User {
@@ -1763,5 +1764,434 @@ export interface AnnouncementListPaginatedResponse {
     total: number
     pages: number
   }
+}
+
+// ============================================================================
+// Admin Combat Simulation Types
+// ============================================================================
+
+export interface CombatParticipant {
+  empire_id: number
+  type: 'fleet' | 'planet'
+  fleet_id?: number
+  planet_id?: number
+  ships?: Record<string, number>
+  defences?: Array<{ defence_slug: string; quantity: number }> | Record<string, number>
+}
+
+export interface CombatAction {
+  attacker: CombatParticipant
+  target: CombatParticipant
+  damage_dealt: number
+}
+
+export interface CombatRoundLog {
+  round: number
+  participants_before: CombatParticipant[]
+  actions: CombatAction[]
+  participants_after: CombatParticipant[]
+}
+
+export interface CombatSimulationResult {
+  winner_empire_id: number
+  ships_lost: Record<number, Record<string, number>>
+  defences_destroyed?: Array<{ defence_slug: string; quantity: number }>
+  facilities_destroyed?: Array<{ facility_slug: string; quantity: number }>
+  seed: number
+  battle_id: string
+  final_participants: CombatParticipant[]
+  round_logs?: CombatRoundLog[]
+}
+
+export interface SimulateCombatRequest {
+  fleet_id?: number
+  planet_id?: number
+  custom_fleet_ships?: Record<string, number>
+  custom_planet_defences?: Array<{ defence_slug: string; quantity: number }>
+  tick_number?: number
+  override_seed?: string
+  detailed_logs?: boolean
+}
+
+export interface SimulateCombatResponse {
+  message: string
+  simulation: CombatSimulationResult
+}
+
+export interface BatchScenario {
+  name: string
+  fleet_id?: number
+  planet_id?: number
+  custom_fleet_ships?: Record<string, number>
+  custom_planet_defences?: Array<{ defence_slug: string; quantity: number }>
+  tick_number?: number
+  override_seed?: string
+  detailed_logs?: boolean
+}
+
+export interface BatchSimulateCombatRequest {
+  scenarios: BatchScenario[]
+  compare_results?: boolean
+}
+
+export interface BatchSimulateResult {
+  scenario_index: number
+  scenario_name: string
+  success: boolean
+  result?: CombatSimulationResult
+  error?: string
+}
+
+export interface WinnerDistribution {
+  [empireId: string]: number
+}
+
+export interface AverageShipLosses {
+  [empireId: string]: {
+    [shipType: string]: number
+  }
+}
+
+export interface BatchComparison {
+  total_simulations: number
+  winner_distribution: WinnerDistribution
+  average_ships_lost: AverageShipLosses
+}
+
+export interface BatchSimulateCombatResponse {
+  message: string
+  results: {
+    total_scenarios: number
+    successful: number
+    failed: number
+    results: BatchSimulateResult[]
+    comparison?: BatchComparison
+  }
+}
+
+export interface DefenceConfiguration {
+  name?: string
+  defences: Array<{ defence_slug: string; quantity: number }>
+  empire_id: number
+  override_seed?: string
+}
+
+export interface TestFleetAgainstDefencesRequest {
+  fleet_ships: Record<string, number>
+  fleet_empire_id: number
+  defence_configs: DefenceConfiguration[]
+}
+
+export interface TestFleetResult {
+  defence_config: string
+  defences: Array<{ defence_slug: string; quantity: number }>
+  winner_empire_id: number
+  fleet_won: boolean
+  ships_lost: Record<number, Record<string, number>>
+  defences_destroyed?: Array<{ defence_slug: string; quantity: number }>
+}
+
+export interface TestFleetAgainstDefencesResponse {
+  message: string
+  results: {
+    fleet_composition: Record<string, number>
+    tests_run: number
+    fleet_wins: number
+    fleet_losses: number
+    win_rate_percent: number
+    results: TestFleetResult[]
+  }
+}
+
+export interface FleetConfiguration {
+  name: string
+  ships: Record<string, number>
+  empire_id: number
+  override_seed?: string
+}
+
+export interface TestDefenceAgainstFleetsRequest {
+  defences: Array<{ defence_slug: string; quantity: number }>
+  planet_empire_id: number
+  fleet_configs: FleetConfiguration[]
+}
+
+export interface TestDefenceResult {
+  fleet_config: string
+  winner_empire_id: number
+  defence_won: boolean
+  ships_lost: Record<number, Record<string, number>>
+  defences_destroyed?: Array<{ defence_slug: string; quantity: number }>
+}
+
+export interface TestDefenceAgainstFleetsResponse {
+  message: string
+  results: {
+    defences: Array<{ defence_slug: string; quantity: number }>
+    tests_run: number
+    defence_wins: number
+    defence_losses: number
+    win_rate_percent: number
+    results: TestDefenceResult[]
+  }
+}
+
+// ============================================================================
+// Admin Tick Testing Types
+// ============================================================================
+
+export interface DryRunTickRequest {
+  force_recalc?: boolean
+  detailed_diff?: boolean
+}
+
+export interface TickStats {
+  tick_number: number
+  planets_processed: number
+  production_applied?: number
+  facilities_completed?: number
+  research_completed?: number
+  fleets_arrived?: number
+  combats_resolved?: number
+  defences_completed?: number
+  ships_completed?: number
+  ai_actions_generated?: number
+  ai_actions_executed?: number
+  ai_actions_failed?: number
+  duration_seconds: number
+  finished_at?: string | null
+}
+
+export interface ValueDiff {
+  before: any
+  after: any
+  change: any
+}
+
+export interface DetailedDiff {
+  planets?: Record<number, Record<string, ValueDiff>>
+  empires?: Record<number, Record<string, ValueDiff>>
+  fleets?: Record<number, Record<string, ValueDiff>>
+  construction_queues?: Record<number, Record<string, ValueDiff>>
+}
+
+export interface DryRunTickResponse {
+  message: string
+  results: {
+    dry_run: boolean
+    stats: TickStats
+    diff?: DetailedDiff
+    warning?: string
+  }
+}
+
+export interface SandboxTickRequest {
+  ticks_to_process: number
+  reset_before?: boolean
+  initial_state?: any
+}
+
+export interface SandboxTickResponse {
+  message: string
+  results: {
+    sandbox: boolean
+    ticks_processed: number
+    stats: TickStats[]
+    final_state?: any
+    warning?: string
+  }
+}
+
+export interface CompareTickResultsRequest {
+  // Placeholder for future implementation
+}
+
+export interface CompareTickResultsResponse {
+  message: string
+}
+
+// ============================================================================
+// Admin Game Definitions Types
+// ============================================================================
+
+export interface GameDefinition {
+  id: number
+  slug: string
+  name: string
+  era: number
+  base_tellerium_cost: number
+  base_krypton_cost: number
+  build_time_ticks?: number
+  prerequisites?: string[]
+  description?: string
+  created_at: string
+  updated_at: string
+  // Additional fields for ships
+  stats?: {
+    armour?: number
+    init?: number
+    travel_ticks?: number
+    gun_power?: number
+    accuracy?: number
+    agility?: number
+  }
+  // Additional fields for defences
+  defence_stats?: {
+    armour?: number
+    gun_power?: number
+  }
+}
+
+export interface DefinitionListResponse {
+  data: GameDefinition[]
+  meta: {
+    page: number
+    per_page: number
+    total: number
+    pages: number
+  }
+}
+
+export interface DefinitionDetailResponse {
+  data: GameDefinition
+}
+
+export interface CreateDefinitionRequest {
+  slug: string
+  name: string
+  era: number
+  base_tellerium_cost: number
+  base_krypton_cost: number
+  build_time_ticks: number
+  prerequisites?: string[]
+  description?: string
+  stats?: {
+    armour?: number
+    init?: number
+    travel_ticks?: number
+    gun_power?: number
+    accuracy?: number
+    agility?: number
+  }
+  defence_stats?: {
+    armour?: number
+    gun_power?: number
+  }
+}
+
+export interface UpdateDefinitionRequest {
+  slug?: string
+  name?: string
+  era?: number
+  base_tellerium_cost?: number
+  base_krypton_cost?: number
+  build_time_ticks?: number
+  prerequisites?: string[]
+  description?: string
+  change_reason?: string
+  stats?: {
+    armour?: number
+    init?: number
+    travel_ticks?: number
+    gun_power?: number
+    accuracy?: number
+    agility?: number
+  }
+  defence_stats?: {
+    armour?: number
+    gun_power?: number
+  }
+}
+
+export interface CreateDefinitionResponse {
+  message: string
+  data: GameDefinition
+}
+
+export interface UpdateDefinitionResponse {
+  message: string
+  data: GameDefinition
+  warnings?: string[]
+}
+
+export interface DeleteDefinitionResponse {
+  status: 'ok' | 'error'
+  code?: string
+  message: string
+  warnings?: string[]
+}
+
+export interface DefinitionImpactAnalysisRequest {
+  proposed_changes: Partial<UpdateDefinitionRequest>
+}
+
+export interface ImpactField {
+  active_queues_affected?: number
+  note: string
+}
+
+export interface DefinitionImpactAnalysis {
+  definition_type: 'facilities' | 'ships' | 'defences' | 'research'
+  definition_id: number
+  definition_slug: string
+  proposed_changes: Record<string, any>
+  current_usage: string[]
+  impact: {
+    [key: string]: ImpactField
+  }
+}
+
+export interface DefinitionImpactAnalysisResponse {
+  analysis: DefinitionImpactAnalysis
+}
+
+export interface DefinitionVersion {
+  version_number: number
+  changed_by: {
+    id: number
+    username: string
+  }
+  changed_at: string
+  change_reason?: string | null
+  rollback_count: number
+}
+
+export interface DefinitionHistoryResponse {
+  history: DefinitionVersion[]
+}
+
+export interface CompareVersionsRequest {
+  version1: number
+  version2: number
+}
+
+export interface VersionComparison {
+  version_1: {
+    version_number: number
+    changed_at: string
+    changed_by: string
+  }
+  version_2: {
+    version_number: number
+    changed_at: string
+    changed_by: string
+  }
+  differences: Record<string, {
+    version_2?: any
+    version_3?: any
+  }>
+}
+
+export interface CompareVersionsResponse {
+  comparison: VersionComparison
+}
+
+export interface RollbackDefinitionRequest {
+  version_number: number
+  reason: string
+}
+
+export interface RollbackDefinitionResponse {
+  message: string
 }
 

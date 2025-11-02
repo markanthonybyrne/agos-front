@@ -75,6 +75,7 @@ function getPanelTitle(panel: Panel): string {
     [PanelType.ACHIEVEMENTS]: 'Achievements',
     [PanelType.SIGNALS]: 'Signals',
     [PanelType.COMBAT_LOGS]: 'Combat Logs',
+    [PanelType.COMPOSE_MAIL]: 'Compose Message',
     [PanelType.CHAT]: 'Global Chat',
     [PanelType.MARKET]: 'Market',
     [PanelType.FLEETS]: 'Fleet Command',
