@@ -106,13 +106,14 @@ export function UnifiedUniverseMapV2() {
       
       const planets: Planet[] = [...(firstPage.planets || [])]
       const total = firstPage.total || 0
+      const maxPlanetsToLoad = 15000 // Load up to 15000 planets
       let offset = firstPage.planets?.length || 100
       const limit = 100 // API maximum is 100 per page
 
-      console.log('[UnifiedUniverseMapV2] Starting planet load:', { total, alreadyLoaded: planets.length })
+      console.log('[UnifiedUniverseMapV2] Starting planet load:', { total, alreadyLoaded: planets.length, maxToLoad: maxPlanetsToLoad })
 
-      // Continue loading until we have all planets or hit an error
-      while (planets.length < total && offset < total) {
+      // Continue loading until we have 15000 planets, all planets, or hit an error
+      while (planets.length < maxPlanetsToLoad && planets.length < total && offset < total) {
         try {
           // Ensure base URL doesn't have trailing slash to avoid double slashes
           const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '')
@@ -144,7 +145,8 @@ export function UnifiedUniverseMapV2() {
           })
           
           offset += limit
-          setLoadingProgress((planets.length / total) * 100)
+          const progressTotal = Math.min(total, maxPlanetsToLoad)
+          setLoadingProgress((planets.length / progressTotal) * 100)
           
           // If we got fewer planets than requested, we've reached the end
           if (newPlanets.length < limit) {
@@ -356,6 +358,105 @@ export function UnifiedUniverseMapV2() {
     }
   }
 
+  // Track container dimensions for resize handling
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  
+  // Update container size when it changes
+  useEffect(() => {
+    const container = zoomPan.containerRef.current
+    if (!container) return
+    
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect()
+      setContainerSize({ width: rect.width, height: rect.height })
+    }
+    
+    // Initial size
+    updateSize()
+    
+    // Listen for resize
+    const resizeObserver = new ResizeObserver(updateSize)
+    resizeObserver.observe(container)
+    
+    return () => resizeObserver.disconnect()
+  }, [zoomPan.containerRef])
+  
+  // Calculate dynamic viewBox based on actual container dimensions to ensure content always fills viewport
+  // MUST be before early return to maintain hook order
+  const dynamicViewBox = useMemo(() => {
+    if (containerSize.width === 0 || containerSize.height === 0) {
+      return { viewBox: `0 0 ${gridSize} ${gridSize}`, bounds: { minX: 0, minY: 0, maxX: gridSize, maxY: gridSize } }
+    }
+    
+    const containerWidth = containerSize.width
+    const containerHeight = containerSize.height
+    const containerAspectRatio = containerWidth / containerHeight
+    
+    // Calculate what grid coordinates are visible based on current scale and pan
+    // Since we removed the transform scale, we need to calculate based on viewBox mapping
+    const scale = zoomPan.scale
+    const panX = zoomPan.panX
+    const panY = zoomPan.panY
+    
+    // Calculate visible grid area: the viewBox shows this area of the grid
+    // The viewBox width/height in grid coordinates depends on the scale
+    // At scale 1.0, 1 grid unit = 1 screen pixel (roughly)
+    // But we need to account for the container size
+    
+    // Calculate center point in grid coordinates
+    const centerX = gridSize / 2 - panX / scale
+    const centerY = gridSize / 2 - panY / scale
+    
+    // Calculate visible width/height in grid coordinates
+    // The container size divided by scale gives us grid units visible
+    const visibleGridWidth = containerWidth / scale
+    const visibleGridHeight = containerHeight / scale
+    
+    // Calculate bounds
+    let minX = Math.max(0, centerX - visibleGridWidth / 2)
+    let maxX = Math.min(gridSize, centerX + visibleGridWidth / 2)
+    let minY = Math.max(0, centerY - visibleGridHeight / 2)
+    let maxY = Math.min(gridSize, centerY + visibleGridHeight / 2)
+    
+    let width = maxX - minX
+    let height = maxY - minY
+    
+    // Adjust to match container aspect ratio so viewBox fills viewport
+    const currentAspectRatio = width / height
+    if (containerAspectRatio > currentAspectRatio) {
+      // Container is wider - increase width
+      const newWidth = height * containerAspectRatio
+      const widthDiff = newWidth - width
+      width = newWidth
+      minX = Math.max(0, minX - widthDiff / 2)
+      maxX = Math.min(gridSize, maxX + widthDiff / 2)
+    } else if (containerAspectRatio < currentAspectRatio) {
+      // Container is taller - increase height
+      const newHeight = width / containerAspectRatio
+      const heightDiff = newHeight - height
+      height = newHeight
+      minY = Math.max(0, minY - heightDiff / 2)
+      maxY = Math.min(gridSize, maxY + heightDiff / 2)
+    }
+    
+    // Add small padding to ensure content at edges is visible
+    const padding = Math.max(width, height) * 0.05
+    const viewBoxX = Math.max(0, minX - padding)
+    const viewBoxY = Math.max(0, minY - padding)
+    const viewBoxWidth = Math.min(gridSize, width + padding * 2)
+    const viewBoxHeight = Math.min(gridSize, height + padding * 2)
+    
+    return {
+      viewBox: `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`,
+      bounds: {
+        minX: viewBoxX,
+        minY: viewBoxY,
+        maxX: viewBoxX + viewBoxWidth,
+        maxY: viewBoxY + viewBoxHeight
+      }
+    }
+  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, containerSize, gridSize])
+
   // Show loading state only if actively loading
   if (isLoadingConfig || isLoadingFirstPage || isLoadingPlanets) {
     return (
@@ -391,7 +492,16 @@ export function UnifiedUniverseMapV2() {
   // }
 
   return (
-    <div className="relative w-full h-full overflow-hidden" style={{ backgroundColor: 'transparent' }}>
+    <div 
+      className="fixed inset-0 overflow-hidden" 
+      style={{ 
+        backgroundColor: 'transparent',
+        top: '64px', // Account for PersistentHUD height
+        left: '64px', // Account for QuickAccessSidebar width
+        width: 'calc(100vw - 64px)',
+        height: 'calc(100vh - 64px)'
+      }}
+    >
       {/* Map container with zoom/pan */}
       <div
         ref={zoomPan.containerRef}
@@ -404,47 +514,40 @@ export function UnifiedUniverseMapV2() {
         onTouchMove={zoomPan.onTouchMove}
         onTouchEnd={zoomPan.onTouchEnd}
         style={{ 
-          minHeight: '100vh', 
-          minWidth: '100%',
+          width: '100%',
+          height: '100%',
           position: 'relative',
           backgroundColor: 'transparent'
         }}
       >
         {/* SVG overlay for rendering entities */}
-        {/* Use slice to fill viewport at all zoom levels for infinite zoom feel */}
+        {/* Dynamic viewBox ensures visible content always fills viewport at all zoom levels */}
         <svg
           className="absolute inset-0 w-full h-full"
           style={{
             width: '100%',
             height: '100%'
           }}
-          viewBox={`0 0 ${gridSize} ${gridSize}`}
-          preserveAspectRatio="xMidYMid slice"
+          viewBox={dynamicViewBox.viewBox}
+          preserveAspectRatio="none"
         >
-          <g
-            style={{
-              transform: `translate(${zoomPan.panX}px, ${zoomPan.panY}px) scale(${zoomPan.scale})`,
-              transformOrigin: 'center center'
-            }}
-          >
+          <g>
           {/* Transparent background */}
           <rect width={gridSize} height={gridSize} fill="transparent" />
           
-          {/* Debug: Show viewport bounds */}
-          {zoomPan.viewportBounds && (
-            <g className="debug-viewport">
-              <rect
-                x={zoomPan.viewportBounds.minX}
-                y={zoomPan.viewportBounds.minY}
-                width={zoomPan.viewportBounds.maxX - zoomPan.viewportBounds.minX}
-                height={zoomPan.viewportBounds.maxY - zoomPan.viewportBounds.minY}
-                fill="none"
-                stroke="rgba(255, 255, 0, 0.5)"
-                strokeWidth={2}
-                strokeDasharray="4,4"
-              />
-            </g>
-          )}
+          {/* Debug: Show viewport bounds - now matches the actual viewBox */}
+          <g className="debug-viewport">
+            <rect
+              x={dynamicViewBox.bounds.minX}
+              y={dynamicViewBox.bounds.minY}
+              width={dynamicViewBox.bounds.maxX - dynamicViewBox.bounds.minX}
+              height={dynamicViewBox.bounds.maxY - dynamicViewBox.bounds.minY}
+              fill="none"
+              stroke="rgba(255, 255, 0, 0.5)"
+              strokeWidth={2}
+              strokeDasharray="4,4"
+            />
+          </g>
           
           {/* Grid overlay */}
           <GridOverlay
