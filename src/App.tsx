@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -5,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { AuthGuard } from '@/components/common/AuthGuard'
 import { TickCountdownTimer } from '@/components/common/TickCountdownTimer'
 import { AuthTransitionOverlay } from '@/components/common/AuthTransitionOverlay'
+import { InitialDataLoader } from '@/components/common/InitialDataLoader'
 import { useAchievementNotifications } from '@/hooks/useAchievementNotifications'
 import { useGlobalTickData } from '@/hooks/useGlobalTickData'
 import { useTutorialDetection } from '@/hooks/useTutorialDetection'
@@ -129,9 +131,13 @@ function AppContent() {
 }
 
 function App() {
+  const [dataLoadingComplete, setDataLoadingComplete] = useState(false)
+
   return (
     <ErrorBoundary>
       <AppContent />
+      <InitialDataLoader onComplete={() => setDataLoadingComplete(true)} />
+      {!dataLoadingComplete && <div className="fixed inset-0 z-[999998] pointer-events-none" />}
       <TickCountdownTimer />
       <AuthTransitionOverlay />
       <Toaster 

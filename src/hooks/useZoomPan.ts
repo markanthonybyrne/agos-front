@@ -27,6 +27,14 @@ export interface UseZoomPanOptions {
    */
   initialScale?: number
   /**
+   * Initial pan X position
+   */
+  initialPanX?: number
+  /**
+   * Initial pan Y position
+   */
+  initialPanY?: number
+  /**
    * Grid dimensions (universe is 1000×1000)
    */
   gridWidth?: number
@@ -59,6 +67,8 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     minScale = 0.1,
     maxScale = 2.0,
     initialScale = 0.5,
+    initialPanX = 0,
+    initialPanY = 0,
     gridWidth = 1000,
     gridHeight = 1000,
     containerWidth,
@@ -70,8 +80,8 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
 
   const [state, setState] = useState<ZoomPanState>({
     scale: initialScale,
-    panX: 0,
-    panY: 0
+    panX: initialPanX,
+    panY: initialPanY
   })
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -208,10 +218,10 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
   const reset = useCallback(() => {
     setState({
       scale: initialScale,
-      panX: 0,
-      panY: 0
+      panX: initialPanX,
+      panY: initialPanY
     })
-  }, [initialScale])
+  }, [initialScale, initialPanX, initialPanY])
 
   // Pan handlers
   const handleStart = useCallback((clientX: number, clientY: number) => {
@@ -223,6 +233,8 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
   const handleMove = useCallback((clientX: number, clientY: number) => {
     if (!isDraggingRef.current) return
 
+    // Calculate pan delta - divide by scale so movement feels consistent across zoom levels
+    // At higher zoom (larger scale), same mouse movement moves less in grid space
     const deltaX = (clientX - dragStartRef.current.x) / state.scale
     const deltaY = (clientY - dragStartRef.current.y) / state.scale
 
@@ -231,11 +243,18 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
 
     const clamped = clampPan(newPanX, newPanY, state.scale)
 
-    setState(prev => ({
-      ...prev,
-      panX: clamped.x,
-      panY: clamped.y
-    }))
+    // Use functional update to ensure we're using latest state
+    setState(prev => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (prev.panX === clamped.x && prev.panY === clamped.y) {
+        return prev
+      }
+      return {
+        ...prev,
+        panX: clamped.x,
+        panY: clamped.y
+      }
+    })
   }, [state.scale, clampPan])
 
   const handleEnd = useCallback(() => {

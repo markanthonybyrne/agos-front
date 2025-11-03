@@ -1,15 +1,17 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useGetUniverseConfigQuery } from '@/api/endpoints/universeApi'
-import { useSearchPlanetsQuery } from '@/api/endpoints/planetsApi'
+import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { useAuth } from '@/hooks/useAuth'
 import { useZoomPan } from '@/hooks/useZoomPan'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
+import { useAppSelector } from '@/app/hooks'
 import { getPlanetXY } from '@/lib/coordinates'
 import { 
   groupPlanetsBySystem,
   convertSystemGroupsToData,
+  getPlanetSystemKey,
   type SystemData
 } from '@/lib/systemUtils'
 import { getPlanetImage } from '@/lib/planetImages'
@@ -52,148 +54,22 @@ export function UnifiedUniverseMapV2() {
   const gridHeight = configData?.grid_height || (typeof configData?.grid_size === 'object' ? configData.grid_size.height : null) || (configData?.grid_size || DEFAULT_GRID_HEIGHT)
   const maxPlanets = configData?.capacities?.max_planets || 24000
 
-  // Pre-load all planets with pagination
-  // Cache planets in localStorage to avoid reloading on each visit
-  const CACHE_KEY = 'universe_map_planets'
-  const CACHE_TIMESTAMP_KEY = 'universe_map_planets_timestamp'
-  const CACHE_EXPIRY = 24 * 60 * 60 * 1000 // 24 hours
-  
-  const [allPlanets, setAllPlanets] = useState<Planet[]>(() => {
-    // Try to load from cache on mount
-    try {
-      const cached = localStorage.getItem(CACHE_KEY)
-      const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
-      
-      if (cached && timestamp) {
-        const age = Date.now() - parseInt(timestamp, 10)
-        if (age < CACHE_EXPIRY) {
-          const planets = JSON.parse(cached)
-          console.log('[UnifiedUniverseMapV2] Loaded planets from cache:', planets.length)
-          return planets
-        } else {
-          console.log('[UnifiedUniverseMapV2] Cache expired, will reload')
-          localStorage.removeItem(CACHE_KEY)
-          localStorage.removeItem(CACHE_TIMESTAMP_KEY)
-        }
-      }
-    } catch (error) {
-      console.error('[UnifiedUniverseMapV2] Error loading cache:', error)
-    }
-    return []
-  })
-  
-  const [isLoadingPlanets, setIsLoadingPlanets] = useState(allPlanets.length === 0)
-  const [loadingProgress, setLoadingProgress] = useState(0)
-
-  // Fetch first page to get total count
-  // Use larger page size to reduce number of requests and avoid rate limiting
-  // Note: API might limit to 100 per page, so we'll handle that
-  const { data: firstPage, isLoading: isLoadingFirstPage, error: firstPageError } = useSearchPlanetsQuery({
-    limit: 100,  // Start with 100 to avoid API limits
-    offset: 0
-  }, {
-    skip: allPlanets.length > 0 // Skip if we have cached data
+  // Fetch homeworld planet to center map on it at 600% zoom
+  const { data: homeworldData } = useGetPlanetQuery(empire?.homeworld_planet_id || 0, {
+    skip: !empire?.homeworld_planet_id
   })
 
-  // Pre-load all planets with pagination
-  useEffect(() => {
-    const loadAllPlanets = async () => {
-      // If we already have planets from cache, don't reload
-      if (allPlanets.length > 0) {
-        console.log('[UnifiedUniverseMapV2] Using cached planets, skipping reload')
-        return
-      }
-      
-      if (!firstPage || isLoadingFirstPage) return
-      
-      setIsLoadingPlanets(true)
-      setLoadingProgress(0)
-      
-      const planets: Planet[] = [...(firstPage.planets || [])]
-      const total = firstPage.total || 0
-      const maxPlanetsToLoad = 15000 // Load up to 15000 planets
-      let offset = firstPage.planets?.length || 100
-      const limit = 100 // API maximum is 100 per page
-
-      console.log('[UnifiedUniverseMapV2] Starting planet load:', { total, alreadyLoaded: planets.length, maxToLoad: maxPlanetsToLoad })
-
-      // Continue loading until we have 15000 planets, all planets, or hit an error
-      while (planets.length < maxPlanetsToLoad && planets.length < total && offset < total) {
-        try {
-          // Ensure base URL doesn't have trailing slash to avoid double slashes
-          const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '')
-          const response = await fetch(
-            `${baseUrl}/planets/search?limit=${limit}&offset=${offset}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          )
-          
-          if (!response.ok) {
-            console.error('[UnifiedUniverseMapV2] Failed to fetch planets:', response.status, response.statusText)
-            break
-          }
-          
-          const data = await response.json()
-          const newPlanets = data.planets || []
-          planets.push(...newPlanets)
-          
-          console.log('[UnifiedUniverseMapV2] Loaded planets:', { 
-            offset, 
-            fetched: newPlanets.length, 
-            totalLoaded: planets.length, 
-            total,
-            remaining: total - planets.length
-          })
-          
-          offset += limit
-          const progressTotal = Math.min(total, maxPlanetsToLoad)
-          setLoadingProgress((planets.length / progressTotal) * 100)
-          
-          // If we got fewer planets than requested, we've reached the end
-          if (newPlanets.length < limit) {
-            console.log('[UnifiedUniverseMapV2] Reached end of data (got fewer than requested)')
-            break
-          }
-          
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100))
-        } catch (error) {
-          console.error('[UnifiedUniverseMapV2] Error loading planets:', error)
-          break
-        }
-      }
-      
-      console.log('[UnifiedUniverseMapV2] Finished loading planets:', { loaded: planets.length, expected: total })
-      
-      // Cache the loaded planets
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(planets))
-        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-        console.log('[UnifiedUniverseMapV2] Cached planets to localStorage')
-      } catch (error) {
-        console.error('[UnifiedUniverseMapV2] Error caching planets:', error)
-      }
-      
-      setAllPlanets(planets)
-      setIsLoadingPlanets(false)
-      setLoadingProgress(100)
-    }
-
-    if (firstPage && !isLoadingFirstPage && allPlanets.length === 0) {
-      loadAllPlanets()
-    }
-  }, [firstPage, isLoadingFirstPage, allPlanets.length])
+  // Use global planets from Redux store (loaded on login)
+  const { allPlanets, isLoading: isLoadingPlanets } = useAppSelector((state) => state.planets)
+  const hasSetInitialPosition = useRef(false)
 
   // Zoom and pan hook
   // Extended max scale to allow very high zoom (700%) for detailed system viewing
+  // Default view: zoomed to 600% on user's homeworld system
   const zoomPan = useZoomPan({
     minScale: 0.01,  // Universe view
     maxScale: 7.0,   // Very high zoom for detailed system/planet viewing (allows 700%)
-    initialScale: 0.05, // Start at sector level
+    initialScale: 0.05, // Start at sector level, will update when homeworld system is found
     gridWidth: gridWidth,
     gridHeight: gridHeight
   })
@@ -212,6 +88,42 @@ export function UnifiedUniverseMapV2() {
     
     return systemsMap
   }, [allPlanets])
+
+  // Calculate initial pan position to center on homeworld system at 600% zoom
+  // Find the system containing the homeworld planet and center on its center
+  const homeworldSystemCenter = useMemo(() => {
+    if (!homeworldData?.planet || systemsByKey.size === 0) {
+      return null
+    }
+    
+    const homeworldSystemKey = getPlanetSystemKey(homeworldData.planet)
+    if (!homeworldSystemKey) {
+      return null
+    }
+    
+    const system = systemsByKey.get(homeworldSystemKey)
+    if (!system) {
+      return null
+    }
+    
+    return system.center
+  }, [homeworldData, systemsByKey])
+
+  // Update pan and zoom when homeworld system is found (only once on initial load)
+  useEffect(() => {
+    if (!hasSetInitialPosition.current && homeworldSystemCenter) {
+      // Center on homeworld system at 600% zoom
+      // Formula: panX = (gridWidth / 2 - targetX) * scale
+      // This centers the viewport on the target coordinate
+      const initialScale = 6.0 // 600% zoom
+      const panX = (gridWidth / 2 - homeworldSystemCenter.x) * initialScale
+      const panY = (gridHeight / 2 - homeworldSystemCenter.y) * initialScale
+      
+      zoomPan.setZoom(initialScale)
+      zoomPan.setPan(panX, panY)
+      hasSetInitialPosition.current = true
+    }
+  }, [homeworldSystemCenter, gridWidth, gridHeight, zoomPan])
 
   // Group systems by galaxy for rendering
   const systemsByGalaxy = useMemo(() => {
@@ -332,7 +244,7 @@ export function UnifiedUniverseMapV2() {
 
   // Debug logging - MUST be before early return to maintain hook order
   useEffect(() => {
-    if (!isLoadingConfig && !isLoadingFirstPage && !isLoadingPlanets && allPlanets.length > 0) {
+    if (!isLoadingConfig && !isLoadingPlanets && allPlanets.length > 0) {
       console.log('[UnifiedUniverseMapV2] Render state:', {
         allPlanetsCount: allPlanets.length,
         systemsCount: systemsByKey.size,
@@ -342,7 +254,7 @@ export function UnifiedUniverseMapV2() {
         visiblePlanets: visiblePlanets.length
       })
     }
-  }, [allPlanets.length, systemsByKey.size, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingFirstPage, isLoadingPlanets])
+  }, [allPlanets.length, systemsByKey.size, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingPlanets])
 
   // Handle system click
   const handleSystemClick = (system: SystemData) => {
@@ -462,17 +374,17 @@ export function UnifiedUniverseMapV2() {
     }
   }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, containerSize, gridWidth, gridHeight])
 
-  // Show loading state only if actively loading
-  if (isLoadingConfig || isLoadingFirstPage || isLoadingPlanets) {
+  // Show loading state only if actively loading config or planets
+  if (isLoadingConfig || isLoadingPlanets || allPlanets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full">
         <Loader />
         <div className="mt-4">
           <p className="text-sm text-muted-foreground">
-            Loading universe... {Math.round(loadingProgress)}%
+            {isLoadingPlanets ? 'Loading universe data...' : 'Initializing map...'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            {allPlanets.length > 0 ? `${allPlanets.length} planets loaded` : 'Initializing...'}
+            {allPlanets.length > 0 ? `${allPlanets.length.toLocaleString()} planets loaded` : 'Waiting for planet data...'}
           </p>
         </div>
       </div>

@@ -63,6 +63,9 @@ const authSlice = createSlice({
       // Clear universe map cache on logout
       localStorage.removeItem('universe_map_planets')
       localStorage.removeItem('universe_map_planets_timestamp')
+      // Clear global planets cache
+      localStorage.removeItem('global_planets_cache')
+      localStorage.removeItem('global_planets_cache_timestamp')
     },
     updateEmpire: (state, action: PayloadAction<Empire>) => {
       state.empire = action.payload
