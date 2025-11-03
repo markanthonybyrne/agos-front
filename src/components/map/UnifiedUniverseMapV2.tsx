@@ -452,20 +452,6 @@ export function UnifiedUniverseMapV2() {
           {/* Transparent background */}
           <rect width={gridWidth} height={gridHeight} fill="transparent" />
           
-          {/* Debug: Show viewport bounds - now matches the actual viewBox */}
-          <g className="debug-viewport">
-            <rect
-              x={dynamicViewBox.bounds.minX}
-              y={dynamicViewBox.bounds.minY}
-              width={dynamicViewBox.bounds.maxX - dynamicViewBox.bounds.minX}
-              height={dynamicViewBox.bounds.maxY - dynamicViewBox.bounds.minY}
-              fill="none"
-              stroke="rgba(255, 255, 0, 0.5)"
-              strokeWidth={2}
-              strokeDasharray="4,4"
-            />
-          </g>
-          
           {/* Grid overlay */}
           <GridOverlay
             width={gridWidth}
@@ -538,18 +524,6 @@ export function UnifiedUniverseMapV2() {
                   </g>
                 )
               })}
-              {/* Debug: Show count if no systems visible */}
-              {visibleSystems.length === 0 && systemsByKey.size > 0 && (
-                <text
-                  x={gridWidth / 2}
-                  y={gridHeight / 2}
-                  textAnchor="middle"
-                  className="fill-yellow-400"
-                  style={{ fontSize: '16px' }}
-                >
-                  {systemsByKey.size} systems exist but none visible in viewport
-                </text>
-              )}
             </g>
           )}
 
@@ -678,50 +652,15 @@ export function UnifiedUniverseMapV2() {
             </g>
           )}
 
-          {/* Debug info - always show some visual feedback */}
-          {allPlanets.length > 0 && (
-            <g className="debug-info">
-              <text
-                x={gridWidth / 2}
-                y={50}
-                textAnchor="middle"
-                className="text-sm fill-yellow-400 font-mono"
-              >
-                Planets: {allPlanets.length} | Systems: {systemsByKey.size} | Zoom: {zoomLevel} ({Math.round(zoomPan.scale * 100)}%)
-              </text>
-              {(visibleSystems.length === 0 && visiblePlanets.length === 0) && (
-                <>
-                  <text
-                    x={gridWidth / 2}
-                    y={gridHeight / 2}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="text-lg fill-yellow-400"
-                  >
-                    No entities visible at current zoom level
-                  </text>
-                  <text
-                    x={gridWidth / 2}
-                    y={gridHeight / 2 + 25}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="text-sm fill-yellow-300"
-                  >
-                    Zoom in or pan to explore
-                  </text>
-                </>
-              )}
-            </g>
-          )}
           
           </g>
         </svg>
 
         {/* Zoom controls */}
-        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 bg-black/80 backdrop-blur-sm p-2 rounded-lg border border-gray-700">
+        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 bg-black/80 backdrop-blur-sm px-4 py-3 angled-corners border border-gray-700">
           <button
             onClick={() => zoomPan.zoomIn()}
-            className="p-2 bg-blue-600 hover:bg-blue-700 rounded text-white font-bold text-lg"
+            className="p-2 bg-blue-600 hover:bg-blue-700 angled-corners text-white font-bold text-lg"
             title="Zoom In"
           >
             +
@@ -731,14 +670,14 @@ export function UnifiedUniverseMapV2() {
           </div>
           <button
             onClick={() => zoomPan.zoomOut()}
-            className="p-2 bg-blue-600 hover:bg-blue-700 rounded text-white font-bold text-lg"
+            className="p-2 bg-blue-600 hover:bg-blue-700 angled-corners text-white font-bold text-lg"
             title="Zoom Out"
           >
             −
           </button>
           <button
             onClick={() => zoomPan.reset()}
-            className="p-2 bg-gray-600 hover:bg-gray-700 rounded text-white text-xs"
+            className="p-2 bg-gray-600 hover:bg-gray-700 angled-corners text-white text-xs"
             title="Reset Zoom"
           >
             Reset
@@ -746,7 +685,7 @@ export function UnifiedUniverseMapV2() {
         </div>
 
         {/* Zoom level indicator */}
-        <div className="absolute top-4 left-4 z-50 bg-black/80 backdrop-blur-sm p-2 rounded-lg text-white text-sm border border-gray-700">
+        <div className="absolute top-4 left-4 z-50 bg-black/80 backdrop-blur-sm px-4 py-3 angled-corners text-white text-sm border border-gray-700">
           <div className="font-mono">
             Zoom: {zoomLevel} ({Math.round(zoomPan.scale * 100)}%)
           </div>
