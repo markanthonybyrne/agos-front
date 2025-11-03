@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { getQuadrantXyRange } from '@/lib/coordinateUtils'
 
 interface QuadrantOverlayProps {
-  gridSize: number
+  gridWidth: number
+  gridHeight: number
   scale: number
   viewportBounds?: {
     minX: number
@@ -19,7 +20,8 @@ interface QuadrantOverlayProps {
  * Only visible at universe/quadrant zoom levels as a navigation aid
  */
 export function QuadrantOverlay({
-  gridSize,
+  gridWidth,
+  gridHeight,
   scale,
   viewportBounds,
   onQuadrantClick

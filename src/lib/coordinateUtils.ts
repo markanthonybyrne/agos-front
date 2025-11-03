@@ -1,8 +1,13 @@
 /**
  * Coordinate Conversion Utilities
  * 
- * Converts between X/Y coordinates (0-999 grid) and hierarchical coordinates
+ * Converts between X/Y coordinates (0-1999 x 0-999 grid) and hierarchical coordinates
  * (Quadrant:Sector:Galaxy:Planet). X/Y coordinates are the source of truth.
+ * 
+ * Grid dimensions: 2000 x 1000 (rectangular)
+ * - Quadrant width: 500 (2000/4)
+ * - Quadrant height: 250 (1000/4)
+ * - Sector width: 125 (500/4)
  */
 
 export interface XYCoordinate {
@@ -24,6 +29,13 @@ export interface XYRanges {
   y_min: number
   y_max: number
 }
+
+// Constants for grid dimensions
+const GRID_WIDTH = 2000
+const GRID_HEIGHT = 1000
+const QUADRANT_WIDTH = 500  // 2000 / 4
+const QUADRANT_HEIGHT = 250 // 1000 / 4
+const SECTOR_WIDTH = 125    // 500 / 4
 
 /**
  * Simple CRC32 hash function for planet number assignment
@@ -49,26 +61,26 @@ function crc32(str: string): number {
  */
 export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
   // Ensure coordinates are within valid range
-  const clampedX = Math.max(0, Math.min(999, Math.floor(x)))
-  const clampedY = Math.max(0, Math.min(999, Math.floor(y)))
+  const clampedX = Math.max(0, Math.min(GRID_WIDTH - 1, Math.floor(x)))
+  const clampedY = Math.max(0, Math.min(GRID_HEIGHT - 1, Math.floor(y)))
 
-  // Quadrant: X = 0-249 (Q1), 250-499 (Q2), 500-749 (Q3), 750-999 (Q4)
-  const quadrant = Math.floor(clampedX / 250) + 1
+  // Quadrant: X = 0-499 (Q1), 500-999 (Q2), 1000-1499 (Q3), 1500-1999 (Q4)
+  const quadrant = Math.floor(clampedX / QUADRANT_WIDTH) + 1
 
-  // Sector: Divide quadrant width (250) into 4 sectors
-  // Sector 1: X = 0-62, Sector 2: X = 62-125, Sector 3: X = 125-187, Sector 4: X = 187-250
-  const xWithinQuadrant = clampedX % 250
-  const sector = Math.floor(xWithinQuadrant / 62.5) + 1
+  // Sector: Divide quadrant width (500) into 4 sectors
+  // Sector 1: X = 0-124, Sector 2: X = 125-249, Sector 3: X = 250-374, Sector 4: X = 375-499
+  const xWithinQuadrant = clampedX % QUADRANT_WIDTH
+  const sector = Math.floor(xWithinQuadrant / SECTOR_WIDTH) + 1
 
   // Galaxy: Distributed both horizontally (X) and vertically (Y) within a sector
-  // Sector width is 62.5, divide by 10 for X component
-  // Sector height is 250 (quadrant height), divide by 10 for Y component
-  const xWithinSector = xWithinQuadrant % 62.5
-  const yWithinQuadrant = clampedY % 250
+  // Sector width is 125, divide by 10 for X component = 12.5
+  // Sector height is 250 (quadrant height), divide by 10 for Y component = 25
+  const xWithinSector = xWithinQuadrant % SECTOR_WIDTH
+  const yWithinQuadrant = clampedY % QUADRANT_HEIGHT
   
   // Calculate galaxy number from 2D grid within sector
-  const galaxyXComponent = Math.floor(xWithinSector / 6.25) // 0-9
-  const galaxyYComponent = Math.floor(yWithinQuadrant / 25) // 0-9
+  const galaxyXComponent = Math.floor(xWithinSector / (SECTOR_WIDTH / 10)) // 0-9
+  const galaxyYComponent = Math.floor(yWithinQuadrant / (QUADRANT_HEIGHT / 10)) // 0-9
   
   // Galaxy number: 1-10, calculated as a 2D position
   // We have 10 galaxies per sector in a 2D grid (approximately)
@@ -117,17 +129,17 @@ export function hierarchicalToXy(
   const p = Math.max(1, Math.min(15, planet))
 
   // Calculate base X from quadrant and sector
-  const quadrantBaseX = (q - 1) * 250
-  const sectorBaseX = (s - 1) * 62.5
+  const quadrantBaseX = (q - 1) * QUADRANT_WIDTH
+  const sectorBaseX = (s - 1) * SECTOR_WIDTH
   const baseX = quadrantBaseX + sectorBaseX
 
   // Galaxy X component (0-9, representing position within sector width)
   const galaxyXComponent = (g - 1) % 10
-  const galaxyXOffset = galaxyXComponent * 6.25
+  const galaxyXOffset = galaxyXComponent * (SECTOR_WIDTH / 10)
 
   // Galaxy Y component (0-9, representing position within quadrant height)
   const galaxyYComponent = Math.floor((g - 1) / 10)
-  const galaxyYOffset = galaxyYComponent * 25
+  const galaxyYOffset = galaxyYComponent * (QUADRANT_HEIGHT / 10)
 
   // Approximate X position: base + galaxy offset + small planet-based offset
   const x = baseX + galaxyXOffset + (p % 5) * 0.5
@@ -136,8 +148,8 @@ export function hierarchicalToXy(
   const y = galaxyYOffset + (p * 2)
 
   return {
-    x: Math.max(0, Math.min(999, Math.floor(x))),
-    y: Math.max(0, Math.min(999, Math.floor(y)))
+    x: Math.max(0, Math.min(GRID_WIDTH - 1, Math.floor(x))),
+    y: Math.max(0, Math.min(GRID_HEIGHT - 1, Math.floor(y)))
   }
 }
 
@@ -180,9 +192,9 @@ export function getSystemXyRange(
 
   return {
     x_min: Math.max(0, Math.floor(x_min)),
-    x_max: Math.min(999, Math.ceil(x_max)),
+    x_max: Math.min(GRID_WIDTH - 1, Math.ceil(x_max)),
     y_min: Math.max(0, Math.floor(y_min)),
-    y_max: Math.min(999, Math.ceil(y_max))
+    y_max: Math.min(GRID_HEIGHT - 1, Math.ceil(y_max))
   }
 }
 
@@ -204,17 +216,17 @@ export function getGalaxyXyRange(
   const g = Math.max(1, Math.min(10, galaxy))
 
   // Quadrant and sector base positions
-  const quadrantBaseX = (q - 1) * 250
-  const sectorBaseX = (s - 1) * 62.5
-  const quadrantBaseY = (q - 1) * 250
+  const quadrantBaseX = (q - 1) * QUADRANT_WIDTH
+  const sectorBaseX = (s - 1) * SECTOR_WIDTH
+  const quadrantBaseY = (q - 1) * QUADRANT_HEIGHT
 
   // Galaxy position within sector (2D grid)
   const galaxyXComponent = (g - 1) % 10
   const galaxyYComponent = Math.floor((g - 1) / 10)
 
   // Galaxy bounds within sector
-  const galaxyWidth = 6.25
-  const galaxyHeight = 25
+  const galaxyWidth = SECTOR_WIDTH / 10  // 12.5
+  const galaxyHeight = QUADRANT_HEIGHT / 10  // 25
 
   const x_min = quadrantBaseX + sectorBaseX + (galaxyXComponent * galaxyWidth)
   const x_max = x_min + galaxyWidth
@@ -223,9 +235,9 @@ export function getGalaxyXyRange(
 
   return {
     x_min: Math.max(0, Math.floor(x_min)),
-    x_max: Math.min(999, Math.ceil(x_max)),
+    x_max: Math.min(GRID_WIDTH - 1, Math.ceil(x_max)),
     y_min: Math.max(0, Math.floor(y_min)),
-    y_max: Math.min(999, Math.ceil(y_max))
+    y_max: Math.min(GRID_HEIGHT - 1, Math.ceil(y_max))
   }
 }
 
@@ -240,20 +252,20 @@ export function getSectorXyRange(quadrant: number, sector: number): XYRanges {
   const q = Math.max(1, Math.min(4, quadrant))
   const s = Math.max(1, Math.min(4, sector))
 
-  const quadrantBaseX = (q - 1) * 250
-  const sectorBaseX = (s - 1) * 62.5
-  const quadrantBaseY = (q - 1) * 250
+  const quadrantBaseX = (q - 1) * QUADRANT_WIDTH
+  const sectorBaseX = (s - 1) * SECTOR_WIDTH
+  const quadrantBaseY = (q - 1) * QUADRANT_HEIGHT
 
   const x_min = quadrantBaseX + sectorBaseX
-  const x_max = x_min + 62.5
+  const x_max = x_min + SECTOR_WIDTH
   const y_min = quadrantBaseY
-  const y_max = quadrantBaseY + 250
+  const y_max = quadrantBaseY + QUADRANT_HEIGHT
 
   return {
     x_min: Math.max(0, Math.floor(x_min)),
-    x_max: Math.min(999, Math.ceil(x_max)),
+    x_max: Math.min(GRID_WIDTH - 1, Math.ceil(x_max)),
     y_min: Math.max(0, Math.floor(y_min)),
-    y_max: Math.min(999, Math.ceil(y_max))
+    y_max: Math.min(GRID_HEIGHT - 1, Math.ceil(y_max))
   }
 }
 
@@ -266,16 +278,16 @@ export function getSectorXyRange(quadrant: number, sector: number): XYRanges {
 export function getQuadrantXyRange(quadrant: number): XYRanges {
   const q = Math.max(1, Math.min(4, quadrant))
 
-  const x_min = (q - 1) * 250
-  const x_max = q * 250
-  const y_min = (q - 1) * 250
-  const y_max = q * 250
+  const x_min = (q - 1) * QUADRANT_WIDTH
+  const x_max = q * QUADRANT_WIDTH
+  const y_min = (q - 1) * QUADRANT_HEIGHT
+  const y_max = q * QUADRANT_HEIGHT
 
   return {
     x_min: Math.max(0, Math.floor(x_min)),
-    x_max: Math.min(999, Math.ceil(x_max)),
+    x_max: Math.min(GRID_WIDTH - 1, Math.ceil(x_max)),
     y_min: Math.max(0, Math.floor(y_min)),
-    y_max: Math.min(999, Math.ceil(y_max))
+    y_max: Math.min(GRID_HEIGHT - 1, Math.ceil(y_max))
   }
 }
 

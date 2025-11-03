@@ -24,8 +24,10 @@ import { Loader } from '@/components/ui/loader'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
 
-// Default grid size (will be overridden by config)
-const DEFAULT_GRID_SIZE = 1000
+// Default grid dimensions (will be overridden by config)
+// Universe is now rectangular: 2000 x 1000
+const DEFAULT_GRID_WIDTH = 2000
+const DEFAULT_GRID_HEIGHT = 1000
 
 /**
  * UnifiedUniverseMapV2 - Main component for the 5-level universe map
@@ -44,7 +46,10 @@ export function UnifiedUniverseMapV2() {
   const [selectedSystem, setSelectedSystem] = useState<SystemData | null>(null)
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
-  const gridSize = configData?.grid_size || DEFAULT_GRID_SIZE
+  // Support both old format (single grid_size) and new format (grid_width/grid_height)
+  // If API returns single number, assume square; otherwise use separate width/height
+  const gridWidth = configData?.grid_width || (typeof configData?.grid_size === 'object' ? configData.grid_size.width : null) || (configData?.grid_size || DEFAULT_GRID_WIDTH)
+  const gridHeight = configData?.grid_height || (typeof configData?.grid_size === 'object' ? configData.grid_size.height : null) || (configData?.grid_size || DEFAULT_GRID_HEIGHT)
   const maxPlanets = configData?.capacities?.max_planets || 24000
 
   // Pre-load all planets with pagination
@@ -184,13 +189,13 @@ export function UnifiedUniverseMapV2() {
   }, [firstPage, isLoadingFirstPage, allPlanets.length])
 
   // Zoom and pan hook
-  // Extended max scale to allow very high zoom (300%+) for detailed system viewing
+  // Extended max scale to allow very high zoom (700%) for detailed system viewing
   const zoomPan = useZoomPan({
     minScale: 0.01,  // Universe view
-    maxScale: 5.0,   // Very high zoom for detailed system/planet viewing (allows 300%+)
+    maxScale: 7.0,   // Very high zoom for detailed system/planet viewing (allows 700%)
     initialScale: 0.05, // Start at sector level
-    gridWidth: gridSize,
-    gridHeight: gridSize
+    gridWidth: gridWidth,
+    gridHeight: gridHeight
   })
 
   // Group planets by system
@@ -385,7 +390,7 @@ export function UnifiedUniverseMapV2() {
   // MUST be before early return to maintain hook order
   const dynamicViewBox = useMemo(() => {
     if (containerSize.width === 0 || containerSize.height === 0) {
-      return { viewBox: `0 0 ${gridSize} ${gridSize}`, bounds: { minX: 0, minY: 0, maxX: gridSize, maxY: gridSize } }
+      return { viewBox: `0 0 ${gridWidth} ${gridHeight}`, bounds: { minX: 0, minY: 0, maxX: gridWidth, maxY: gridHeight } }
     }
     
     const containerWidth = containerSize.width
@@ -404,8 +409,8 @@ export function UnifiedUniverseMapV2() {
     // But we need to account for the container size
     
     // Calculate center point in grid coordinates
-    const centerX = gridSize / 2 - panX / scale
-    const centerY = gridSize / 2 - panY / scale
+    const centerX = gridWidth / 2 - panX / scale
+    const centerY = gridHeight / 2 - panY / scale
     
     // Calculate visible width/height in grid coordinates
     // The container size divided by scale gives us grid units visible
@@ -414,9 +419,9 @@ export function UnifiedUniverseMapV2() {
     
     // Calculate bounds
     let minX = Math.max(0, centerX - visibleGridWidth / 2)
-    let maxX = Math.min(gridSize, centerX + visibleGridWidth / 2)
+    let maxX = Math.min(gridWidth, centerX + visibleGridWidth / 2)
     let minY = Math.max(0, centerY - visibleGridHeight / 2)
-    let maxY = Math.min(gridSize, centerY + visibleGridHeight / 2)
+    let maxY = Math.min(gridHeight, centerY + visibleGridHeight / 2)
     
     let width = maxX - minX
     let height = maxY - minY
@@ -429,22 +434,22 @@ export function UnifiedUniverseMapV2() {
       const widthDiff = newWidth - width
       width = newWidth
       minX = Math.max(0, minX - widthDiff / 2)
-      maxX = Math.min(gridSize, maxX + widthDiff / 2)
+      maxX = Math.min(gridWidth, maxX + widthDiff / 2)
     } else if (containerAspectRatio < currentAspectRatio) {
       // Container is taller - increase height
       const newHeight = width / containerAspectRatio
       const heightDiff = newHeight - height
       height = newHeight
       minY = Math.max(0, minY - heightDiff / 2)
-      maxY = Math.min(gridSize, maxY + heightDiff / 2)
+      maxY = Math.min(gridHeight, maxY + heightDiff / 2)
     }
     
     // Add small padding to ensure content at edges is visible
     const padding = Math.max(width, height) * 0.05
     const viewBoxX = Math.max(0, minX - padding)
     const viewBoxY = Math.max(0, minY - padding)
-    const viewBoxWidth = Math.min(gridSize, width + padding * 2)
-    const viewBoxHeight = Math.min(gridSize, height + padding * 2)
+    const viewBoxWidth = Math.min(gridWidth, width + padding * 2)
+    const viewBoxHeight = Math.min(gridHeight, height + padding * 2)
     
     return {
       viewBox: `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`,
@@ -455,7 +460,7 @@ export function UnifiedUniverseMapV2() {
         maxY: viewBoxY + viewBoxHeight
       }
     }
-  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, containerSize, gridSize])
+  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, containerSize, gridWidth, gridHeight])
 
   // Show loading state only if actively loading
   if (isLoadingConfig || isLoadingFirstPage || isLoadingPlanets) {
@@ -533,7 +538,7 @@ export function UnifiedUniverseMapV2() {
         >
           <g>
           {/* Transparent background */}
-          <rect width={gridSize} height={gridSize} fill="transparent" />
+          <rect width={gridWidth} height={gridHeight} fill="transparent" />
           
           {/* Debug: Show viewport bounds - now matches the actual viewBox */}
           <g className="debug-viewport">
@@ -551,15 +556,16 @@ export function UnifiedUniverseMapV2() {
           
           {/* Grid overlay */}
           <GridOverlay
-            width={gridSize}
-            height={gridSize}
+            width={gridWidth}
+            height={gridHeight}
             scale={zoomPan.scale}
             viewportBounds={zoomPan.viewportBounds}
           />
 
           {/* Navigation overlays */}
           <QuadrantOverlay
-            gridSize={gridSize}
+            gridWidth={gridWidth}
+            gridHeight={gridHeight}
             scale={zoomPan.scale}
             viewportBounds={zoomPan.viewportBounds}
             onQuadrantClick={(quadrant) => {
@@ -571,7 +577,8 @@ export function UnifiedUniverseMapV2() {
             }}
           />
           <SectorOverlay
-            gridSize={gridSize}
+            gridWidth={gridWidth}
+            gridHeight={gridHeight}
             scale={zoomPan.scale}
             viewportBounds={zoomPan.viewportBounds}
             onSectorClick={(quadrant, sector) => {
@@ -622,8 +629,8 @@ export function UnifiedUniverseMapV2() {
               {/* Debug: Show count if no systems visible */}
               {visibleSystems.length === 0 && systemsByKey.size > 0 && (
                 <text
-                  x={gridSize / 2}
-                  y={gridSize / 2}
+                  x={gridWidth / 2}
+                  y={gridHeight / 2}
                   textAnchor="middle"
                   className="fill-yellow-400"
                   style={{ fontSize: '16px' }}
@@ -763,7 +770,7 @@ export function UnifiedUniverseMapV2() {
           {allPlanets.length > 0 && (
             <g className="debug-info">
               <text
-                x={gridSize / 2}
+                x={gridWidth / 2}
                 y={50}
                 textAnchor="middle"
                 className="text-sm fill-yellow-400 font-mono"
@@ -773,8 +780,8 @@ export function UnifiedUniverseMapV2() {
               {(visibleSystems.length === 0 && visiblePlanets.length === 0) && (
                 <>
                   <text
-                    x={gridSize / 2}
-                    y={gridSize / 2}
+                    x={gridWidth / 2}
+                    y={gridHeight / 2}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     className="text-lg fill-yellow-400"
@@ -782,8 +789,8 @@ export function UnifiedUniverseMapV2() {
                     No entities visible at current zoom level
                   </text>
                   <text
-                    x={gridSize / 2}
-                    y={gridSize / 2 + 25}
+                    x={gridWidth / 2}
+                    y={gridHeight / 2 + 25}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     className="text-sm fill-yellow-300"

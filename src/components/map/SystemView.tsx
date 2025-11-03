@@ -69,31 +69,47 @@ function SystemView({
   const logScale = Math.log10(Math.max(1, scale * 10)) // Logarithmic scaling
   const starSize = scale < 0.5 
     ? Math.max(6, Math.min(12, logScale * 8))
-    : Math.max(12, Math.min(35, logScale * 10)) // Capped at 35px even at high zoom
+    : scale >= 7.0 ? 80  // Much larger at 700% zoom
+    : scale >= 6.0 ? 65  // Large at 600% zoom
+    : scale >= 5.0 ? 50  // Larger at 500% zoom
+    : scale >= 4.0 ? 40  // Increased at 400% zoom
+    : Math.max(12, Math.min(35, logScale * 10)) // Standard scaling below 400%
   
   // Determine planet size based on zoom scale - logarithmic scaling
   const basePlanetSize = scale < 0.5
     ? Math.max(6, Math.min(12, logScale * 6))
-    : Math.max(12, Math.min(25, logScale * 8)) // Capped at 25px even at high zoom
+    : scale >= 7.0 ? 50  // Much larger at 700% zoom
+    : scale >= 6.0 ? 40  // Large at 600% zoom
+    : scale >= 5.0 ? 32  // Larger at 500% zoom
+    : scale >= 4.0 ? 28  // Increased at 400% zoom
+    : Math.max(12, Math.min(25, logScale * 8)) // Standard scaling below 400%
   
   return (
     <g className={cn('system-view', className)}>
       {/* Orbit lines - dashed circles around central star */}
       {/* Show orbit lines at system level zoom (scale >= 1.57, which is 157%) */}
-      {scale >= 1.57 && uniqueOrbitRadii.map((radius, index) => (
-        <circle
-          key={`orbit-${system.key}-${radius}-${index}`}
-          cx={system.center.x}
-          cy={system.center.y}
-          r={radius}
-          fill="none"
-          stroke="rgba(100, 200, 255, 0.5)"
-          strokeWidth={1.5}
-          strokeDasharray="4,4"
-          className="orbit-line"
-          style={{ opacity: 0.6 }}
-        />
-      ))}
+      {scale >= 1.57 && uniqueOrbitRadii.map((radius, index) => {
+        // Increase orbit line stroke width at high zoom levels
+        const orbitStrokeWidth = scale >= 7.0 ? 4
+          : scale >= 6.0 ? 3.5
+          : scale >= 5.0 ? 3
+          : scale >= 4.0 ? 2.5
+          : 1.5
+        return (
+          <circle
+            key={`orbit-${system.key}-${radius}-${index}`}
+            cx={system.center.x}
+            cy={system.center.y}
+            r={radius}
+            fill="none"
+            stroke="rgba(100, 200, 255, 0.5)"
+            strokeWidth={orbitStrokeWidth}
+            strokeDasharray="4,4"
+            className="orbit-line"
+            style={{ opacity: 0.6 }}
+          />
+        )
+      })}
       
       {/* Central star */}
       <g className="central-star">
@@ -215,8 +231,8 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-white font-mono font-semibold"
                   style={{ 
-                    fontSize: `${Math.max(7, Math.min(9, logScale * 2.5))}px`, // Much smaller text for planet level
-                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                    fontSize: `${scale >= 7.0 ? '2.5px' : scale >= 6.0 ? '3px' : scale >= 5.0 ? '3.5px' : scale >= 4.0 ? '4px' : Math.max(6, Math.min(8, logScale * 2))}px`, // Much smaller text at 400%+ zoom
+                    textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
                   Planet {formatCoordinate(planet.coordinate)}
@@ -227,8 +243,8 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-gray-300 font-mono"
                   style={{ 
-                    fontSize: `${Math.max(6, Math.min(8, logScale * 2))}px`, // Much smaller text for planet level
-                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                    fontSize: `${scale >= 7.0 ? '2px' : scale >= 6.0 ? '2.5px' : scale >= 5.0 ? '3px' : scale >= 4.0 ? '3.5px' : Math.max(5, Math.min(7, logScale * 1.5))}px`, // Much smaller text at 400%+ zoom
+                    textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
                   {formatCoordinate(planet.coordinate)}

@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { getSectorXyRange } from '@/lib/coordinateUtils'
 
 interface SectorOverlayProps {
-  gridSize: number
+  gridWidth: number
+  gridHeight: number
   scale: number
   viewportBounds?: {
     minX: number
@@ -19,7 +20,8 @@ interface SectorOverlayProps {
  * Only visible at quadrant/sector zoom levels as a navigation aid
  */
 export function SectorOverlay({
-  gridSize,
+  gridWidth,
+  gridHeight,
   scale,
   viewportBounds,
   onSectorClick

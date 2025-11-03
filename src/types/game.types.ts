@@ -5,7 +5,7 @@ export interface Coordinate {
   galaxy: number
   system?: number  // System level (5-level hierarchy)
   planet: number
-  // X/Y coordinates (0-999 grid) - source of truth for positioning
+  // X/Y coordinates (0-1999 x 0-999 grid) - source of truth for positioning
   x?: number
   y?: number
 }
