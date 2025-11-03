@@ -166,57 +166,8 @@ export function GridOverlay({
         ))}
       </g>
 
-      {/* Main grid lines (solid, larger squares) */}
-      <g className="main-grid" opacity={0.9}>
-        {visibleGridLines.mainVertical.map(x => (
-          <line
-            key={`main-v-${x}`}
-            x1={x}
-            y1={0}
-            x2={x}
-            y2={height}
-            stroke="rgba(25, 234, 253, 1)"
-            strokeWidth={1.5}
-          />
-        ))}
-        {visibleGridLines.mainHorizontal.map(y => (
-          <line
-            key={`main-h-${y}`}
-            x1={0}
-            y1={y}
-            x2={width}
-            y2={y}
-            stroke="rgba(25, 234, 253, 1)"
-            strokeWidth={1.5}
-          />
-        ))}
-      </g>
-
-      {/* Plus signs at main grid intersections */}
-      <g className="grid-intersections">
-        {intersections.map(({ x, y }) => (
-          <g key={`intersection-${x}-${y}`} transform={`translate(${x}, ${y})`}>
-            <line
-              x1={-4}
-              y1={0}
-              x2={4}
-              y2={0}
-              stroke="rgba(25, 234, 253, 1)"
-              strokeWidth={2}
-              strokeLinecap="round"
-            />
-            <line
-              x1={0}
-              y1={-4}
-              x2={0}
-              y2={4}
-              stroke="rgba(25, 234, 253, 1)"
-              strokeWidth={2}
-              strokeLinecap="round"
-            />
-          </g>
-        ))}
-      </g>
+      {/* Main grid lines (solid, larger squares) - REMOVED per user request */}
+      {/* Plus signs at main grid intersections - REMOVED per user request */}
 
       {/* Coordinate labels */}
       {coordinateLabels.length > 0 && (

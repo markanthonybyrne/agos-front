@@ -79,8 +79,8 @@ function SystemView({
   return (
     <g className={cn('system-view', className)}>
       {/* Orbit lines - dashed circles around central star */}
-      {/* Only show orbit lines at planet level zoom (scale >= 3.0) */}
-      {scale >= 3.0 && uniqueOrbitRadii.map((radius, index) => (
+      {/* Show orbit lines at system level zoom (scale >= 1.57, which is 157%) */}
+      {scale >= 1.57 && uniqueOrbitRadii.map((radius, index) => (
         <circle
           key={`orbit-${system.key}-${radius}-${index}`}
           cx={system.center.x}
@@ -165,7 +165,8 @@ function SystemView({
         }
         const planetImage = getPlanetImage(planetSlug)
         const isHovered = hoveredPlanet?.id === planet.id
-        const planetSize = isHovered ? basePlanetSize * 1.2 : basePlanetSize
+        // Keep planet size constant to prevent jumping on hover
+        const planetSize = basePlanetSize
         
         return (
           <g
@@ -198,10 +199,7 @@ function SystemView({
                   y={planetXY.y - planetSize / 2}
                   width={planetSize}
                   height={planetSize}
-                  className={cn(
-                    'planet-image transition-all',
-                    isHovered && 'scale-110'
-                  )}
+                  className="planet-image"
                   style={{ 
                     filter: isHovered ? 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.6))' : 'none'
                   }}

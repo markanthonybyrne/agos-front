@@ -4,6 +4,8 @@ import { useSearchPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { useAuth } from '@/hooks/useAuth'
 import { useZoomPan } from '@/hooks/useZoomPan'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { getPlanetXY } from '@/lib/coordinates'
 import { 
   groupPlanetsBySystem,
@@ -37,6 +39,7 @@ const DEFAULT_GRID_SIZE = 1000
  */
 export function UnifiedUniverseMapV2() {
   const { empire } = useAuth()
+  const { openPanel } = usePanel()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<SystemData | null>(null)
   // Load universe config
@@ -313,10 +316,11 @@ export function UnifiedUniverseMapV2() {
     })
   }, [allPlanets, zoomPan.viewportBounds, zoomLevel])
 
-  // Handle planet click
+  // Handle planet click - open sliding panel with planet info and actions
   const handlePlanetClick = (planet: Planet) => {
-    console.log('Planet clicked:', planet)
-    // TODO: Open planet detail panel
+    openPanel(PanelType.PLANET_INTERACTION, PanelSize.MEDIUM, {
+      planet: planet
+    })
   }
 
   // Debug logging - MUST be before early return to maintain hook order
