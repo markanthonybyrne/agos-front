@@ -233,6 +233,9 @@ export function PlanetsList() {
                 </div>
                       <div className="pt-1 border-t border-border/50">
                         <span className="text-xs text-muted-foreground capitalize">{planet.type?.name || planet.type?.slug}</span>
+                        {planet.type?.description && (
+                          <p className="mt-1 text-xs text-muted-foreground/80 line-clamp-1">{planet.type.description}</p>
+                        )}
                   </div>
                 </div>
                   </div>

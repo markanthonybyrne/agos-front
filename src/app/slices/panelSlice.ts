@@ -29,6 +29,7 @@ export enum PanelType {
   CHAT = 'CHAT',
   MARKET = 'MARKET',
   FLEETS = 'FLEETS',
+  PLANET_INTERACTION = 'PLANET_INTERACTION',
 }
 
 export enum PanelSize {
@@ -71,6 +72,7 @@ const panelSlice = createSlice({
   reducers: {
     openPanel: (state, action: PayloadAction<{ type: PanelType; size?: PanelSize; data?: any }>) => {
       const { type, size = PanelSize.MEDIUM, data } = action.payload
+      console.log('[panelSlice] openPanel called:', { type, data })
       const panel: Panel = {
         id: `${type}-${Date.now()}`,
         type,
@@ -79,6 +81,7 @@ const panelSlice = createSlice({
         data,
         zIndex: state.nextZIndex++,
       }
+      console.log('[panelSlice] Created panel:', panel)
       
       state.panels.push(panel)
       state.backdropVisible = true

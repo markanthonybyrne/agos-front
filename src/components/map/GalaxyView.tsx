@@ -3,11 +3,14 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Planet } from '@/types/api.types'
-import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
+import { formatCoordinate, parseCoordinate, getPlanetXY } from '@/lib/coordinates'
 import { useAuth } from '@/hooks/useAuth'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
+import { usePanning } from '@/hooks/usePanning'
+import { getGalaxyXyRange } from '@/lib/coordinateUtils'
 import { Star, MapPin, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { GalaxyGridOverlay } from './GalaxyGridOverlay'
 
 interface GalaxyViewProps {
   planets: Planet[]
@@ -28,6 +31,20 @@ export function GalaxyView({
 }: GalaxyViewProps) {
   const { empire } = useAuth()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
+  
+  // Panning hook - reset when galaxy changes
+  const { panOffset, isDragging, onMouseDown, onTouchStart } = usePanning({
+    enabled: true,
+    resetDeps: quadrantNumber && sectorNumber && galaxyNumber 
+      ? [quadrantNumber, sectorNumber, galaxyNumber] 
+      : []
+  })
+  
+  // Get galaxy X/Y range for scaling
+  const galaxyRange = useMemo(() => {
+    if (!quadrantNumber || !sectorNumber || !galaxyNumber) return null
+    return getGalaxyXyRange(quadrantNumber, sectorNumber, galaxyNumber)
+  }, [quadrantNumber, sectorNumber, galaxyNumber])
 
   // Fetch fleets to get travel routes
   // NOTE: This endpoint only returns the user's own fleets, not other players' fleets.
@@ -166,25 +183,72 @@ export function GalaxyView({
     return `/assets/images/galaxy/galaxy_type_${galaxyType}.png`
   }, [galaxyNumber])
 
-  // Calculate planet positions in orbital positions around the galaxy
+  // Calculate planet positions from X/Y coordinates
   const planetPositions = useMemo(() => {
+    if (!galaxyRange) {
     return planets.map((planet, index) => {
+        const coord = formatCoordinate(planet.coordinate)
+        const [, , , planetNum] = coord.split(':').map(Number)
+        // Fallback to orbital positioning if no galaxy range
+        const totalPlanets = planets.length
+        const angle = (index / totalPlanets) * Math.PI * 2
+        const radius = 150 + (planetNum % 10) * 8
+        return {
+          planet,
+          x: (50 + Math.cos(angle) * (radius / 400) * 100) + '%',
+          y: (50 + Math.sin(angle) * (radius / 400) * 100) + '%',
+          planetNum
+        }
+      })
+    }
+    
+    return planets.map((planet) => {
       const coord = formatCoordinate(planet.coordinate)
       const [, , , planetNum] = coord.split(':').map(Number)
       
-      // Distribute planets in orbital positions
-      const totalPlanets = planets.length
-      const angle = (index / totalPlanets) * Math.PI * 2
-      const radius = 150 + (planetNum % 10) * 8 // Vary radius based on planet number
+      // Get X/Y coordinates from planet
+      const xy = getPlanetXY(planet)
+      if (!xy) {
+        // Fallback to center if no X/Y available
+        return {
+          planet,
+          x: '50%',
+          y: '50%',
+          planetNum
+        }
+      }
+      
+      // Scale X/Y coordinates (0-999) to percentage positions within galaxy range
+      const galaxyWidth = galaxyRange.x_max - galaxyRange.x_min
+      const galaxyHeight = galaxyRange.y_max - galaxyRange.y_min
+      
+      if (galaxyWidth === 0 || galaxyHeight === 0) {
+        return {
+          planet,
+          x: '50%',
+          y: '50%',
+          planetNum
+        }
+      }
+      
+      // Calculate position within galaxy range (0-1 normalized)
+      const normalizedX = (xy.x - galaxyRange.x_min) / galaxyWidth
+      const normalizedY = (xy.y - galaxyRange.y_min) / galaxyHeight
+      
+      // Scale to percentage (0-100%)
+      // Add some padding (10% on each side) so planets aren't at the edges
+      const padding = 10
+      const xPercent = padding + (normalizedX * (100 - padding * 2))
+      const yPercent = padding + (normalizedY * (100 - padding * 2))
       
       return {
         planet,
-        x: 50 + Math.cos(angle) * (radius / 400) * 100 + '%',
-        y: 50 + Math.sin(angle) * (radius / 400) * 100 + '%',
+        x: `${xPercent}%`,
+        y: `${yPercent}%`,
         planetNum
       }
     })
-  }, [planets])
+  }, [planets, galaxyRange])
 
   // Helper to find planet ID from coordinate
   const getPlanetIdFromCoordinate = (coord: { quadrant: number; sector: number; galaxy: number; planet: number }): number | null => {
@@ -212,8 +276,13 @@ export function GalaxyView({
   return (
     <div className={`relative ${className}`}>
       <Card className="panel-glass border-cyan/20 contain-map">
-        <div className="galaxy-container min-h-[500px] p-8 relative" style={{ overflow: 'visible' }}>
-          {/* ALWAYS render test SVG to verify rendering */}
+        <div 
+          className={`galaxy-container min-h-[500px] p-8 relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
+          style={{ overflow: 'hidden' }}
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
+        >
+          {/* SVG overlay for grid and fleet travel lines */}
           <svg
             className="absolute pointer-events-none"
             style={{ 
@@ -226,29 +295,13 @@ export function GalaxyView({
               right: 0,
               bottom: 0,
               pointerEvents: 'none',
-              backgroundColor: 'rgba(255, 0, 0, 0.1)', // Red tint to see SVG area
             }}
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
           >
-            {/* Test line - bright green diagonal */}
-            <line
-              x1="5%"
-              y1="5%"
-              x2="95%"
-              y2="95%"
-              stroke="#00ff00"
-              strokeWidth="20"
-              strokeOpacity="1"
-            />
-            {/* Test line - bright red horizontal */}
-            <line
-              x1="0%"
-              y1="50%"
-              x2="100%"
-              y2="50%"
-              stroke="#ff0000"
-              strokeWidth="15"
-              strokeOpacity="1"
-            />
+            {/* Grid Overlay - Disabled */}
+            {/* <GalaxyGridOverlay width={100} height={100} /> */}
+            
             {/* Fleet travel lines */}
             {relevantFleets.length > 0 && planetPositions.length > 0 && relevantFleets.map((fleet) => {
                     // Use destination.id from API if available (more reliable), otherwise fallback to coordinate lookup
@@ -337,13 +390,15 @@ export function GalaxyView({
                   })}
           </svg>
           
-          {/* Animated galaxy spiral */}
+          {/* Map container with panning transform */}
           <div 
             className="galaxy-spiral galaxy-animated relative"
             style={{
               backgroundImage: `url(${galaxyImage})`,
               zIndex: 1,
-              position: 'relative'
+              position: 'relative',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              transition: isDragging ? 'none' : 'transform 0.1s ease-out',
             }}
           >
             {/* Planet indicators positioned around the spiral */}
@@ -465,9 +520,14 @@ export function GalaxyView({
                 </div>
 
                 {hoveredPlanet.type && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Type:</span>
-                    <span className="capitalize font-medium">{hoveredPlanet.type.name}</span>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Type:</span>
+                      <span className="capitalize font-medium">{hoveredPlanet.type.name}</span>
+                    </div>
+                    {hoveredPlanet.type.description && (
+                      <p className="mt-1 text-xs text-muted-foreground">{hoveredPlanet.type.description}</p>
+                    )}
                   </div>
                 )}
 

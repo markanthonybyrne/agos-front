@@ -10,6 +10,8 @@ import { useGlobalTickData } from '@/hooks/useGlobalTickData'
 import { useTutorialDetection } from '@/hooks/useTutorialDetection'
 import { TutorialManager } from '@/components/tutorial/TutorialManager'
 import { AdminGuard } from '@/features/admin/components/AdminGuard'
+import { LandingGuard } from '@/components/common/LandingGuard'
+import { LandingPage } from '@/features/landing/LandingPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { PlayerManual } from '@/features/manual/PlayerManual'
 import { Holopad } from '@/features/holopad/Holopad'
@@ -58,6 +60,14 @@ function AppContent() {
     <>
       <TutorialManager />
       <Routes>
+        <Route 
+          path="/" 
+          element={
+            <LandingGuard>
+              <LandingPage />
+            </LandingGuard>
+          } 
+        />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
         <Route path="/manual" element={<PlayerManual />} />
@@ -67,7 +77,6 @@ function AppContent() {
             <AuthGuard>
               <MainLayout>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/holopad" replace />} />
                   <Route path="/holopad" element={<Holopad />} />
                   <Route path="/map" element={<UniverseMap />} />
                   <Route path="/planets" element={<PlanetsList />} />

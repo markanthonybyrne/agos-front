@@ -131,9 +131,14 @@ export function PlanetImageDisplay({
               {planet.state}
             </Badge>
             {planet?.type?.name && (
-              <Badge variant="secondary" className="capitalize">
-                {planet.type.name}
-              </Badge>
+              <div>
+                <Badge variant="secondary" className="capitalize">
+                  {planet.type.name}
+                </Badge>
+                {planet?.type?.description && (
+                  <p className="mt-1 text-xs text-muted-foreground italic">{planet.type.description}</p>
+                )}
+              </div>
             )}
           </div>
         </div>

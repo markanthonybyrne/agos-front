@@ -1,0 +1,735 @@
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useGetUniverseConfigQuery } from '@/api/endpoints/universeApi'
+import { useSearchPlanetsQuery } from '@/api/endpoints/planetsApi'
+import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
+import { useAuth } from '@/hooks/useAuth'
+import { useZoomPan } from '@/hooks/useZoomPan'
+import { getPlanetXY } from '@/lib/coordinates'
+import { 
+  groupPlanetsBySystem,
+  convertSystemGroupsToData,
+  type SystemData
+} from '@/lib/systemUtils'
+import { getPlanetImage } from '@/lib/planetImages'
+import { getGalaxyImage } from '@/lib/galaxyImages'
+import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange } from '@/lib/coordinateUtils'
+import { SystemViewMemo as SystemView } from './SystemView'
+import { GridOverlay } from './GridOverlay'
+import { QuadrantOverlay } from './QuadrantOverlay'
+import { SectorOverlay } from './SectorOverlay'
+import { Planet } from '@/types/api.types'
+import { Loader } from '@/components/ui/loader'
+import { cn } from '@/lib/utils'
+import { formatCoordinate } from '@/lib/coordinates'
+
+// Default grid size (will be overridden by config)
+const DEFAULT_GRID_SIZE = 1000
+
+/**
+ * UnifiedUniverseMapV2 - Main component for the 5-level universe map
+ * 
+ * Features:
+ * - Pre-loads all planet data before rendering
+ * - Single flat grid with zoom/pan
+ * - 5 zoom levels: Universe → Quadrant → Sector → Galaxy → System → Planet
+ * - System-level rendering with central stars and orbit lines
+ * - Navigation overlays for quadrant/sector
+ */
+export function UnifiedUniverseMapV2() {
+  const { empire } = useAuth()
+  const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
+  const [selectedSystem, setSelectedSystem] = useState<SystemData | null>(null)
+  // Load universe config
+  const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
+  const gridSize = configData?.grid_size || DEFAULT_GRID_SIZE
+  const maxPlanets = configData?.capacities?.max_planets || 24000
+
+  // Pre-load all planets with pagination
+  // Cache planets in localStorage to avoid reloading on each visit
+  const CACHE_KEY = 'universe_map_planets'
+  const CACHE_TIMESTAMP_KEY = 'universe_map_planets_timestamp'
+  const CACHE_EXPIRY = 24 * 60 * 60 * 1000 // 24 hours
+  
+  const [allPlanets, setAllPlanets] = useState<Planet[]>(() => {
+    // Try to load from cache on mount
+    try {
+      const cached = localStorage.getItem(CACHE_KEY)
+      const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
+      
+      if (cached && timestamp) {
+        const age = Date.now() - parseInt(timestamp, 10)
+        if (age < CACHE_EXPIRY) {
+          const planets = JSON.parse(cached)
+          console.log('[UnifiedUniverseMapV2] Loaded planets from cache:', planets.length)
+          return planets
+        } else {
+          console.log('[UnifiedUniverseMapV2] Cache expired, will reload')
+          localStorage.removeItem(CACHE_KEY)
+          localStorage.removeItem(CACHE_TIMESTAMP_KEY)
+        }
+      }
+    } catch (error) {
+      console.error('[UnifiedUniverseMapV2] Error loading cache:', error)
+    }
+    return []
+  })
+  
+  const [isLoadingPlanets, setIsLoadingPlanets] = useState(allPlanets.length === 0)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+
+  // Fetch first page to get total count
+  // Use larger page size to reduce number of requests and avoid rate limiting
+  // Note: API might limit to 100 per page, so we'll handle that
+  const { data: firstPage, isLoading: isLoadingFirstPage, error: firstPageError } = useSearchPlanetsQuery({
+    limit: 100,  // Start with 100 to avoid API limits
+    offset: 0
+  }, {
+    skip: allPlanets.length > 0 // Skip if we have cached data
+  })
+
+  // Pre-load all planets with pagination
+  useEffect(() => {
+    const loadAllPlanets = async () => {
+      // If we already have planets from cache, don't reload
+      if (allPlanets.length > 0) {
+        console.log('[UnifiedUniverseMapV2] Using cached planets, skipping reload')
+        return
+      }
+      
+      if (!firstPage || isLoadingFirstPage) return
+      
+      setIsLoadingPlanets(true)
+      setLoadingProgress(0)
+      
+      const planets: Planet[] = [...(firstPage.planets || [])]
+      const total = firstPage.total || 0
+      let offset = firstPage.planets?.length || 100
+      const limit = 100 // API maximum is 100 per page
+
+      console.log('[UnifiedUniverseMapV2] Starting planet load:', { total, alreadyLoaded: planets.length })
+
+      // Continue loading until we have all planets or hit an error
+      while (planets.length < total && offset < total) {
+        try {
+          // Ensure base URL doesn't have trailing slash to avoid double slashes
+          const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '')
+          const response = await fetch(
+            `${baseUrl}/planets/search?limit=${limit}&offset=${offset}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+          
+          if (!response.ok) {
+            console.error('[UnifiedUniverseMapV2] Failed to fetch planets:', response.status, response.statusText)
+            break
+          }
+          
+          const data = await response.json()
+          const newPlanets = data.planets || []
+          planets.push(...newPlanets)
+          
+          console.log('[UnifiedUniverseMapV2] Loaded planets:', { 
+            offset, 
+            fetched: newPlanets.length, 
+            totalLoaded: planets.length, 
+            total,
+            remaining: total - planets.length
+          })
+          
+          offset += limit
+          setLoadingProgress((planets.length / total) * 100)
+          
+          // If we got fewer planets than requested, we've reached the end
+          if (newPlanets.length < limit) {
+            console.log('[UnifiedUniverseMapV2] Reached end of data (got fewer than requested)')
+            break
+          }
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100))
+        } catch (error) {
+          console.error('[UnifiedUniverseMapV2] Error loading planets:', error)
+          break
+        }
+      }
+      
+      console.log('[UnifiedUniverseMapV2] Finished loading planets:', { loaded: planets.length, expected: total })
+      
+      // Cache the loaded planets
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(planets))
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+        console.log('[UnifiedUniverseMapV2] Cached planets to localStorage')
+      } catch (error) {
+        console.error('[UnifiedUniverseMapV2] Error caching planets:', error)
+      }
+      
+      setAllPlanets(planets)
+      setIsLoadingPlanets(false)
+      setLoadingProgress(100)
+    }
+
+    if (firstPage && !isLoadingFirstPage && allPlanets.length === 0) {
+      loadAllPlanets()
+    }
+  }, [firstPage, isLoadingFirstPage, allPlanets.length])
+
+  // Zoom and pan hook
+  // Extended max scale to allow very high zoom (300%+) for detailed system viewing
+  const zoomPan = useZoomPan({
+    minScale: 0.01,  // Universe view
+    maxScale: 5.0,   // Very high zoom for detailed system/planet viewing (allows 300%+)
+    initialScale: 0.05, // Start at sector level
+    gridWidth: gridSize,
+    gridHeight: gridSize
+  })
+
+  // Group planets by system
+  const systemsByKey = useMemo(() => {
+    if (allPlanets.length === 0) return new Map<string, SystemData>()
+    
+    const systemGroups = groupPlanetsBySystem(allPlanets)
+    const systems = convertSystemGroupsToData(systemGroups)
+    
+    const systemsMap = new Map<string, SystemData>()
+    systems.forEach(system => {
+      systemsMap.set(system.key, system)
+    })
+    
+    return systemsMap
+  }, [allPlanets])
+
+  // Group systems by galaxy for rendering
+  const systemsByGalaxy = useMemo(() => {
+    const grouped = new Map<string, SystemData[]>()
+    
+    systemsByKey.forEach(system => {
+      const key = `${system.quadrant}:${system.sector}:${system.galaxy}`
+      if (!grouped.has(key)) {
+        grouped.set(key, [])
+      }
+      grouped.get(key)!.push(system)
+    })
+    
+    return grouped
+  }, [systemsByKey])
+
+  // Determine current zoom level
+  // System view should show at scale >= 0.5, planet detail at scale >= 3.0
+  const zoomLevel = useMemo(() => {
+    const scale = zoomPan.scale
+    if (scale < 0.01) return 'universe'
+    if (scale < 0.05) return 'quadrant'
+    if (scale < 0.1) return 'sector'
+    if (scale < 0.5) return 'galaxy'
+    if (scale < 3.0) return 'system'  // Extended system view range
+    return 'planet'  // Very high zoom for individual planet detail
+  }, [zoomPan.scale])
+
+  // Filter entities visible in viewport
+  // At very high zoom (scale > 2.0), only show the system closest to viewport center
+  const visibleSystems = useMemo(() => {
+    const bounds = zoomPan.viewportBounds
+    const scale = zoomPan.scale
+    const visible: SystemData[] = []
+    
+    systemsByKey.forEach(system => {
+      // Check if system center is in viewport (simpler check)
+      const centerX = system.center.x
+      const centerY = system.center.y
+      
+      // Add padding to viewport bounds to include systems near edges
+      // Reduce padding at high zoom to show fewer systems and improve performance
+      const padding = scale > 2.5 ? 10 : scale > 1.5 ? 30 : 50
+      
+      if (
+        centerX >= bounds.minX - padding &&
+        centerX <= bounds.maxX + padding &&
+        centerY >= bounds.minY - padding &&
+        centerY <= bounds.maxY + padding
+      ) {
+        visible.push(system)
+      }
+    })
+    
+    // At high zoom (scale > 1.5), limit visible systems to reduce rendering load
+    // At very high zoom (scale > 2.5), only show the closest system
+    if (scale > 2.5 && visible.length > 1) {
+      const viewportCenterX = (bounds.minX + bounds.maxX) / 2
+      const viewportCenterY = (bounds.minY + bounds.maxY) / 2
+      
+      // Find the system closest to viewport center
+      let closestSystem = visible[0]
+      let closestDistance = Infinity
+      
+      visible.forEach(system => {
+        const dx = system.center.x - viewportCenterX
+        const dy = system.center.y - viewportCenterY
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        
+        if (distance < closestDistance) {
+          closestDistance = distance
+          closestSystem = system
+        }
+      })
+      
+      return [closestSystem]
+    }
+    
+    // At medium-high zoom (1.5-2.5), limit to 10 closest systems for performance
+    if (scale > 1.5 && scale <= 2.5 && visible.length > 10) {
+      const viewportCenterX = (bounds.minX + bounds.maxX) / 2
+      const viewportCenterY = (bounds.minY + bounds.maxY) / 2
+      
+      // Sort by distance and take closest 10
+      return visible
+        .map(system => {
+          const dx = system.center.x - viewportCenterX
+          const dy = system.center.y - viewportCenterY
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          return { system, distance }
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 10)
+        .map(item => item.system)
+    }
+    
+    return visible
+  }, [systemsByKey, zoomPan.viewportBounds, zoomPan.scale])
+
+  const visiblePlanets = useMemo(() => {
+    if (zoomLevel !== 'planet') return []
+    
+    const bounds = zoomPan.viewportBounds
+    return allPlanets.filter(planet => {
+      const xy = getPlanetXY(planet)
+      if (!xy) return false
+      return xy.x >= bounds.minX && xy.x <= bounds.maxX &&
+             xy.y >= bounds.minY && xy.y <= bounds.maxY
+    })
+  }, [allPlanets, zoomPan.viewportBounds, zoomLevel])
+
+  // Handle planet click
+  const handlePlanetClick = (planet: Planet) => {
+    console.log('Planet clicked:', planet)
+    // TODO: Open planet detail panel
+  }
+
+  // Debug logging - MUST be before early return to maintain hook order
+  useEffect(() => {
+    if (!isLoadingConfig && !isLoadingFirstPage && !isLoadingPlanets && allPlanets.length > 0) {
+      console.log('[UnifiedUniverseMapV2] Render state:', {
+        allPlanetsCount: allPlanets.length,
+        systemsCount: systemsByKey.size,
+        zoomLevel,
+        scale: zoomPan.scale,
+        visibleSystems: visibleSystems.length,
+        visiblePlanets: visiblePlanets.length
+      })
+    }
+  }, [allPlanets.length, systemsByKey.size, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingFirstPage, isLoadingPlanets])
+
+  // Handle system click
+  const handleSystemClick = (system: SystemData) => {
+    if (zoomLevel === 'system') {
+      // Zoom out to galaxy
+      const galaxyRange = getGalaxyXyRange(system.quadrant, system.sector, system.galaxy)
+      const centerX = (galaxyRange.x_min + galaxyRange.x_max) / 2
+      const centerY = (galaxyRange.y_min + galaxyRange.y_max) / 2
+      const screen = zoomPan.gridToScreen(centerX, centerY)
+      zoomPan.setZoom(0.4, screen.x, screen.y)
+    } else {
+      // Zoom in to system
+      const centerX = system.center.x
+      const centerY = system.center.y
+      const screen = zoomPan.gridToScreen(centerX, centerY)
+      zoomPan.setZoom(0.6, screen.x, screen.y)
+      setSelectedSystem(system)
+    }
+  }
+
+  // Show loading state only if actively loading
+  if (isLoadingConfig || isLoadingFirstPage || isLoadingPlanets) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full">
+        <Loader />
+        <div className="mt-4">
+          <p className="text-sm text-muted-foreground">
+            Loading universe... {Math.round(loadingProgress)}%
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {allPlanets.length > 0 ? `${allPlanets.length} planets loaded` : 'Initializing...'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Convert grid coordinates to viewport position
+  const gridToViewport = (gridX: number, gridY: number) => {
+    const screen = zoomPan.gridToScreen(gridX, gridY)
+    const container = zoomPan.containerRef.current
+    if (!container) return { x: 0, y: 0 }
+    const rect = container.getBoundingClientRect()
+    return {
+      x: screen.x,
+      y: screen.y
+    }
+  }
+
+  // Debug logging removed for performance - only log in development if needed
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.log('[UnifiedUniverseMapV2] Rendering:', { zoomLevel, scale: zoomPan.scale, visible: visibleSystems.length })
+  // }
+
+  return (
+    <div className="relative w-full h-full overflow-hidden" style={{ backgroundColor: 'transparent' }}>
+      {/* Map container with zoom/pan */}
+      <div
+        ref={zoomPan.containerRef}
+        className="relative w-full h-full cursor-grab active:cursor-grabbing"
+        onMouseDown={zoomPan.onMouseDown}
+        onMouseMove={zoomPan.onMouseMove}
+        onMouseUp={zoomPan.onMouseUp}
+        onWheel={zoomPan.onWheel}
+        onTouchStart={zoomPan.onTouchStart}
+        onTouchMove={zoomPan.onTouchMove}
+        onTouchEnd={zoomPan.onTouchEnd}
+        style={{ 
+          minHeight: '100vh', 
+          minWidth: '100%',
+          position: 'relative',
+          backgroundColor: 'transparent'
+        }}
+      >
+        {/* SVG overlay for rendering entities */}
+        {/* Use slice to fill viewport at all zoom levels for infinite zoom feel */}
+        <svg
+          className="absolute inset-0 w-full h-full"
+          style={{
+            width: '100%',
+            height: '100%'
+          }}
+          viewBox={`0 0 ${gridSize} ${gridSize}`}
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <g
+            style={{
+              transform: `translate(${zoomPan.panX}px, ${zoomPan.panY}px) scale(${zoomPan.scale})`,
+              transformOrigin: 'center center'
+            }}
+          >
+          {/* Transparent background */}
+          <rect width={gridSize} height={gridSize} fill="transparent" />
+          
+          {/* Debug: Show viewport bounds */}
+          {zoomPan.viewportBounds && (
+            <g className="debug-viewport">
+              <rect
+                x={zoomPan.viewportBounds.minX}
+                y={zoomPan.viewportBounds.minY}
+                width={zoomPan.viewportBounds.maxX - zoomPan.viewportBounds.minX}
+                height={zoomPan.viewportBounds.maxY - zoomPan.viewportBounds.minY}
+                fill="none"
+                stroke="rgba(255, 255, 0, 0.5)"
+                strokeWidth={2}
+                strokeDasharray="4,4"
+              />
+            </g>
+          )}
+          
+          {/* Grid overlay */}
+          <GridOverlay
+            width={gridSize}
+            height={gridSize}
+            scale={zoomPan.scale}
+            viewportBounds={zoomPan.viewportBounds}
+          />
+
+          {/* Navigation overlays */}
+          <QuadrantOverlay
+            gridSize={gridSize}
+            scale={zoomPan.scale}
+            viewportBounds={zoomPan.viewportBounds}
+            onQuadrantClick={(quadrant) => {
+              const range = getQuadrantXyRange(quadrant)
+              const centerX = (range.x_min + range.x_max) / 2
+              const centerY = (range.y_min + range.y_max) / 2
+              const screen = zoomPan.gridToScreen(centerX, centerY)
+              zoomPan.setZoom(0.05, screen.x, screen.y)
+            }}
+          />
+          <SectorOverlay
+            gridSize={gridSize}
+            scale={zoomPan.scale}
+            viewportBounds={zoomPan.viewportBounds}
+            onSectorClick={(quadrant, sector) => {
+              const range = getSectorXyRange(quadrant, sector)
+              const centerX = (range.x_min + range.x_max) / 2
+              const centerY = (range.y_min + range.y_max) / 2
+              const screen = zoomPan.gridToScreen(centerX, centerY)
+              zoomPan.setZoom(0.1, screen.x, screen.y)
+            }}
+          />
+
+          {/* Render based on zoom level */}
+          {/* Sector level - show systems as simple markers */}
+          {zoomLevel === 'sector' && (
+            <g className="systems-layer" style={{ pointerEvents: 'all' }}>
+              {visibleSystems.map(system => {
+                // Use a larger radius that's visible even at low zoom
+                // Radius in SVG coordinates (0-1000 grid)
+                const radius = 20 // Visible radius in grid coordinates
+                return (
+                  <g key={system.key}>
+                    <circle
+                      cx={system.center.x}
+                      cy={system.center.y}
+                      r={radius}
+                      fill="rgba(100, 200, 255, 0.9)"
+                      stroke="rgba(150, 220, 255, 1)"
+                      strokeWidth={2}
+                      className="system-marker cursor-pointer hover:opacity-100"
+                      onClick={() => handleSystemClick(system)}
+                      style={{ pointerEvents: 'all' }}
+                    />
+                    {/* Show system identifier */}
+                    {zoomPan.scale > 0.06 && (
+                      <text
+                        x={system.center.x}
+                        y={system.center.y + radius + 12}
+                        textAnchor="middle"
+                        className="fill-blue-300 font-mono pointer-events-none"
+                        style={{ fontSize: '10px' }}
+                      >
+                        {system.key}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+              {/* Debug: Show count if no systems visible */}
+              {visibleSystems.length === 0 && systemsByKey.size > 0 && (
+                <text
+                  x={gridSize / 2}
+                  y={gridSize / 2}
+                  textAnchor="middle"
+                  className="fill-yellow-400"
+                  style={{ fontSize: '16px' }}
+                >
+                  {systemsByKey.size} systems exist but none visible in viewport
+                </text>
+              )}
+            </g>
+          )}
+
+          {/* Galaxy level - show systems with SystemView component */}
+          {zoomLevel === 'galaxy' && visibleSystems.length > 0 && (
+            <g className="systems-layer">
+              {visibleSystems.map(system => (
+                <SystemView
+                  key={system.key}
+                  system={system}
+                  scale={zoomPan.scale}
+                  onPlanetClick={handlePlanetClick}
+                  onPlanetHover={setHoveredPlanet}
+                  hoveredPlanet={hoveredPlanet}
+                />
+              ))}
+            </g>
+          )}
+
+          {/* System view - show at scale >= 0.5 */}
+          {(zoomLevel === 'system' || zoomLevel === 'planet') && (
+            <g className="systems-layer">
+              {visibleSystems.map(system => (
+                <SystemView
+                  key={system.key}
+                  system={system}
+                  scale={zoomPan.scale}
+                  onPlanetClick={handlePlanetClick}
+                  onPlanetHover={setHoveredPlanet}
+                  hoveredPlanet={hoveredPlanet}
+                />
+              ))}
+            </g>
+          )}
+
+          {/* Fallback: show galaxies if no systems visible at galaxy level */}
+          {zoomLevel === 'galaxy' && visibleSystems.length === 0 && (
+            <g className="galaxies-layer">
+              {Array.from(systemsByGalaxy.entries()).map(([galaxyKey, systems]) => {
+                const [q, s, g] = galaxyKey.split(':').map(Number)
+                const galaxyRange = getGalaxyXyRange(q, s, g)
+                const centerX = (galaxyRange.x_min + galaxyRange.x_max) / 2
+                const centerY = (galaxyRange.y_min + galaxyRange.y_max) / 2
+                const galaxyImage = getGalaxyImage(((g - 1) % 4) + 1)
+                
+                return (
+                  <g
+                    key={galaxyKey}
+                    className="galaxy-marker"
+                    onClick={() => {
+                      const screen = zoomPan.gridToScreen(centerX, centerY)
+                      zoomPan.setZoom(0.6, screen.x, screen.y)
+                    }}
+                  >
+                    <image
+                      href={galaxyImage}
+                      x={centerX - 20}
+                      y={centerY - 20}
+                      width={40}
+                      height={40}
+                      className="cursor-pointer opacity-80 hover:opacity-100"
+                    />
+                    {zoomPan.scale > 0.2 && (
+                      <text
+                        x={centerX}
+                        y={centerY + 30}
+                        textAnchor="middle"
+                        className="text-xs fill-blue-300 font-mono"
+                      >
+                        Galaxy {galaxyKey}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+            </g>
+          )}
+
+          {/* Planet detail view - only show individual planets when zoomed very high and outside system view */}
+          {zoomLevel === 'planet' && visibleSystems.length === 0 && (
+            <g className="planets-layer">
+              {visiblePlanets.map(planet => {
+                const xy = getPlanetXY(planet)
+                if (!xy) return null
+                // Get planet image, but ensure we never use sol images for planets
+                let planetSlug = planet.type?.slug
+                // If planet type is sol-related, fall back to default planet image
+                if (planetSlug === 'sol' || planetSlug === 'sol_angry' || planetSlug === 'sol-angry' || 
+                    planetSlug === 'sol_massive' || planetSlug === 'sol-massive') {
+                  planetSlug = undefined // Will fall back to aridImg
+                }
+                const planetImage = getPlanetImage(planetSlug)
+                const isHovered = hoveredPlanet?.id === planet.id
+                
+                return (
+                  <g
+                    key={planet.id}
+                    className={cn('planet-marker', isHovered && 'planet-hovered')}
+                    onClick={() => handlePlanetClick(planet)}
+                    onMouseEnter={() => setHoveredPlanet(planet)}
+                    onMouseLeave={() => setHoveredPlanet(null)}
+                  >
+                    {planetImage && (
+                      <image
+                        href={planetImage}
+                        x={xy.x - 10}
+                        y={xy.y - 10}
+                        width={isHovered ? 24 : 20}
+                        height={isHovered ? 24 : 20}
+                        className="cursor-pointer"
+                      />
+                    )}
+                    {zoomPan.scale > 2.5 && (
+                      <text
+                        x={xy.x}
+                        y={xy.y + 15}
+                        textAnchor="middle"
+                        className="text-xs fill-white font-mono"
+                      >
+                        {formatCoordinate(planet.coordinate)}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+            </g>
+          )}
+
+          {/* Debug info - always show some visual feedback */}
+          {allPlanets.length > 0 && (
+            <g className="debug-info">
+              <text
+                x={gridSize / 2}
+                y={50}
+                textAnchor="middle"
+                className="text-sm fill-yellow-400 font-mono"
+              >
+                Planets: {allPlanets.length} | Systems: {systemsByKey.size} | Zoom: {zoomLevel} ({Math.round(zoomPan.scale * 100)}%)
+              </text>
+              {(visibleSystems.length === 0 && visiblePlanets.length === 0) && (
+                <>
+                  <text
+                    x={gridSize / 2}
+                    y={gridSize / 2}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-lg fill-yellow-400"
+                  >
+                    No entities visible at current zoom level
+                  </text>
+                  <text
+                    x={gridSize / 2}
+                    y={gridSize / 2 + 25}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-sm fill-yellow-300"
+                  >
+                    Zoom in or pan to explore
+                  </text>
+                </>
+              )}
+            </g>
+          )}
+          
+          </g>
+        </svg>
+
+        {/* Zoom controls */}
+        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 bg-black/80 backdrop-blur-sm p-2 rounded-lg border border-gray-700">
+          <button
+            onClick={() => zoomPan.zoomIn()}
+            className="p-2 bg-blue-600 hover:bg-blue-700 rounded text-white font-bold text-lg"
+            title="Zoom In"
+          >
+            +
+          </button>
+          <div className="text-center text-xs text-white px-2 font-mono">
+            {Math.round(zoomPan.scale * 100)}%
+          </div>
+          <button
+            onClick={() => zoomPan.zoomOut()}
+            className="p-2 bg-blue-600 hover:bg-blue-700 rounded text-white font-bold text-lg"
+            title="Zoom Out"
+          >
+            −
+          </button>
+          <button
+            onClick={() => zoomPan.reset()}
+            className="p-2 bg-gray-600 hover:bg-gray-700 rounded text-white text-xs"
+            title="Reset Zoom"
+          >
+            Reset
+          </button>
+        </div>
+
+        {/* Zoom level indicator */}
+        <div className="absolute top-4 left-4 z-50 bg-black/80 backdrop-blur-sm p-2 rounded-lg text-white text-sm border border-gray-700">
+          <div className="font-mono">
+            Zoom: {zoomLevel} ({Math.round(zoomPan.scale * 100)}%)
+          </div>
+          <div className="text-xs text-gray-400 mt-1">
+            Planets: {allPlanets.length} | Systems: {systemsByKey.size}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+

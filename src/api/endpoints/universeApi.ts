@@ -98,6 +98,23 @@ export const universeApi = apiSlice.injectEndpoints({
       query: () => '/universe/discoverable',
       providesTags: ['Universe'],
     }),
+    getUniverseConfig: builder.query<{
+      grid_size: number
+      universe_structure: {
+        quadrant_count: number
+        sectors_per_quadrant: number
+        galaxies_per_sector: number
+        systems_per_galaxy: number
+        planets_per_system: number
+      }
+      capacities: {
+        total_systems: number
+        max_planets: number
+      }
+    }, void>({
+      query: () => '/universe/config',
+      providesTags: ['Universe'],
+    }),
   }),
 })
 
@@ -108,6 +125,7 @@ export const {
   useGetExplorationStatusQuery,
   useGetVisibilityQuery,
   useValidateFleetRangeMutation,
-  useGetDiscoverableQuery
+  useGetDiscoverableQuery,
+  useGetUniverseConfigQuery
 } = universeApi
 

@@ -164,6 +164,9 @@ export function PlanetDetail() {
                 </>
               )}
           </p>
+          {planet?.type?.description && (
+            <p className="mt-2 text-sm text-muted-foreground italic">{planet.type.description}</p>
+          )}
           </div>
         </div>
       </div>

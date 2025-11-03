@@ -1,4 +1,6 @@
 import { Coordinate } from '@/types/game.types'
+import { Planet } from '@/types/api.types'
+import { hierarchicalToXy, calculateEuclideanDistance as calculateEuclideanDistanceUtil } from './coordinateUtils'
 
 // Coordinate parsing and formatting
 export function parseCoordinate(coordinate: string | Coordinate): Coordinate | null {
@@ -10,15 +12,58 @@ export function parseCoordinate(coordinate: string | Coordinate): Coordinate | n
   // If it's a string, parse it
   if (typeof coordinate === 'string') {
     const parts = coordinate.split(':').map(Number)
-    if (parts.length !== 4 || parts.some(isNaN)) {
-      return null
+    // Support both 4-level (Q:S:G:P) and 5-level (Q:S:G:Sy:P) formats
+    if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+      // 4-level format (legacy)
+      return {
+        quadrant: parts[0],
+        sector: parts[1],
+        galaxy: parts[2],
+        planet: parts[3],
+      }
+    } else if (parts.length === 5 && parts.every(p => !isNaN(p))) {
+      // 5-level format (new)
+      return {
+        quadrant: parts[0],
+        sector: parts[1],
+        galaxy: parts[2],
+        system: parts[3],
+        planet: parts[4],
+      }
     }
-    return {
-      quadrant: parts[0],
-      sector: parts[1],
-      galaxy: parts[2],
-      planet: parts[3],
+    return null
+  }
+  
+  return null
+}
+
+/**
+ * Extract X/Y coordinates from a planet
+ * Falls back to approximate conversion from hierarchical coordinates if X/Y not available
+ */
+export function getPlanetXY(planet: Planet): { x: number; y: number } | null {
+  // If planet has X/Y coordinates directly, use them
+  if (typeof planet.x === 'number' && typeof planet.y === 'number') {
+    return { x: planet.x, y: planet.y }
+  }
+
+  // If planet coordinate has X/Y, extract them
+  if (typeof planet.coordinate === 'object' && planet.coordinate !== null) {
+    const coord = planet.coordinate as Coordinate
+    if (typeof coord.x === 'number' && typeof coord.y === 'number') {
+      return { x: coord.x, y: coord.y }
     }
+
+    // Fallback: convert hierarchical to approximate X/Y
+    if (coord.quadrant && coord.sector && coord.galaxy && coord.planet) {
+      return hierarchicalToXy(coord.quadrant, coord.sector, coord.galaxy, coord.planet)
+    }
+  }
+
+  // Try parsing string coordinate
+  const parsed = parseCoordinate(planet.coordinate)
+  if (parsed && parsed.quadrant && parsed.sector && parsed.galaxy && parsed.planet) {
+    return hierarchicalToXy(parsed.quadrant, parsed.sector, parsed.galaxy, parsed.planet)
   }
   
   return null
@@ -35,9 +80,9 @@ export function formatCoordinate(coordinate: Coordinate | string | null | undefi
     if (coordinate.trim() === '') {
       return 'Invalid coordinate'
     }
-    // Validate string format
+    // Validate string format (support both 4-level and 5-level)
     const parts = coordinate.split(':')
-    if (parts.length === 4 && parts.every(p => !isNaN(Number(p)))) {
+    if ((parts.length === 4 || parts.length === 5) && parts.every(p => !isNaN(Number(p)))) {
       return coordinate
     }
     return 'Invalid coordinate'
@@ -49,6 +94,7 @@ export function formatCoordinate(coordinate: Coordinate | string | null | undefi
     const quadrant = coord.quadrant ?? coord.quadrant_number
     const sector = coord.sector ?? coord.sector_number
     const galaxy = coord.galaxy ?? coord.galaxy_number
+    const system = coord.system ?? coord.system_number
     const planet = coord.planet ?? coord.planet_number ?? coord.planet_id
     
     if (
@@ -61,6 +107,10 @@ export function formatCoordinate(coordinate: Coordinate | string | null | undefi
       !isNaN(galaxy) &&
       !isNaN(planet)
     ) {
+      // If system is present, use 5-level format, otherwise 4-level (backward compatibility)
+      if (typeof system === 'number' && !isNaN(system)) {
+        return `${quadrant}:${sector}:${galaxy}:${system}:${planet}`
+      }
       return `${quadrant}:${sector}:${galaxy}:${planet}`
     }
   }
@@ -73,17 +123,42 @@ export function isValidCoordinate(coordinate: string): boolean {
 }
 
 export function calculateDistance(
-  origin: Coordinate | string,
-  destination: Coordinate | string
+  origin: Coordinate | string | Planet,
+  destination: Coordinate | string | Planet
 ): number {
-  const originCoord = typeof origin === 'string' ? parseCoordinate(origin) : origin
-  const destCoord = typeof destination === 'string' ? parseCoordinate(destination) : destination
+  // Try to extract X/Y coordinates if origin/destination are planets
+  let originXY: { x: number; y: number } | null = null
+  let destXY: { x: number; y: number } | null = null
+
+  if (typeof origin === 'object' && origin !== null && 'id' in origin) {
+    // It's a Planet
+    originXY = getPlanetXY(origin as Planet)
+  }
+
+  if (typeof destination === 'object' && destination !== null && 'id' in destination) {
+    // It's a Planet
+    destXY = getPlanetXY(destination as Planet)
+  }
+
+  // If both have X/Y coordinates, use Euclidean distance
+  if (originXY && destXY) {
+    return calculateEuclideanDistanceUtil(originXY.x, originXY.y, destXY.x, destXY.y)
+  }
+
+  // Fallback to hierarchical coordinates
+  const originCoord = typeof origin === 'string' 
+    ? parseCoordinate(origin) 
+    : ('quadrant' in (origin as any) ? origin as Coordinate : parseCoordinate((origin as Planet).coordinate))
+  
+  const destCoord = typeof destination === 'string'
+    ? parseCoordinate(destination)
+    : ('quadrant' in (destination as any) ? destination as Coordinate : parseCoordinate((destination as Planet).coordinate))
 
   if (!originCoord || !destCoord) {
     return Infinity
   }
 
-  // Simple Manhattan distance
+  // Simple Manhattan distance (fallback when X/Y not available)
   let distance = 0
 
   if (originCoord.quadrant !== destCoord.quadrant) {

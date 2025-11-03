@@ -22,6 +22,8 @@ import { FleetCommandPanel } from '@/components/fleet/FleetCommandPanel'
 import { UniverseMap } from '@/features/map/UniverseMap'
 import { ConstructionQueue } from '@/components/construction/ConstructionQueue'
 import { PlanetConsolePanel } from '@/components/planet/PlanetConsolePanel'
+import { PlanetDetailPanel } from '@/components/planet/PlanetDetailPanel'
+import { PlanetInteractionPanel } from '@/components/planet/PlanetInteractionPanel'
 import { PlanetImageDisplay } from '@/components/planet/PlanetImageDisplay'
 import { FleetsPanel } from '@/features/fleets/FleetsPanel'
 import { MessagingPage } from '@/features/messaging/MessagingPage'
@@ -42,6 +44,8 @@ import { useParams } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useState, useEffect } from 'react'
+import { AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // Get panel title helper function
@@ -60,7 +64,7 @@ function getPanelTitle(panel: Panel): string {
     [PanelType.VISUAL_COORDINATE]: 'Select Destination',
     [PanelType.SHIP_SELECTOR]: 'Select Ships',
     [PanelType.RESEARCH_DETAIL]: 'Research Details',
-    [PanelType.PLANET_VIEW]: 'Planet View',
+    [PanelType.PLANET_VIEW]: panel.data?.showDetailView ? 'Planet Details' : 'Planet View',
     [PanelType.CONSTRUCTION_QUEUE]: 'Construction Queue',
     [PanelType.GALAXY_MAP]: 'Galaxy Map',
     [PanelType.MESSAGING]: 'Messages',
@@ -79,12 +83,13 @@ function getPanelTitle(panel: Panel): string {
     [PanelType.CHAT]: 'Global Chat',
     [PanelType.MARKET]: 'Market',
     [PanelType.FLEETS]: 'Fleet Command',
+    [PanelType.PLANET_INTERACTION]: 'Planet Actions',
   }
   
   return titles[panel.type] || 'Panel'
 }
 
-// Planet view with opening/closing animations
+// Planet view with opening/closing animations - optimized
 function PlanetViewWithAnimation({ 
   panel, 
   onClose, 
@@ -100,61 +105,86 @@ function PlanetViewWithAnimation({
 }) {
   const [isClosing, setIsClosing] = useState(false)
   const [isOpening, setIsOpening] = useState(true)
+  const [isVisible, setIsVisible] = useState(true)
   
-  // Trigger opening animation on mount
+  // Trigger opening animation on mount with proper timing
   useEffect(() => {
-    // Small delay to trigger CSS transition
-    const timer = setTimeout(() => {
-      setIsOpening(false)
-    }, 10)
-    return () => clearTimeout(timer)
+    // Use requestAnimationFrame for smoother animation start
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsOpening(false)
+      })
+    })
   }, [])
   
   const handleClose = () => {
     setIsClosing(true)
     // Wait for animation to complete before actually closing
     setTimeout(() => {
+      setIsVisible(false)
       onClose()
-    }, 500) // Match animation duration
+    }, 400) // Match animation duration
   }
+
+  if (!isVisible) return null
 
   return (
     <div 
       className={cn(
-        "fixed inset-0 z-40 transition-opacity duration-500",
+        "sliding-panel-container fixed inset-0 z-40 transition-opacity ease-out",
         isClosing ? "opacity-0" : isOpening ? "opacity-0" : "opacity-100"
       )}
-      style={{ zIndex: panel.zIndex - 1 }}
+      style={{ 
+        transitionDuration: '400ms',
+        zIndex: panel.zIndex - 1,
+        pointerEvents: isClosing ? 'none' : 'auto'
+      }}
     >
       {/* Full screen backdrop for split layout */}
       <div 
         className={cn(
-          "fixed inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto transition-opacity duration-500",
+          "sliding-panel-backdrop fixed inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto transition-opacity ease-out",
           isClosing ? "opacity-0" : isOpening ? "opacity-0" : "opacity-100"
         )}
+        style={{ transitionDuration: '400ms' }}
         onClick={handleClose} 
       />
       
-      <PlanetImageDisplay
-        planetId={panel.data?.planetId}
+      <div
         className={cn(
-          "fixed left-0 top-0 h-full w-[50%] flex items-center justify-center pointer-events-none transition-all duration-500",
+          "sliding-panel-content fixed left-0 top-0 h-full w-[50%] flex items-center justify-center pointer-events-none transition-all ease-out",
           isClosing 
-            ? "opacity-0 scale-50" 
+            ? "opacity-0 scale-95" 
             : isOpening 
-            ? "opacity-0 scale-75" 
+            ? "opacity-0 scale-95" 
             : "opacity-100 scale-100"
         )}
-      />
+        style={{
+          transform: isClosing || isOpening 
+            ? 'scale(0.95) translateZ(0)' 
+            : 'scale(1) translateZ(0)',
+          transitionDuration: '400ms'
+        }}
+      >
+        <PlanetImageDisplay
+          planetId={panel.data?.planetId}
+        />
+      </div>
       <div 
         className={cn(
-          "fixed right-0 top-0 h-full w-[50%] pointer-events-none transition-all duration-500",
+          "sliding-panel-container fixed right-0 top-0 h-full w-[50%] pointer-events-none transition-all ease-out",
           isClosing 
-            ? "translate-x-full opacity-0" 
+            ? "opacity-0" 
             : isOpening 
-            ? "translate-x-full opacity-0" 
-            : "translate-x-0 opacity-100"
+            ? "opacity-0" 
+            : "opacity-100"
         )}
+        style={{
+          transform: isClosing || isOpening 
+            ? 'translate3d(100%, 0, 0)' 
+            : 'translate3d(0, 0, 0)',
+          transitionDuration: '400ms'
+        }}
       >
         <SlidingPanel
           isOpen={true}
@@ -186,6 +216,10 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
   
   switch (panel.type) {
     case PanelType.PLANET_VIEW:
+      // Check if we should show full detail view (when opened from map) or console view
+      if (panel.data?.showDetailView) {
+        return <PlanetDetailPanel planetId={panel.data?.planetId || planetId} onClose={onClose} />
+      }
       return <PlanetConsolePanel planetId={panel.data?.planetId || planetId} />
     
     case PanelType.TECH_TREE_FACILITIES:
@@ -218,7 +252,7 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
       )
     
     case PanelType.FLEET_COMMAND:
-      return <FleetCommandPanel planetId={panel.data?.planetId} />
+      return <FleetCommandPanel planetId={panel.data?.planetId} destinationPlanet={panel.data?.destinationPlanet} />
     
     case PanelType.GALAXY_MAP:
       return <UniverseMap />
@@ -275,6 +309,29 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     
     case PanelType.FLEETS:
       return <FleetsPanel />
+    
+    case PanelType.PLANET_INTERACTION:
+      // Require planet object to be explicitly provided
+      const interactionPlanet = panel.data?.planet
+      
+      if (!interactionPlanet) {
+        console.error('[PanelManager] PLANET_INTERACTION: No planet in panel.data', panel.data)
+        return (
+          <div className="text-center py-12 p-6">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-destructive mb-2">Invalid Planet</h2>
+            <p className="text-muted-foreground mb-6">
+              No planet data provided. Panel data: {JSON.stringify(panel.data)}
+            </p>
+            {onClose && (
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+            )}
+          </div>
+        )
+      }
+      return <PlanetInteractionPanel planet={interactionPlanet} onClose={onClose} />
     
     default:
       return <div>Panel content not implemented yet</div>

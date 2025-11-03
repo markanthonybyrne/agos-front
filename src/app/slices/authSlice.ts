@@ -60,6 +60,9 @@ const authSlice = createSlice({
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('empire')
+      // Clear universe map cache on logout
+      localStorage.removeItem('universe_map_planets')
+      localStorage.removeItem('universe_map_planets_timestamp')
     },
     updateEmpire: (state, action: PayloadAction<Empire>) => {
       state.empire = action.payload

@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGetPlanetsQuery, useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useCreateFleetMutation } from '@/api/endpoints/fleetsApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Ship, MapPin, Clock, Shield, Target, ArrowLeftRight, Zap, Send, CheckCircle } from 'lucide-react'
-import { formatCoordinate, calculateDistance } from '@/lib/coordinates'
+import { formatCoordinate, calculateDistance, parseCoordinate } from '@/lib/coordinates'
+import { hierarchicalToXy } from '@/lib/coordinateUtils'
 import { Coordinate } from '@/types/game.types'
 import { toast } from 'sonner'
 import { VisualCoordinateSelector } from './VisualCoordinateSelector'
@@ -13,13 +14,23 @@ import { VisualShipSelector } from './VisualShipSelector'
 
 interface FleetCommandPanelProps {
   planetId?: number
+  destinationPlanet?: any // Planet object from API
 }
 
-export function FleetCommandPanel({ planetId }: FleetCommandPanelProps) {
+export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandPanelProps) {
   const [step, setStep] = useState<'origin' | 'ships' | 'destination' | 'confirm'>('origin')
   const [selectedOriginPlanet, setSelectedOriginPlanet] = useState<number>(planetId || 0)
   const [selectedShips, setSelectedShips] = useState<Record<string, number>>({})
-  const [selectedDestination, setSelectedDestination] = useState<Coordinate | null>(null)
+  const [selectedDestination, setSelectedDestination] = useState<Coordinate | null>(() => {
+    // Pre-fill destination if provided
+    if (destinationPlanet?.coordinate) {
+      const coord = typeof destinationPlanet.coordinate === 'string' 
+        ? parseCoordinate(destinationPlanet.coordinate)
+        : destinationPlanet.coordinate
+      return coord || null
+    }
+    return null
+  })
   const [orderType, setOrderType] = useState<'attack' | 'defend' | 'station' | 'return'>('attack')
   const [autoReturn, setAutoReturn] = useState(false)
 
@@ -65,6 +76,14 @@ export function FleetCommandPanel({ planetId }: FleetCommandPanelProps) {
       return
     }
 
+    // Convert hierarchical coordinates to X/Y coordinates
+    const destinationXY = hierarchicalToXy(
+      selectedDestination.quadrant,
+      selectedDestination.sector,
+      selectedDestination.galaxy,
+      selectedDestination.planet
+    )
+
     try {
       await createFleet({
         ships: selectedShips,
@@ -73,6 +92,8 @@ export function FleetCommandPanel({ planetId }: FleetCommandPanelProps) {
         destination_sector: selectedDestination.sector,
         destination_galaxy: selectedDestination.galaxy,
         destination_planet: selectedDestination.planet,
+        destination_x: destinationXY.x,
+        destination_y: destinationXY.y,
         order_type: orderType,
         auto_return_on_failure: autoReturn,
       }).unwrap()
@@ -84,7 +105,18 @@ export function FleetCommandPanel({ planetId }: FleetCommandPanelProps) {
       setSelectedShips({})
       setSelectedDestination(null)
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to launch fleet')
+      const errorMessage = error?.data?.message || 'Failed to launch fleet'
+      const errorDetails = error?.data?.details
+      
+      // If there are details (array of validation errors), format them nicely
+      if (Array.isArray(errorDetails) && errorDetails.length > 0) {
+        const detailsText = errorDetails.join('\n• ')
+        toast.error(`${errorMessage}\n\n• ${detailsText}`, {
+          duration: 8000, // Show longer for validation errors
+        })
+      } else {
+        toast.error(errorMessage)
+      }
     }
   }
 

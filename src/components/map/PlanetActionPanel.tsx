@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { useColonizePlanetMutation, useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useNavigate } from 'react-router-dom'
 import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
+import { hierarchicalToXy } from '@/lib/coordinateUtils'
 import { formatResource } from '@/lib/formatters'
 import { 
   Home, 
@@ -60,11 +61,16 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
     }
 
     try {
+      // Calculate x, y coordinates from hierarchical coordinates
+      const xy = hierarchicalToXy(coord.quadrant, coord.sector, coord.galaxy, coord.planet)
+      
       await colonizePlanet({
         quadrant: coord.quadrant,
         sector: coord.sector,
         galaxy: coord.galaxy,
         planet: coord.planet,
+        x: xy.x,
+        y: xy.y,
         name: name.trim(),
       }).unwrap()
 
@@ -143,6 +149,9 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
               <div>
                 <label className="text-sm text-muted-foreground">Type</label>
                 <div className="mt-1 font-semibold">{displayPlanet.type.name}</div>
+                {displayPlanet.type.description && (
+                  <p className="mt-1 text-xs text-muted-foreground">{displayPlanet.type.description}</p>
+                )}
               </div>
             )}
             {displayPlanet.owner_empire_id && (

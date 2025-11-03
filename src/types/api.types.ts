@@ -130,8 +130,9 @@ export interface Planet {
   defence_grid?: Record<string, number>
   // New: planet type for imagery
   type?: { 
-    slug: 'arid' | 'oceanic' | 'volcanic' | 'ice' | 'asteroid' | 'barren' | 'temperate' | 'toxic' | 'crystalline' | 'gas_giant' | 'terran'; 
-    name: string 
+    slug: 'arid' | 'oceanic' | 'volcanic' | 'ice' | 'asteroid' | 'barren' | 'temperate' | 'toxic' | 'crystalline' | 'gas_giant' | 'terran' | 'blue_planet' | 'blue-planet' | 'blue-planet-space' | 'dwarf' | 'exotic' | 'forest' | 'jungle' | 'metallic' | 'molten' | 'nebulous' | 'plasma' | 'quantum' | 'ringed' | 'rocky' | 'sol' | 'sol_angry' | 'sol-angry' | 'sol_massive' | 'sol-massive' | 'swamp' | 'tropical' | 'tundra' | 'yellow' | string; 
+    name: string
+    description?: string
   }
   production?: {
     tellerium_per_tick: number
@@ -143,6 +144,9 @@ export interface Planet {
     discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
   }
   discovered?: boolean // Alternative field name
+  // X/Y coordinates (0-999 grid) - source of truth for positioning
+  x?: number
+  y?: number
 }
 
 export interface Fleet {
@@ -895,6 +899,8 @@ export interface CreateFleetRequest {
   destination_sector: number
   destination_galaxy: number
   destination_planet: number
+  destination_x: number
+  destination_y: number
   order_type: 'attack' | 'defend' | 'station' | 'return'
   auto_return_on_failure?: boolean
   name?: string
@@ -926,6 +932,8 @@ export interface ColonizePlanetRequest {
   sector: number
   galaxy: number
   planet: number
+  x: number
+  y: number
   name: string
 }
 

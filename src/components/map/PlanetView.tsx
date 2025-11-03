@@ -3,11 +3,16 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Planet } from '@/types/api.types'
-import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
+import { formatCoordinate, parseCoordinate, getPlanetXY } from '@/lib/coordinates'
 import { formatResource } from '@/lib/formatters'
 import { useAuth } from '@/hooks/useAuth'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
+import { usePanning } from '@/hooks/usePanning'
+import { getGalaxyXyRange } from '@/lib/coordinateUtils'
 import { cn } from '@/lib/utils'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
+import { GalaxyGridOverlay } from './GalaxyGridOverlay'
 import { 
   Home, 
   AlertCircle, 
@@ -30,12 +35,19 @@ interface PlanetViewProps {
   }
 }
 
-export function PlanetView({ planets, onPlanetClick, className = '', currentGalaxy }: PlanetViewProps) {
+export function PlanetView({ planets, onPlanetClick: _onPlanetClick, className = '', currentGalaxy }: PlanetViewProps) {
   const { empire } = useAuth()
+  const { openPanel } = usePanel()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [expandedPlanet, setExpandedPlanet] = useState<Planet | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const [planetPositions, setPlanetPositions] = useState<Map<number, { x: number; y: number }>>(new Map())
+  
+  // Panning hook - reset when galaxy changes
+  const { panOffset, isDragging, onMouseDown, onTouchStart } = usePanning({
+    enabled: true,
+    resetDeps: currentGalaxy ? [currentGalaxy.quadrant, currentGalaxy.sector, currentGalaxy.galaxy] : []
+  })
   
   // Fetch fleets to get travel routes
   // NOTE: This endpoint only returns the user's own fleets, not other players' fleets.
@@ -112,55 +124,52 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
     }) as typeof filtered
   }, [fleetsData, currentGalaxy])
   
-  // Calculate planet positions in orbital layout around central star
-  const orbitalPlanetPositions = useMemo(() => {
-    if (!planets.length) {
-      console.log('[PlanetView] No planets to position')
+  // Get galaxy X/Y range for scaling
+  const galaxyRange = useMemo(() => {
+    if (!currentGalaxy) return null
+    return getGalaxyXyRange(currentGalaxy.quadrant, currentGalaxy.sector, currentGalaxy.galaxy)
+  }, [currentGalaxy])
+
+  // Calculate planet positions from X/Y coordinates
+  const planetPositionsFromXY = useMemo(() => {
+    if (!planets.length || !galaxyRange) {
       return new Map<number, { x: number; y: number }>()
     }
     
     const positions = new Map<number, { x: number; y: number }>()
-    const centerX = 50 // Percentage
-    const centerY = 50 // Percentage
     
-    console.log(`[PlanetView] Calculating orbital positions for ${planets.length} planets`)
-    
-    planets.forEach((planet, index) => {
-      const coord = parseCoordinate(planet.coordinate)
-      if (!coord) {
-        console.warn(`[PlanetView] Could not parse coordinate for planet ${planet.id}`)
+    planets.forEach((planet) => {
+      // Get X/Y coordinates from planet
+      const xy = getPlanetXY(planet)
+      if (!xy) {
+        console.warn(`[PlanetView] Could not get X/Y coordinates for planet ${planet.id}`)
         return
       }
       
-      const planetNum = coord.planet || index + 1
+      // Scale X/Y coordinates (0-999) to percentage positions within galaxy range
+      // Map X/Y to viewport percentage, accounting for pan offset
+      const galaxyWidth = galaxyRange.x_max - galaxyRange.x_min
+      const galaxyHeight = galaxyRange.y_max - galaxyRange.y_min
       
-      // Distribute planets in orbital rings
-      // Group planets into orbital rings (3-4 per ring)
-      const planetsPerRing = 4
-      const orbitRing = Math.floor((planetNum - 1) / planetsPerRing)
-      const positionInRing = (planetNum - 1) % planetsPerRing
+      if (galaxyWidth === 0 || galaxyHeight === 0) return
       
-      // Base radius increases with each ring to spread planets out
-      const baseRadius = 20 + orbitRing * 10 // Start at 20%, increase by 10% per ring
-      const radius = baseRadius + (positionInRing * 2) // Slight spacing within ring
+      // Calculate position within galaxy range (0-1 normalized)
+      const normalizedX = (xy.x - galaxyRange.x_min) / galaxyWidth
+      const normalizedY = (xy.y - galaxyRange.y_min) / galaxyHeight
       
-      // Distribute planets evenly around the circle within their ring
-      const angle = (positionInRing / planetsPerRing) * Math.PI * 2 + (orbitRing * 0.3) // Slight rotation per ring
-      
-      // Calculate position
-      const xPercent = centerX + Math.cos(angle) * radius
-      const yPercent = centerY + Math.sin(angle) * radius
-      
-      console.log(`[PlanetView] Planet ${planet.id} (${planetNum}): ring ${orbitRing}, pos ${positionInRing}, angle ${(angle * 180 / Math.PI).toFixed(1)}°, radius ${radius.toFixed(1)}%, position (${xPercent.toFixed(1)}%, ${yPercent.toFixed(1)}%)`)
+      // Scale to percentage (0-100%)
+      // Add some padding (10% on each side) so planets aren't at the edges
+      const padding = 10
+      const xPercent = padding + (normalizedX * (100 - padding * 2))
+      const yPercent = padding + (normalizedY * (100 - padding * 2))
       
       positions.set(planet.id, { x: xPercent, y: yPercent })
     })
     
-    console.log(`[PlanetView] Calculated ${positions.size} planet positions`)
     return positions
-  }, [planets])
+  }, [planets, galaxyRange])
   
-  // Update planetPositions state for fleet line rendering
+  // Update planetPositions state for fleet line rendering (pixel coordinates)
   useEffect(() => {
     if (!gridRef.current) return
     
@@ -168,10 +177,10 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
       const containerRect = gridRef.current!.getBoundingClientRect()
       const newPositions = new Map<number, { x: number; y: number }>()
       
-      orbitalPlanetPositions.forEach((pos, planetId) => {
-        // Convert percentage to pixel coordinates
-        const x = (pos.x / 100) * containerRect.width
-        const y = (pos.y / 100) * containerRect.height
+      planetPositionsFromXY.forEach((pos, planetId) => {
+        // Convert percentage to pixel coordinates, accounting for pan offset
+        const x = ((pos.x / 100) * containerRect.width) + panOffset.x
+        const y = ((pos.y / 100) * containerRect.height) + panOffset.y
         newPositions.set(planetId, { x, y })
       })
       
@@ -189,7 +198,7 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
       window.removeEventListener('resize', updatePositions)
       observer.disconnect()
     }
-  }, [orbitalPlanetPositions])
+  }, [planetPositionsFromXY, panOffset])
 
   // Get planet image based on type
   const getPlanetImage = (planet: Planet): string | null => {
@@ -272,29 +281,16 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
 
   return (
     <div 
-      className={`relative ${className}`} 
+      className={`relative ${className} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
       style={{ 
         minHeight: '600px', 
         height: '600px',
-        backgroundColor: 'rgba(0, 100, 0, 0.1)', // DEBUG: Green tint to see container
-        border: '2px solid red', // DEBUG: Red border to see container
+        overflow: 'hidden',
       }}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
     >
-      {/* DEBUG: Visible text indicator */}
-      <div style={{ 
-        position: 'absolute', 
-        top: 10, 
-        left: 10, 
-        zIndex: 10000, 
-        backgroundColor: 'red', 
-        color: 'white', 
-        padding: '4px 8px',
-        fontSize: '12px'
-      }}>
-        PlanetView Active - {planets.length} planets
-      </div>
-      
-      {/* SVG overlay for travel lines - ALWAYS render test lines */}
+      {/* SVG overlay for grid and travel lines */}
       <svg
         className="absolute inset-0 pointer-events-none"
         style={{ 
@@ -307,28 +303,13 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
           right: 0,
           bottom: 0,
           pointerEvents: 'none',
-          backgroundColor: 'rgba(0, 255, 0, 0.05)', // Green tint to see SVG area
         }}
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
       >
-        {/* Test lines to verify SVG rendering */}
-        <line
-          x1="5%"
-          y1="5%"
-          x2="95%"
-          y2="95%"
-          stroke="#00ff00"
-          strokeWidth="20"
-          strokeOpacity="1"
-        />
-        <line
-          x1="0%"
-          y1="50%"
-          x2="100%"
-          y2="50%"
-          stroke="#ff0000"
-          strokeWidth="15"
-          strokeOpacity="1"
-        />
+        {/* Grid Overlay - Disabled */}
+        {/* <GalaxyGridOverlay width={100} height={100} /> */}
+        
         {/* Fleet travel lines */}
         {relevantFleets.length > 0 && planetPositions.size > 0 && gridRef.current && relevantFleets.map((fleet) => {
             // Use destination.id from API if available (more reliable), otherwise fallback to coordinate lookup
@@ -398,43 +379,19 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
           })}
       </svg>
       
-      {/* Orbital layout container */}
+      {/* Map container with panning transform */}
       <div
         ref={gridRef}
-        className="relative w-full"
+        className="relative w-full h-full"
         style={{ 
           minHeight: '600px', 
           height: '600px',
           position: 'relative',
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
         }}
       >
-        {/* Central Star */}
-        <div
-          className="absolute"
-          style={{
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '200px',
-            height: '200px',
-            zIndex: 5,
-            pointerEvents: 'none',
-          }}
-        >
-          <img
-            src="/assets/images/planets/sol.png"
-            alt="Star"
-            className="w-full h-full object-contain animate-pulse"
-            style={{
-              filter: 'drop-shadow(0 0 40px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 80px rgba(255, 255, 255, 0.6))',
-            }}
-            onError={(e) => {
-              console.error('[PlanetView] Failed to load star image:', e)
-            }}
-          />
-        </div>
-        
-        {/* Planets in orbital positions */}
+        {/* Planets positioned using X/Y coordinates */}
         <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
         {planets.map((planet) => {
         const isOwned = planet.owner_empire_id === empire?.id
@@ -445,8 +402,8 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
         const isDiscovered = planet.discovered !== false // Default to true if not specified
         const isVisible = planet.visibility?.is_visible !== false
         
-        const orbitalPos = orbitalPlanetPositions.get(planet.id)
-        if (!orbitalPos) return null
+        const pos = planetPositionsFromXY.get(planet.id)
+        if (!pos) return null
 
         return (
           <Card
@@ -454,16 +411,16 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
             data-planet-id={planet.id}
             className={cn(
               "absolute cursor-pointer overflow-hidden",
-              "planet-interactive orbit-float transition-all duration-300",
-              "w-24 h-24", // Fixed size, smaller than star (200px)
+              "planet-interactive transition-all duration-300",
+              "w-24 h-24",
               isExpanded && "expanded scale-150 z-50",
               !isDiscovered && "opacity-50 grayscale",
               isOwned ? 'bg-green-500/5 border-green-500/30' : planet.owner_empire_id ? 'bg-red-500/5 border-red-500/30' : 'bg-muted/5 border-muted/20',
               !isVisible && "border-dashed"
             )}
             style={{
-              left: `${orbitalPos.x}%`,
-              top: `${orbitalPos.y}%`,
+              left: `${pos.x}%`,
+              top: `${pos.y}%`,
               transform: 'translate(-50%, -50%)',
               zIndex: isExpanded ? 50 : 15,
               pointerEvents: 'auto',
@@ -473,7 +430,10 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
             onClick={() => {
               if (isExpanded) {
                 setExpandedPlanet(null)
-                onPlanetClick(planet)
+                // Open planet interaction panel (for actions like colonize, send fleet, travel time)
+                openPanel(PanelType.PLANET_INTERACTION, PanelSize.MEDIUM, { 
+                  planet
+                })
               } else {
                 setExpandedPlanet(planet)
               }
@@ -481,9 +441,6 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
           >
             {/* Planet glow effect */}
             <div className="planet-glow" />
-
-            {/* Orbital rings */}
-            <div className="orbital-rings" />
 
             {/* Planet background image */}
             {planetImage && (
@@ -502,10 +459,10 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
                   <img
                     src={planetImage}
                     alt={planet.type?.name || 'Planet'}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover planet-shadow-spin"
                   />
                 ) : (
-                  <div className="w-full h-full bg-muted/20" />
+                  <div className="w-full h-full bg-muted/20 planet-shadow-spin" />
                 )}
                 <div className="absolute inset-0 border-2 border-current opacity-50 rounded-full" />
               </div>
@@ -555,6 +512,9 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
                     <div className="text-xs">
                       <span className="text-muted-foreground">Type: </span>
                       <span className="capitalize font-medium">{planet.type.name}</span>
+                      {planet.type.description && (
+                        <p className="mt-1 text-xs text-muted-foreground">{planet.type.description}</p>
+                      )}
                     </div>
                   )}
 
@@ -615,11 +575,14 @@ export function PlanetView({ planets, onPlanetClick, className = '', currentGala
                       onClick={(e) => {
                         e.stopPropagation()
                         setExpandedPlanet(null)
-                        onPlanetClick(planet)
+                        // Open planet interaction panel (for actions like colonize, send fleet, travel time)
+                        openPanel(PanelType.PLANET_INTERACTION, PanelSize.MEDIUM, { 
+                          planet
+                        })
                       }}
                     >
                       <Eye className="w-3 h-3 mr-1" />
-                      Details
+                      Actions
                     </Button>
                     {isOwned && (
                       <Button

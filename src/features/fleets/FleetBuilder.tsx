@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { calculateDistance } from '@/lib/coordinates'
+import { hierarchicalToXy } from '@/lib/coordinateUtils'
 import { Ship, MapPin, Clock, Zap, AlertCircle, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getShipImage } from '@/lib/shipImages'
@@ -168,6 +169,9 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
         return
       }
 
+      // Calculate x, y coordinates from hierarchical coordinates
+      const destinationXY = hierarchicalToXy(coordParts[0], coordParts[1], coordParts[2], coordParts[3])
+
       await createFleet({
         ships: fleetShips,
         origin_planet_id: data.origin_planet_id,
@@ -175,6 +179,8 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
         destination_sector: coordParts[1],
         destination_galaxy: coordParts[2],
         destination_planet: coordParts[3],
+        destination_x: destinationXY.x,
+        destination_y: destinationXY.y,
         order_type: data.order_type,
         auto_return_on_failure: data.auto_return_on_failure,
       }).unwrap()

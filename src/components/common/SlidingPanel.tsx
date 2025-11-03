@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { X, Minimize2, Maximize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +47,8 @@ export function SlidingPanel({
 }: SlidingPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
 
   // Handle ESC key to close
   useEffect(() => {
@@ -61,15 +63,33 @@ export function SlidingPanel({
 
   // Focus management
   useEffect(() => {
-    if (isOpen && panelRef.current) {
+    if (isOpen && panelRef.current && isVisible) {
       const firstFocusable = panelRef.current.querySelector(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       ) as HTMLElement
       firstFocusable?.focus()
     }
+  }, [isOpen, isVisible])
+
+  // Handle slide-in animation
+  useEffect(() => {
+    if (isOpen) {
+      setIsVisible(true)
+      // Trigger animation on next frame
+      requestAnimationFrame(() => {
+        setIsAnimating(true)
+      })
+    } else {
+      setIsAnimating(false)
+      // Wait for animation to complete before hiding
+      const timer = setTimeout(() => {
+        setIsVisible(false)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!isOpen && !isVisible) return null
 
   // Don't render minimized panels here - they're handled by PanelManager as tabs
   if (panelState === PanelState.MINIMIZED) return null
@@ -80,8 +100,15 @@ export function SlidingPanel({
       {!hideBackdrop && (
         <div 
           ref={backdropRef}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300"
+          className={cn(
+            "sliding-panel-backdrop fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-all duration-300 ease-out",
+            isAnimating ? "opacity-100" : "opacity-0"
+          )}
+          style={{ 
+            pointerEvents: isAnimating ? 'auto' : 'none'
+          }}
           onClick={(e) => {
+            if (!isAnimating) return
             // Check if tutorial is active - if so, don't close panel on backdrop click
             const tutorialActive = document.querySelector('[data-tutorial-active="true"]')
             if (tutorialActive) {
@@ -97,23 +124,28 @@ export function SlidingPanel({
       <div
         ref={panelRef}
         className={cn(
-          'fixed right-0 h-full bg-card border-l border-border z-50 shadow-2xl',
-          'transform transition-all duration-300 ease-out',
+          'sliding-panel-container fixed right-0 top-0 h-full bg-card border-l border-border shadow-2xl',
           'overflow-hidden',
           className?.includes(CUSTOM_WIDTH_CLASS) ? '' : SIZE_MAP[size],
           className
         )}
         style={{ 
           zIndex,
-          ...(className?.includes(CUSTOM_WIDTH_CLASS) ? { width: '70vw' } : {})
+          width: className?.includes(CUSTOM_WIDTH_CLASS) ? '70vw' : undefined,
+          transform: isAnimating ? 'translate3d(0, 0, 0)' : 'translate3d(100%, 0, 0)',
+          transition: 'transform 300ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease-out',
+          opacity: isAnimating ? 1 : 0,
         }}
       >
         <Card className="h-full rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
           {/* Sleek header with minimize/maximize */}
-          <CardHeader className={cn(
-            "sticky top-0 bg-muted/20 backdrop-blur-sm z-10 border-b border-border/50 transition-all duration-200",
-            "p-3"
-          )}>
+          <CardHeader 
+            className={cn(
+              "sliding-panel-content sticky top-0 bg-muted/20 backdrop-blur-sm z-10 border-b border-border/50",
+              "p-3 transition-opacity duration-200",
+              isAnimating ? "opacity-100" : "opacity-0"
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <CardTitle className={cn(
@@ -150,7 +182,12 @@ export function SlidingPanel({
           </CardHeader>
           
           {/* Content */}
-          <CardContent className="p-6 transition-all duration-200 overflow-y-auto h-[calc(100%-56px)]">
+          <CardContent 
+            className={cn(
+              "sliding-panel-content p-6 overflow-y-auto h-[calc(100%-56px)] transition-opacity duration-200",
+              isAnimating ? "opacity-100" : "opacity-0"
+            )}
+          >
             {children}
           </CardContent>
         </Card>

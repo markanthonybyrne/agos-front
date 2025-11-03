@@ -3,7 +3,17 @@ export interface Coordinate {
   quadrant: number
   sector: number
   galaxy: number
+  system?: number  // System level (5-level hierarchy)
   planet: number
+  // X/Y coordinates (0-999 grid) - source of truth for positioning
+  x?: number
+  y?: number
+}
+
+// X/Y coordinate type for positioning
+export interface XYCoordinate {
+  x: number
+  y: number
 }
 
 export interface ShipType {
