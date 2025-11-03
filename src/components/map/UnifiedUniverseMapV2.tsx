@@ -15,7 +15,7 @@ import {
   type SystemData
 } from '@/lib/systemUtils'
 import { getPlanetImage } from '@/lib/planetImages'
-import { getGalaxyImage } from '@/lib/galaxyImages'
+import { getGalaxyImage, getRandomGalaxyTypeForSystem } from '@/lib/galaxyImages'
 import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange } from '@/lib/coordinateUtils'
 import { SystemViewMemo as SystemView } from './SystemView'
 import { GridOverlay } from './GridOverlay'
@@ -489,23 +489,24 @@ export function UnifiedUniverseMapV2() {
           />
 
           {/* Render based on zoom level */}
-          {/* Sector level - show systems as simple markers */}
+          {/* Sector level - show systems as galaxy images */}
           {zoomLevel === 'sector' && (
             <g className="systems-layer" style={{ pointerEvents: 'all' }}>
               {visibleSystems.map(system => {
-                // Use a larger radius that's visible even at low zoom
-                // Radius in SVG coordinates (0-1000 grid)
-                const radius = 20 // Visible radius in grid coordinates
+                // Get a deterministic random galaxy type based on system coordinates
+                const galaxyType = getRandomGalaxyTypeForSystem(system.key)
+                const galaxyImage = getGalaxyImage(galaxyType)
+                const imageSize = 40 // Size in grid coordinates
+                
                 return (
                   <g key={system.key}>
-                    <circle
-                      cx={system.center.x}
-                      cy={system.center.y}
-                      r={radius}
-                      fill="rgba(100, 200, 255, 0.9)"
-                      stroke="rgba(150, 220, 255, 1)"
-                      strokeWidth={2}
-                      className="system-marker cursor-pointer hover:opacity-100"
+                    <image
+                      href={galaxyImage}
+                      x={system.center.x - imageSize / 2}
+                      y={system.center.y - imageSize / 2}
+                      width={imageSize}
+                      height={imageSize}
+                      className="cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
                       onClick={() => handleSystemClick(system)}
                       style={{ pointerEvents: 'all' }}
                     />
@@ -513,7 +514,7 @@ export function UnifiedUniverseMapV2() {
                     {zoomPan.scale > 0.06 && (
                       <text
                         x={system.center.x}
-                        y={system.center.y + radius + 12}
+                        y={system.center.y + imageSize / 2 + 12}
                         textAnchor="middle"
                         className="fill-blue-300 font-mono pointer-events-none"
                         style={{ fontSize: '10px' }}

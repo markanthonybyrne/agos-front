@@ -91,7 +91,7 @@ export function GridOverlay({
 
   // Calculate visible coordinate labels
   const coordinateLabels = useMemo(() => {
-    if (!viewportBounds || scale < 0.2) return [] // Only show labels at low-medium zoom
+    if (!viewportBounds) return [] // Show labels at all zoom levels
     
     const labels: Array<{ x: number; y: number; type: 'x' | 'y'; value: number; position: 'top' | 'bottom' | 'left' | 'right' }> = []
     const labelSpacing = MAIN_GRID_SPACING * 2 // Show labels every 200 units
@@ -134,7 +134,7 @@ export function GridOverlay({
     }
     
     return labels
-  }, [width, height, viewportBounds, scale])
+  }, [width, height, viewportBounds])
 
   return (
     <g className="grid-overlay" opacity={0.6}>
