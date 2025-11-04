@@ -16,7 +16,7 @@ import {
 } from '@/lib/systemUtils'
 import { getPlanetImage } from '@/lib/planetImages'
 import { getGalaxyImage, getRandomGalaxyTypeForSystem } from '@/lib/galaxyImages'
-import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange } from '@/lib/coordinateUtils'
+import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange, getSystemXyRange } from '@/lib/coordinateUtils'
 import { SystemViewMemo as SystemView } from './SystemView'
 import { GridOverlay } from './GridOverlay'
 import { QuadrantOverlay } from './QuadrantOverlay'
@@ -25,6 +25,7 @@ import { Planet } from '@/types/api.types'
 import { Loader } from '@/components/ui/loader'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
+import { CoordinateJumpPanel } from './CoordinateJumpPanel'
 
 // Default grid dimensions (will be overridden by config)
 // Universe is now rectangular: 2000 x 1000
@@ -46,6 +47,7 @@ export function UnifiedUniverseMapV2() {
   const { openPanel } = usePanel()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<SystemData | null>(null)
+  const [showJumpPanel, setShowJumpPanel] = useState(false)
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
   // Support both old format (single grid_size) and new format (grid_width/grid_height)
@@ -96,15 +98,34 @@ export function UnifiedUniverseMapV2() {
       return null
     }
     
-    const homeworldSystemKey = getPlanetSystemKey(homeworldData.planet)
+    const homeworldPlanet = homeworldData.planet
+    const homeworldSystemKey = getPlanetSystemKey(homeworldPlanet)
+    
+    // Debug logging
+    console.log('[UnifiedUniverseMapV2] Homeworld data:', {
+      planetId: homeworldPlanet.id,
+      coordinate: homeworldPlanet.coordinate,
+      coordinateType: typeof homeworldPlanet.coordinate,
+      systemKey: homeworldSystemKey,
+      availableSystems: Array.from(systemsByKey.keys()).slice(0, 10)
+    })
+    
     if (!homeworldSystemKey) {
+      console.warn('[UnifiedUniverseMapV2] Failed to extract system key from homeworld planet:', homeworldPlanet)
       return null
     }
     
     const system = systemsByKey.get(homeworldSystemKey)
     if (!system) {
+      console.warn('[UnifiedUniverseMapV2] Homeworld system not found:', homeworldSystemKey, 'Available systems:', Array.from(systemsByKey.keys()))
       return null
     }
+    
+    console.log('[UnifiedUniverseMapV2] Found homeworld system:', {
+      key: homeworldSystemKey,
+      center: system.center,
+      planetCount: system.planets.length
+    })
     
     return system.center
   }, [homeworldData, systemsByKey])
@@ -112,18 +133,81 @@ export function UnifiedUniverseMapV2() {
   // Update pan and zoom when homeworld system is found (only once on initial load)
   useEffect(() => {
     if (!hasSetInitialPosition.current && homeworldSystemCenter) {
-      // Center on homeworld system at 600% zoom
-      // Formula: panX = (gridWidth / 2 - targetX) * scale
-      // This centers the viewport on the target coordinate
-      const initialScale = 6.0 // 600% zoom
-      const panX = (gridWidth / 2 - homeworldSystemCenter.x) * initialScale
-      const panY = (gridHeight / 2 - homeworldSystemCenter.y) * initialScale
-      
-      zoomPan.setZoom(initialScale)
-      zoomPan.setPan(panX, panY)
-      hasSetInitialPosition.current = true
+      // Wait for container to be ready before calculating pan
+      // Use multiple requestAnimationFrames to ensure DOM is fully ready
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Center on homeworld system at 600% zoom
+          // Viewport center formula: centerX = -panX / scale + gridWidth / 2
+          // To center on targetX: targetX = -panX / scale + gridWidth / 2
+          // Solving for panX: panX = (gridWidth / 2 - targetX) * scale
+          const initialScale = 6.0 // 600% zoom
+          const panX = (gridWidth / 2 - homeworldSystemCenter.x) * initialScale
+          const panY = (gridHeight / 2 - homeworldSystemCenter.y) * initialScale
+          
+          console.log('[UnifiedUniverseMapV2] Setting initial position:', {
+            homeworldCenter: homeworldSystemCenter,
+            gridWidth,
+            gridHeight,
+            initialScale,
+            calculatedPanX: panX,
+            calculatedPanY: panY
+          })
+          
+          // Use setZoomAndPan to set both together atomically
+          if (zoomPan.setZoomAndPan) {
+            zoomPan.setZoomAndPan(initialScale, panX, panY)
+            
+            // Verify and correct position after setting (with multiple attempts if needed)
+            const verifyAndCorrect = (attempt = 1) => {
+              setTimeout(() => {
+                const bounds = zoomPan.viewportBounds
+                const viewportCenterX = (bounds.minX + bounds.maxX) / 2
+                const viewportCenterY = (bounds.minY + bounds.maxY) / 2
+                const diffX = viewportCenterX - homeworldSystemCenter.x
+                const diffY = viewportCenterY - homeworldSystemCenter.y
+                const distance = Math.sqrt(diffX * diffX + diffY * diffY)
+                
+                console.log('[UnifiedUniverseMapV2] Position verification (attempt', attempt, '):', {
+                  viewportCenter: { x: viewportCenterX, y: viewportCenterY },
+                  targetCenter: homeworldSystemCenter,
+                  difference: { x: diffX, y: diffY },
+                  distance: distance.toFixed(2),
+                  actualPan: { x: zoomPan.panX, y: zoomPan.panY },
+                  calculatedPan: { x: panX, y: panY }
+                })
+                
+                // If significantly off-center (more than 10 units), correct it
+                if (distance > 10 && attempt <= 2) {
+                  console.log('[UnifiedUniverseMapV2] Correcting position, attempt', attempt)
+                  // Recalculate pan based on the difference
+                  // We need to shift the viewport center by -diffX and -diffY
+                  // New pan = current pan - (diff * scale)
+                  const correctedPanX = zoomPan.panX - (diffX * initialScale)
+                  const correctedPanY = zoomPan.panY - (diffY * initialScale)
+                  zoomPan.setPan(correctedPanX, correctedPanY)
+                  
+                  // Try once more if still off
+                  if (attempt < 2) {
+                    verifyAndCorrect(attempt + 1)
+                  }
+                }
+              }, attempt === 1 ? 300 : 200)
+            }
+            
+            verifyAndCorrect()
+          } else {
+            zoomPan.setZoom(initialScale)
+            requestAnimationFrame(() => {
+              zoomPan.setPan(panX, panY)
+            })
+          }
+          
+          hasSetInitialPosition.current = true
+        })
+      })
     }
-  }, [homeworldSystemCenter, gridWidth, gridHeight, zoomPan])
+  }, [homeworldSystemCenter, gridWidth, gridHeight, zoomPan, systemsByKey])
 
   // Group systems by galaxy for rendering
   const systemsByGalaxy = useMemo(() => {
@@ -568,7 +652,9 @@ export function UnifiedUniverseMapV2() {
                 const galaxyRange = getGalaxyXyRange(q, s, g)
                 const centerX = (galaxyRange.x_min + galaxyRange.x_max) / 2
                 const centerY = (galaxyRange.y_min + galaxyRange.y_max) / 2
-                const galaxyImage = getGalaxyImage(((g - 1) % 4) + 1)
+                // Use deterministic random galaxy type based on galaxy key
+                const galaxyType = getRandomGalaxyTypeForSystem(galaxyKey)
+                const galaxyImage = getGalaxyImage(galaxyType)
                 
                 return (
                   <g
@@ -694,6 +780,46 @@ export function UnifiedUniverseMapV2() {
             Planets: {allPlanets.length} | Systems: {systemsByKey.size}
           </div>
         </div>
+
+        {/* Jump button */}
+        <button
+          onClick={() => setShowJumpPanel(true)}
+          className="absolute bottom-4 right-4 z-50 bg-cyan-600 hover:bg-cyan-700 angled-corners text-white px-4 py-2 text-sm font-semibold border border-cyan-400/30 hover:border-cyan-400/50 transition-all"
+          title="Jump to Coordinates"
+        >
+          Jump
+        </button>
+
+        {/* Coordinate Jump Panel */}
+        {showJumpPanel && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100]">
+            <CoordinateJumpPanel
+              onJump={(centerX, centerY, zoom) => {
+                // Use the same approach as homeworld centering
+                // Formula: panX = (gridWidth / 2 - targetX) * scale
+                // This centers the viewport on the target coordinate
+                const targetPanX = (gridWidth / 2 - centerX) * zoom
+                const targetPanY = (gridHeight / 2 - centerY) * zoom
+                
+                // Use setZoomAndPan to set both together atomically
+                if (zoomPan.setZoomAndPan) {
+                  zoomPan.setZoomAndPan(zoom, targetPanX, targetPanY)
+                } else {
+                  // Fallback: set zoom first, then pan
+                  zoomPan.setZoom(zoom)
+                  requestAnimationFrame(() => {
+                    zoomPan.setPan(targetPanX, targetPanY)
+                  })
+                }
+                
+                setShowJumpPanel(false)
+              }}
+              onClose={() => setShowJumpPanel(false)}
+              gridWidth={gridWidth}
+              gridHeight={gridHeight}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

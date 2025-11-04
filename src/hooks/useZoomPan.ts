@@ -180,6 +180,17 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     }
   }, [minScale, maxScale, state.scale, zoomToPoint, clampPan])
 
+  // Set zoom and pan together (useful for jumping to coordinates)
+  const setZoomAndPan = useCallback((scale: number, panX: number, panY: number) => {
+    const newScale = Math.max(minScale, Math.min(maxScale, scale))
+    const clamped = clampPan(panX, panY, newScale)
+    setState({
+      scale: newScale,
+      panX: clamped.x,
+      panY: clamped.y
+    })
+  }, [minScale, maxScale, clampPan])
+
   // Zoom in
   const zoomIn = useCallback((centerX?: number, centerY?: number) => {
     setState(prev => {
@@ -419,6 +430,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     
     // Actions
     setZoom,
+    setZoomAndPan,
     zoomIn,
     zoomOut,
     reset,

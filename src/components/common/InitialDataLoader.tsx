@@ -8,7 +8,6 @@ import {
   addPlanets,
 } from '@/app/slices/planetsSlice'
 import { Planet } from '@/types/api.types'
-import { cn } from '@/lib/utils'
 
 interface InitialDataLoaderProps {
   onComplete: () => void
@@ -87,54 +86,95 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           dispatch(setLoadingProgress(10))
           dispatch(addPlanets(planets))
 
-          // Phase 2: Continue loading remaining planets
+          // Phase 2: Continue loading remaining planets in parallel batches
           let offset = planets.length
           const totalToLoad = Math.min(total, maxPlanetsToLoad)
+          const batchSize = 10 // Fetch 10 pages in parallel (10 * 100 = 1000 planets per batch)
+          const batchDelay = 100 // Delay between batches in ms
 
-          console.log('[InitialDataLoader] Loading planets:', { current: planets.length, target: totalToLoad, total })
+          console.log('[InitialDataLoader] Loading planets:', { current: planets.length, target: totalToLoad, total, batchSize })
 
           while (planets.length < totalToLoad && offset < total) {
-            const progress = 10 + (planets.length / totalToLoad) * 80
-            dispatch(setLoadingProgress(progress))
+            // Calculate how many pages to fetch in this batch
+            const remainingPages = Math.ceil((totalToLoad - planets.length) / limit)
+            const pagesInBatch = Math.min(batchSize, remainingPages)
+            
+            // Create array of fetch promises for this batch
+            const fetchPromises = []
+            for (let i = 0; i < pagesInBatch; i++) {
+              const currentOffset = offset + (i * limit)
+              if (currentOffset >= total) break
+              
+              fetchPromises.push(
+                fetch(`${baseUrl}/planets/search?limit=${limit}&offset=${currentOffset}`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                }).then(response => {
+                  if (!response.ok) {
+                    throw new Error(`Failed to fetch planets at offset ${currentOffset}: ${response.status}`)
+                  }
+                  return response.json()
+                })
+              )
+            }
 
-            const response = await fetch(
-              `${baseUrl}/planets/search?limit=${limit}&offset=${offset}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
+            // Fetch all pages in this batch in parallel
+            try {
+              const batchResults = await Promise.all(fetchPromises)
+              
+              // Process all results from this batch
+              let batchPlanetCount = 0
+              let reachedEnd = false
+              
+              for (const data of batchResults) {
+                const newPlanets = data.planets || []
+                if (newPlanets.length > 0) {
+                  planets.push(...newPlanets)
+                  dispatch(addPlanets(newPlanets))
+                  batchPlanetCount += newPlanets.length
+                }
+                
+                // If we got fewer planets than requested, we've reached the end
+                if (newPlanets.length < limit) {
+                  reachedEnd = true
+                }
               }
-            )
 
-            if (!response.ok) {
-              console.error('[InitialDataLoader] Failed to fetch planets:', response.status)
-              break
+              // Update progress
+              const progress = 10 + (planets.length / totalToLoad) * 80
+              dispatch(setLoadingProgress(progress))
+
+              console.log('[InitialDataLoader] Loaded parallel batch:', {
+                batchSize: pagesInBatch,
+                fetched: batchPlanetCount,
+                totalLoaded: planets.length,
+                target: totalToLoad,
+                remaining: totalToLoad - planets.length
+              })
+
+              offset += pagesInBatch * limit
+
+              // If we reached the end or got enough planets, break
+              if (reachedEnd || planets.length >= totalToLoad) {
+                if (reachedEnd) {
+                  console.log('[InitialDataLoader] Reached end of data (got fewer than requested)')
+                }
+                break
+              }
+
+              // Small delay between batches to avoid overwhelming the server
+              if (planets.length < totalToLoad) {
+                await new Promise((resolve) => setTimeout(resolve, batchDelay))
+              }
+            } catch (error) {
+              console.error('[InitialDataLoader] Error fetching batch:', error)
+              // Continue with next batch even if one fails
+              offset += pagesInBatch * limit
+              // Small delay before retrying
+              await new Promise((resolve) => setTimeout(resolve, batchDelay))
             }
-
-            const data = await response.json()
-            const newPlanets = data.planets || []
-            planets.push(...newPlanets)
-            dispatch(addPlanets(newPlanets))
-
-            console.log('[InitialDataLoader] Loaded batch:', { 
-              offset, 
-              fetched: newPlanets.length, 
-              totalLoaded: planets.length, 
-              target: totalToLoad,
-              remaining: totalToLoad - planets.length
-            })
-
-            offset += limit
-
-            // If we got fewer planets than requested, we've reached the end
-            if (newPlanets.length < limit) {
-              console.log('[InitialDataLoader] Reached end of data (got fewer than requested)')
-              break
-            }
-
-            // Small delay to avoid rate limiting
-            await new Promise((resolve) => setTimeout(resolve, 50))
           }
 
           console.log('[InitialDataLoader] Finished loading planets:', { loaded: planets.length, target: totalToLoad, total })

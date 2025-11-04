@@ -1,7 +1,7 @@
 import { Planet } from '@/types/api.types'
 import { Coordinate } from '@/types/game.types'
 import { XYRanges } from './coordinateUtils'
-import { getPlanetXY } from './coordinates'
+import { getPlanetXY, parseCoordinate } from './coordinates'
 
 /**
  * System Utilities
@@ -37,8 +37,17 @@ export function getSystemKey(
  * Extract system key from a planet's coordinate
  */
 export function getPlanetSystemKey(planet: Planet): string | null {
-  if (typeof planet.coordinate === 'object' && planet.coordinate !== null) {
-    const coord = planet.coordinate as Coordinate
+  // First try to parse coordinate if it's a string
+  let coord: Coordinate | null = null
+  
+  if (typeof planet.coordinate === 'string') {
+    coord = parseCoordinate(planet.coordinate)
+  } else if (typeof planet.coordinate === 'object' && planet.coordinate !== null) {
+    coord = planet.coordinate as Coordinate
+  }
+  
+  if (coord) {
+    // Check if we have all required fields
     if (
       typeof coord.quadrant === 'number' &&
       typeof coord.sector === 'number' &&
@@ -47,7 +56,23 @@ export function getPlanetSystemKey(planet: Planet): string | null {
     ) {
       return getSystemKey(coord.quadrant, coord.sector, coord.galaxy, coord.system)
     }
+    
+    // If system is missing but we have quadrant, sector, galaxy, and planet
+    // Try to infer system from planet number (systems have up to 15 planets)
+    // This is a fallback for legacy 4-level coordinates
+    if (
+      typeof coord.quadrant === 'number' &&
+      typeof coord.sector === 'number' &&
+      typeof coord.galaxy === 'number' &&
+      typeof coord.planet === 'number'
+    ) {
+      // Calculate system number from planet number (1-15 per system)
+      // Systems are numbered 1-10, planets are distributed 1-15 per system
+      const system = Math.ceil(coord.planet / 15)
+      return getSystemKey(coord.quadrant, coord.sector, coord.galaxy, system)
+    }
   }
+  
   return null
 }
 

@@ -2,7 +2,7 @@ import { useMemo, memo } from 'react'
 import { Planet } from '@/types/api.types'
 import { SystemData, calculateOrbitRadius, calculateOrbitAngle } from '@/lib/systemUtils'
 import { getPlanetXY } from '@/lib/coordinates'
-import { getPlanetImage, solImg } from '@/lib/planetImages'
+import { getPlanetImage, getRandomSolImageForSystem } from '@/lib/planetImages'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
 
@@ -130,7 +130,7 @@ function SystemView({
           className="star-glow"
         />
         <image
-          href={solImg}
+          href={getRandomSolImageForSystem(system.key)}
           x={system.center.x - starSize}
           y={system.center.y - starSize}
           width={starSize * 2}
