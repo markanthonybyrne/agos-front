@@ -1,6 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useGetUniverseConfigQuery } from '@/api/endpoints/universeApi'
-import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { useAuth } from '@/hooks/useAuth'
 import { useZoomPan } from '@/hooks/useZoomPan'
@@ -56,22 +55,16 @@ export function UnifiedUniverseMapV2() {
   const gridHeight = configData?.grid_height || (typeof configData?.grid_size === 'object' ? configData.grid_size.height : null) || (configData?.grid_size || DEFAULT_GRID_HEIGHT)
   const maxPlanets = configData?.capacities?.max_planets || 24000
 
-  // Fetch homeworld planet to center map on it at 600% zoom
-  const { data: homeworldData } = useGetPlanetQuery(empire?.homeworld_planet_id || 0, {
-    skip: !empire?.homeworld_planet_id
-  })
-
   // Use global planets from Redux store (loaded on login)
   const { allPlanets, isLoading: isLoadingPlanets } = useAppSelector((state) => state.planets)
-  const hasSetInitialPosition = useRef(false)
 
   // Zoom and pan hook
   // Extended max scale to allow very high zoom (700%) for detailed system viewing
-  // Default view: zoomed to 600% on user's homeworld system
+  // Default view: 207% zoom
   const zoomPan = useZoomPan({
     minScale: 0.01,  // Universe view
     maxScale: 7.0,   // Very high zoom for detailed system/planet viewing (allows 700%)
-    initialScale: 0.05, // Start at sector level, will update when homeworld system is found
+    initialScale: 2.07, // Default zoom: 207%
     gridWidth: gridWidth,
     gridHeight: gridHeight
   })
@@ -91,123 +84,8 @@ export function UnifiedUniverseMapV2() {
     return systemsMap
   }, [allPlanets])
 
-  // Calculate initial pan position to center on homeworld system at 600% zoom
-  // Find the system containing the homeworld planet and center on its center
-  const homeworldSystemCenter = useMemo(() => {
-    if (!homeworldData?.planet || systemsByKey.size === 0) {
-      return null
-    }
-    
-    const homeworldPlanet = homeworldData.planet
-    const homeworldSystemKey = getPlanetSystemKey(homeworldPlanet)
-    
-    // Debug logging
-    console.log('[UnifiedUniverseMapV2] Homeworld data:', {
-      planetId: homeworldPlanet.id,
-      coordinate: homeworldPlanet.coordinate,
-      coordinateType: typeof homeworldPlanet.coordinate,
-      systemKey: homeworldSystemKey,
-      availableSystems: Array.from(systemsByKey.keys()).slice(0, 10)
-    })
-    
-    if (!homeworldSystemKey) {
-      console.warn('[UnifiedUniverseMapV2] Failed to extract system key from homeworld planet:', homeworldPlanet)
-      return null
-    }
-    
-    const system = systemsByKey.get(homeworldSystemKey)
-    if (!system) {
-      console.warn('[UnifiedUniverseMapV2] Homeworld system not found:', homeworldSystemKey, 'Available systems:', Array.from(systemsByKey.keys()))
-      return null
-    }
-    
-    console.log('[UnifiedUniverseMapV2] Found homeworld system:', {
-      key: homeworldSystemKey,
-      center: system.center,
-      planetCount: system.planets.length
-    })
-    
-    return system.center
-  }, [homeworldData, systemsByKey])
-
-  // Update pan and zoom when homeworld system is found (only once on initial load)
-  useEffect(() => {
-    if (!hasSetInitialPosition.current && homeworldSystemCenter) {
-      // Wait for container to be ready before calculating pan
-      // Use multiple requestAnimationFrames to ensure DOM is fully ready
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          // Center on homeworld system at 600% zoom
-          // Viewport center formula: centerX = -panX / scale + gridWidth / 2
-          // To center on targetX: targetX = -panX / scale + gridWidth / 2
-          // Solving for panX: panX = (gridWidth / 2 - targetX) * scale
-          const initialScale = 6.0 // 600% zoom
-          const panX = (gridWidth / 2 - homeworldSystemCenter.x) * initialScale
-          const panY = (gridHeight / 2 - homeworldSystemCenter.y) * initialScale
-          
-          console.log('[UnifiedUniverseMapV2] Setting initial position:', {
-            homeworldCenter: homeworldSystemCenter,
-            gridWidth,
-            gridHeight,
-            initialScale,
-            calculatedPanX: panX,
-            calculatedPanY: panY
-          })
-          
-          // Use setZoomAndPan to set both together atomically
-          if (zoomPan.setZoomAndPan) {
-            zoomPan.setZoomAndPan(initialScale, panX, panY)
-            
-            // Verify and correct position after setting (with multiple attempts if needed)
-            const verifyAndCorrect = (attempt = 1) => {
-              setTimeout(() => {
-                const bounds = zoomPan.viewportBounds
-                const viewportCenterX = (bounds.minX + bounds.maxX) / 2
-                const viewportCenterY = (bounds.minY + bounds.maxY) / 2
-                const diffX = viewportCenterX - homeworldSystemCenter.x
-                const diffY = viewportCenterY - homeworldSystemCenter.y
-                const distance = Math.sqrt(diffX * diffX + diffY * diffY)
-                
-                console.log('[UnifiedUniverseMapV2] Position verification (attempt', attempt, '):', {
-                  viewportCenter: { x: viewportCenterX, y: viewportCenterY },
-                  targetCenter: homeworldSystemCenter,
-                  difference: { x: diffX, y: diffY },
-                  distance: distance.toFixed(2),
-                  actualPan: { x: zoomPan.panX, y: zoomPan.panY },
-                  calculatedPan: { x: panX, y: panY }
-                })
-                
-                // If significantly off-center (more than 10 units), correct it
-                if (distance > 10 && attempt <= 2) {
-                  console.log('[UnifiedUniverseMapV2] Correcting position, attempt', attempt)
-                  // Recalculate pan based on the difference
-                  // We need to shift the viewport center by -diffX and -diffY
-                  // New pan = current pan - (diff * scale)
-                  const correctedPanX = zoomPan.panX - (diffX * initialScale)
-                  const correctedPanY = zoomPan.panY - (diffY * initialScale)
-                  zoomPan.setPan(correctedPanX, correctedPanY)
-                  
-                  // Try once more if still off
-                  if (attempt < 2) {
-                    verifyAndCorrect(attempt + 1)
-                  }
-                }
-              }, attempt === 1 ? 300 : 200)
-            }
-            
-            verifyAndCorrect()
-          } else {
-            zoomPan.setZoom(initialScale)
-            requestAnimationFrame(() => {
-              zoomPan.setPan(panX, panY)
-            })
-          }
-          
-          hasSetInitialPosition.current = true
-        })
-      })
-    }
-  }, [homeworldSystemCenter, gridWidth, gridHeight, zoomPan, systemsByKey])
+  // Removed auto-centering on homeworld system
+  // User can pan freely without any snapping behavior
 
   // Group systems by galaxy for rendering
   const systemsByGalaxy = useMemo(() => {
