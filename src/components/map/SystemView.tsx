@@ -157,7 +157,7 @@ function SystemView({
           className="star-image"
           style={{ filter: 'drop-shadow(0 0 10px rgba(255, 200, 0, 0.8))' }}
         />
-        {/* System label - show at system level zoom (0.5-3.0), hide at planet level to reduce clutter */}
+        {/* System label - show from galaxy view (0.5) through system view, hide at planet level to reduce clutter */}
         {scale >= 0.5 && scale < 3.0 && (
           <g>
             <text

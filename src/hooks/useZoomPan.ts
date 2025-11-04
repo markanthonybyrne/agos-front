@@ -137,7 +137,9 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
   // Zoom to a specific point (mouse position)
   const zoomToPoint = useCallback((delta: number, centerX: number, centerY: number) => {
     setState(prev => {
-      // Use a smaller, smoother zoom increment for better performance
+      // Use consistent smooth zoom sensitivity across all ranges
+      // The same sensitivity that feels good at 104%+ is used for 5%-103% too
+      // This creates the same immersive, gradual zoom experience throughout
       const zoomFactor = 1 + delta * zoomSensitivity * 0.5
       const newScale = Math.max(minScale, Math.min(maxScale, prev.scale * zoomFactor))
       
@@ -266,10 +268,8 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     
     panUpdateTimeoutRef.current = requestAnimationFrame(() => {
       setState(prev => {
-        // Only update if values actually changed significantly
-        if (Math.abs(prev.panX - targetPan.x) < 0.1 && Math.abs(prev.panY - targetPan.y) < 0.1) {
-          return prev
-        }
+        // Always update pan values for smooth, consistent panning at all zoom levels
+        // RAF throttling provides sufficient performance optimization
         return {
           ...prev,
           panX: targetPan.x,
@@ -318,7 +318,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     handleEnd()
   }, [handleEnd])
 
-  // Wheel zoom handler with aggressive throttling to prevent browser crashes
+  // Wheel zoom handler with adaptive throttling for smooth zoom experience
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (!enableWheelZoom) return
     
@@ -333,17 +333,15 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
       cancelAnimationFrame(wheelTimeoutRef.current)
     }
     
-    // Throttle zoom updates - only process every 2-3 frames to prevent crashes
+    // Use smoother, less throttled zoom for immersive experience
+    // Single RAF for smoother feel, especially in 5%-103% range
     wheelTimeoutRef.current = requestAnimationFrame(() => {
-      // Double RAF for additional throttling
-      requestAnimationFrame(() => {
-        if (pendingZoomRef.current) {
-          const { delta, centerX, centerY } = pendingZoomRef.current
-          zoomToPoint(delta, centerX, centerY)
-          pendingZoomRef.current = null
-        }
-        wheelTimeoutRef.current = null
-      })
+      if (pendingZoomRef.current) {
+        const { delta, centerX, centerY } = pendingZoomRef.current
+        zoomToPoint(delta, centerX, centerY)
+        pendingZoomRef.current = null
+      }
+      wheelTimeoutRef.current = null
     })
   }, [enableWheelZoom, zoomToPoint])
 

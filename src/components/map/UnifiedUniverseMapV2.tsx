@@ -169,12 +169,12 @@ export function UnifiedUniverseMapV2() {
   }, [allPlanets, planetNameLookup])
 
   // Zoom and pan hook
+  // Start at sector level (showing all galaxies across all quadrants)
   // Extended max scale to allow very high zoom (700%) for detailed system viewing
-  // Default view: 207% zoom
   const zoomPan = useZoomPan({
-    minScale: 0.01,  // Universe view
+    minScale: 0.01,  // Sector view - shows all galaxies
     maxScale: 7.0,   // Very high zoom for detailed system/planet viewing (allows 700%)
-    initialScale: 2.07, // Default zoom: 207%
+    initialScale: 0.05, // Start at sector level (5% zoom) - shows all galaxies
     gridWidth: gridWidth,
     gridHeight: gridHeight
   })
@@ -246,15 +246,14 @@ export function UnifiedUniverseMapV2() {
   }, [enrichedPlanets, mapData])
 
   // Determine current zoom level
-  // System view should show at scale >= 0.5, planet detail at scale >= 3.0
+  // Start at sector level (no quadrant view) - shows all galaxies across all quadrants
+  // Extended sector view to show galaxies at more zoom levels with better spacing
   const zoomLevel = useMemo(() => {
     const scale = zoomPan.scale
-    if (scale < 0.01) return 'universe'
-    if (scale < 0.05) return 'quadrant'
-    if (scale < 0.1) return 'sector'
-    if (scale < 0.5) return 'galaxy'
-    if (scale < 3.0) return 'system'  // Extended system view range
-    return 'planet'  // Very high zoom for individual planet detail
+    if (scale < 0.5) return 'sector'  // Sector view - shows galaxies with more zoom room (1%-50%)
+    if (scale < 0.8) return 'galaxy'  // Galaxy view - shows systems with stars (50%-80%)
+    if (scale < 3.0) return 'system'  // System view - shows full system details (80%-300%)
+    return 'planet'  // Very high zoom for individual planet detail (300%+)
   }, [zoomPan.scale])
 
   // Filter entities visible in viewport with smart limiting for performance
@@ -292,7 +291,7 @@ export function UnifiedUniverseMapV2() {
     
     // Calculate minimum distance between systems based on zoom level
     // At higher zoom, systems need more space to avoid visual overlap
-    // This creates a smooth scale from 0% to 700%+
+    // Increased spacing in sector view to reduce clustering
     const minSystemDistance = scale >= 7.0 ? 200  // Very high zoom: large spacing (single system)
       : scale > 5.6 ? 150                         // 560% zoom: large spacing for 2-3 systems
       : scale > 4.48 ? 100                        // 448% zoom: medium-large spacing
@@ -300,12 +299,15 @@ export function UnifiedUniverseMapV2() {
       : scale > 3.0 ? 60                          // 300% zoom: medium spacing
       : scale > 2.5 ? 50                          // 250% zoom: smaller spacing
       : scale > 1.5 ? 40                          // 150% zoom: smaller spacing
-      : scale > 0.5 ? 30                          // 50% zoom: small spacing
-      : scale > 0.1 ? 20                          // 10% zoom: very small spacing
-      : 10                                         // Very low zoom: minimal spacing
+      : scale > 0.8 ? 35                          // 80% zoom: medium spacing
+      : scale > 0.5 ? 40                          // 50% zoom: increased spacing for sector view
+      : scale > 0.3 ? 35                          // 30% zoom: good spacing
+      : scale > 0.15 ? 30                         // 15% zoom: moderate spacing
+      : scale > 0.1 ? 25                          // 10% zoom: better spacing
+      : 20                                         // Very low zoom: increased spacing to reduce clustering
     
     // Maximum number of systems to show at each zoom level
-    // Creates smooth progression from many systems at low zoom to few at high zoom
+    // Reduced counts in sector view to reduce clustering and improve spacing
     const maxSystems = scale >= 7.0 ? 1     // 700%+: 1 system (detailed planet view)
       : scale > 5.6 ? 2                      // 560%: 2 systems (still very detailed)
       : scale > 4.48 ? 4                     // 448%: 4 systems (detailed but more visible)
@@ -313,9 +315,12 @@ export function UnifiedUniverseMapV2() {
       : scale > 3.0 ? 10                     // 300%: 10 systems
       : scale > 2.5 ? 15                     // 250%: 15 systems
       : scale > 1.5 ? 25                     // 150%: 25 systems
-      : scale > 0.5 ? 50                     // 50%: 50 systems
-      : scale > 0.1 ? 100                    // 10%: 100 systems
-      : 150                                  // Very low: 150 systems
+      : scale > 0.8 ? 40                     // 80%: 40 systems
+      : scale > 0.5 ? 60                     // 50%: 60 systems (reduced from unlimited)
+      : scale > 0.3 ? 80                     // 30%: 80 systems
+      : scale > 0.15 ? 100                    // 15%: 100 systems
+      : scale > 0.1 ? 120                    // 10%: 120 systems (reduced from 150)
+      : 100                                  // Very low: 100 systems (reduced to reduce clustering)
     
     // If we have fewer systems than max, return them all
     if (allInViewport.length <= maxSystems) {
@@ -504,11 +509,11 @@ export function UnifiedUniverseMapV2() {
   
   // Calculate dynamic viewBox based on actual container dimensions to ensure content always fills viewport
   // MUST be before early return to maintain hook order
-  // Round pan values aggressively to reduce update frequency and improve performance
-  // Round to nearest 5 pixels to batch updates and reduce re-renders
-  const roundedPanX = Math.round(zoomPan.panX / 5) * 5
-  const roundedPanY = Math.round(zoomPan.panY / 5) * 5
-  const roundedScale = Math.round(zoomPan.scale * 100) / 100
+  // Use minimal rounding for smooth panning at all zoom levels (like 140% zoom feels)
+  // Only round scale slightly to reduce micro-updates, keep pan values precise
+  const roundedPanX = zoomPan.panX  // No rounding for smooth panning
+  const roundedPanY = zoomPan.panY  // No rounding for smooth panning
+  const roundedScale = Math.round(zoomPan.scale * 1000) / 1000  // Fine-grained rounding for scale only
   
   const dynamicViewBox = useMemo(() => {
     if (containerSize.width === 0 || containerSize.height === 0) {
@@ -677,6 +682,7 @@ export function UnifiedUniverseMapV2() {
           />
 
           {/* Navigation overlays */}
+          {/* Quadrant overlay still available for navigation, but zooms to sector level */}
           <QuadrantOverlay
             gridWidth={gridWidth}
             gridHeight={gridHeight}
@@ -687,6 +693,7 @@ export function UnifiedUniverseMapV2() {
               const centerX = (range.x_min + range.x_max) / 2
               const centerY = (range.y_min + range.y_max) / 2
               const screen = zoomPan.gridToScreen(centerX, centerY)
+              // Zoom to sector level (0.05) to show all galaxies in quadrant
               zoomPan.setZoom(0.05, screen.x, screen.y)
             }}
           />
@@ -705,14 +712,20 @@ export function UnifiedUniverseMapV2() {
           />
 
           {/* Render based on zoom level */}
-          {/* Sector level - show systems as galaxy images */}
+          {/* Sector level - show systems as galaxy images (extended range) */}
           {zoomLevel === 'sector' && (
             <g className="systems-layer" style={{ pointerEvents: 'all' }}>
               {visibleSystems.map(system => {
                 // Get a deterministic random galaxy type based on system coordinates
                 const galaxyType = getRandomGalaxyTypeForSystem(system.key)
                 const galaxyImage = getGalaxyImage(galaxyType)
-                const imageSize = 40 // Size in grid coordinates
+                // Scale image size based on zoom level for better visibility and spacing
+                // Larger images at higher zoom to reduce clustering and improve visibility
+                const baseImageSize = 40
+                const imageSize = zoomPan.scale < 0.1 ? baseImageSize 
+                  : zoomPan.scale < 0.2 ? Math.min(baseImageSize * 1.3, 52)
+                  : zoomPan.scale < 0.3 ? Math.min(baseImageSize * 1.5, 60)
+                  : Math.min(baseImageSize * 1.8, 72)  // Even larger as you zoom in more
                 
                 return (
                   <g key={system.key}>
@@ -726,8 +739,8 @@ export function UnifiedUniverseMapV2() {
                       onClick={() => handleSystemClick(system)}
                       style={{ pointerEvents: 'all' }}
                     />
-                    {/* Show galaxy name when zoomed in enough */}
-                    {zoomPan.scale > 0.08 && (() => {
+                    {/* Show galaxy name - visible from 0.02 scale onwards in sector view */}
+                    {zoomPan.scale >= 0.02 && (() => {
                       const galaxyKey = `${system.quadrant}:${system.sector}:${system.galaxy}`
                       const galaxyName = galaxyNames.get(galaxyKey)
                       return galaxyName && galaxyName.trim() ? (
@@ -737,7 +750,7 @@ export function UnifiedUniverseMapV2() {
                           textAnchor="middle"
                           className="fill-cyan-300 font-mono font-semibold pointer-events-none"
                           style={{ 
-                            fontSize: '11px',
+                            fontSize: `${Math.max(10, Math.min(14, zoomPan.scale * 120))}px`,
                             textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                           }}
                         >
@@ -746,7 +759,7 @@ export function UnifiedUniverseMapV2() {
                       ) : null
                     })()}
                     {/* Show system identifier below galaxy name (only if no galaxy name shown) */}
-                    {zoomPan.scale > 0.06 && !(zoomPan.scale > 0.08 && galaxyNames.get(`${system.quadrant}:${system.sector}:${system.galaxy}`)?.trim()) && (
+                    {zoomPan.scale >= 0.02 && !(galaxyNames.get(`${system.quadrant}:${system.sector}:${system.galaxy}`)?.trim()) && (
                       <text
                         x={system.center.x}
                         y={system.center.y + imageSize / 2 + 12}

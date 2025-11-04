@@ -147,24 +147,28 @@ export function hierarchicalToXy(
   const g = Math.max(1, Math.min(10, galaxy))
   const p = Math.max(1, Math.min(15, planet))
 
-  // Calculate base X from quadrant and sector
-  const quadrantBaseX = (q - 1) * QUADRANT_WIDTH
-  const sectorBaseX = (s - 1) * SECTOR_WIDTH
-  const baseX = quadrantBaseX + sectorBaseX
-
-  // Galaxy X component (0-9, representing position within sector width)
-  const galaxyXComponent = (g - 1) % 10
-  const galaxyXOffset = galaxyXComponent * (SECTOR_WIDTH / 10)
-
-  // Galaxy Y component (0-9, representing position within quadrant height)
-  const galaxyYComponent = Math.floor((g - 1) / 10)
-  const galaxyYOffset = galaxyYComponent * (QUADRANT_HEIGHT / 10)
-
-  // Approximate X position: base + galaxy offset + small planet-based offset
-  const x = baseX + galaxyXOffset + (p % 5) * 0.5
-
-  // Approximate Y position: galaxy Y offset + planet-based offset
-  const y = galaxyYOffset + (p * 2)
+  // Use the same logic as getGalaxyXyRange for consistency
+  // This ensures planets are positioned correctly within their sectors
+  const galaxyRange = getGalaxyXyRange(q, s, g)
+  
+  // Calculate galaxy center
+  const galaxyCenterX = (galaxyRange.x_min + galaxyRange.x_max) / 2
+  const galaxyCenterY = (galaxyRange.y_min + galaxyRange.y_max) / 2
+  
+  // Get system range if system is available (for 5-level hierarchy)
+  // For now, distribute planets within galaxy range
+  const galaxyWidth = galaxyRange.x_max - galaxyRange.x_min
+  const galaxyHeight = galaxyRange.y_max - galaxyRange.y_min
+  
+  // Distribute planets within the galaxy area
+  // Use planet number to create a deterministic but spread out pattern
+  const planetsPerRow = 5
+  const planetXOffset = ((p - 1) % planetsPerRow) * (galaxyWidth / planetsPerRow)
+  const planetYOffset = Math.floor((p - 1) / planetsPerRow) * (galaxyHeight / Math.ceil(15 / planetsPerRow))
+  
+  // Final position: galaxy center + planet offset
+  const x = galaxyCenterX + planetXOffset - (galaxyWidth / 2) + (galaxyWidth / planetsPerRow / 2)
+  const y = galaxyCenterY + planetYOffset - (galaxyHeight / 2) + (galaxyHeight / Math.ceil(15 / planetsPerRow) / 2)
 
   return {
     x: Math.max(0, Math.min(GRID_WIDTH - 1, Math.floor(x))),

@@ -1,6 +1,6 @@
 import { Coordinate } from '@/types/game.types'
 import { Planet } from '@/types/api.types'
-import { hierarchicalToXy, calculateEuclideanDistance as calculateEuclideanDistanceUtil } from './coordinateUtils'
+import { hierarchicalToXy, calculateEuclideanDistance as calculateEuclideanDistanceUtil, getSystemXyRange } from './coordinateUtils'
 
 // Coordinate parsing and formatting
 export function parseCoordinate(coordinate: string | Coordinate): Coordinate | null {
@@ -55,15 +55,48 @@ export function getPlanetXY(planet: Planet): { x: number; y: number } | null {
     }
 
     // Fallback: convert hierarchical to approximate X/Y
+    // Use system if available (5-level hierarchy), otherwise use planet position
     if (coord.quadrant && coord.sector && coord.galaxy && coord.planet) {
-      return hierarchicalToXy(coord.quadrant, coord.sector, coord.galaxy, coord.planet)
+      if (coord.system) {
+        // For 5-level hierarchy, use system center as base position
+        const systemRange = getSystemXyRange(coord.quadrant, coord.sector, coord.galaxy, coord.system)
+        const systemCenterX = (systemRange.x_min + systemRange.x_max) / 2
+        const systemCenterY = (systemRange.y_min + systemRange.y_max) / 2
+        // Distribute planets within system
+        const systemWidth = systemRange.x_max - systemRange.x_min
+        const systemHeight = systemRange.y_max - systemRange.y_min
+        const planetOffsetX = ((coord.planet - 1) % 5) * (systemWidth / 5)
+        const planetOffsetY = Math.floor((coord.planet - 1) / 5) * (systemHeight / Math.ceil(15 / 5))
+        return {
+          x: Math.max(0, Math.min(2000, Math.floor(systemCenterX + planetOffsetX - systemWidth/2 + systemWidth/10))),
+          y: Math.max(0, Math.min(1000, Math.floor(systemCenterY + planetOffsetY - systemHeight/2 + systemHeight/6)))
+        }
+      } else {
+        return hierarchicalToXy(coord.quadrant, coord.sector, coord.galaxy, coord.planet)
+      }
     }
   }
 
   // Try parsing string coordinate
   const parsed = parseCoordinate(planet.coordinate)
   if (parsed && parsed.quadrant && parsed.sector && parsed.galaxy && parsed.planet) {
-    return hierarchicalToXy(parsed.quadrant, parsed.sector, parsed.galaxy, parsed.planet)
+    if (parsed.system) {
+      // For 5-level hierarchy, use system center as base position
+      const systemRange = getSystemXyRange(parsed.quadrant, parsed.sector, parsed.galaxy, parsed.system)
+      const systemCenterX = (systemRange.x_min + systemRange.x_max) / 2
+      const systemCenterY = (systemRange.y_min + systemRange.y_max) / 2
+      // Distribute planets within system
+      const systemWidth = systemRange.x_max - systemRange.x_min
+      const systemHeight = systemRange.y_max - systemRange.y_min
+      const planetOffsetX = ((parsed.planet - 1) % 5) * (systemWidth / 5)
+      const planetOffsetY = Math.floor((parsed.planet - 1) / 5) * (systemHeight / Math.ceil(15 / 5))
+      return {
+        x: Math.max(0, Math.min(2000, Math.floor(systemCenterX + planetOffsetX - systemWidth/2 + systemWidth/10))),
+        y: Math.max(0, Math.min(1000, Math.floor(systemCenterY + planetOffsetY - systemHeight/2 + systemHeight/6)))
+      }
+    } else {
+      return hierarchicalToXy(parsed.quadrant, parsed.sector, parsed.galaxy, parsed.planet)
+    }
   }
   
   return null

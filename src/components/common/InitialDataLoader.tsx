@@ -8,6 +8,8 @@ import {
   addPlanets,
 } from '@/app/slices/planetsSlice'
 import { Planet } from '@/types/api.types'
+import { store } from '@/app/store'
+import { universeApi } from '@/api/endpoints/universeApi'
 
 interface InitialDataLoaderProps {
   onComplete: () => void
@@ -437,13 +439,25 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
             }
           }
 
-          // Phase 3: Processing
+          // Phase 3: Start prefetching map data in background (optional, doesn't block completion)
+          // This is a large response that takes time, so we prefetch it but don't wait
           dispatch(setLoadingPhase('processing'))
-          dispatch(setLoadingProgress(95))
+          dispatch(setLoadingProgress(90))
+          
+          // Prefetch map data using RTK Query (fire and forget)
+          // This will cache the result so useGetMapQuery can use it immediately
+          store.dispatch(
+            universeApi.endpoints.getMap.initiate({}, { forceRefetch: false })
+          ).catch(() => {
+            // Silently handle errors - map data is optional
+            console.warn('[InitialDataLoader] Map data prefetch failed (non-blocking)')
+          })
+          
+          console.log('[InitialDataLoader] Started map data prefetch in background')
 
           // Phase 4: Complete - ensure we have all planets before completing
           dispatch(setAllPlanets(allPlanets))
-          dispatch(setLoadingProgress(100))
+          dispatch(setLoadingProgress(95))
           dispatch(setLoadingPhase('complete'))
 
           // Small delay before completing
