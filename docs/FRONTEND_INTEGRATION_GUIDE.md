@@ -8,8 +8,8 @@ This guide provides comprehensive instructions for frontend developers on how to
 
 ### API Endpoints
 
--   **Production**: `https://api.agameof.space/v1`
--   **Staging**: `https://staging.api.agameof.space/v1`
+-   **Production**: `https://api.astralus.online/api/v1`
+-   **Staging**: `https://staging-api.astralus.online/api/v1`
 -   **Local Development**: `http://localhost:8000/api/v1` (or `https://empirequest.lndo.site/api/v1` for Lando)
 
 ### Authentication

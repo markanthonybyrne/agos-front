@@ -1424,8 +1424,8 @@ async function retryOperation(operation, maxRetries = 3) {
 ### API Base URL
 
 -   **Development**: `http://localhost:8000/api/v1`
--   **Staging**: `https://api.agameof.space/api/v1`
--   **Production**: `https://api.agameof.space/api/v1`
+-   **Staging**: `https://staging-api.astralus.online/api/v1`
+-   **Production**: `https://api.astralus.online/api/v1`
 
 ### Rate Limiting
 

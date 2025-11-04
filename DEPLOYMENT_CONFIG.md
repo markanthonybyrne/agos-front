@@ -6,8 +6,8 @@ This document describes the deployment configuration for staging and production 
 
 ## Environment URLs
 
-- **Staging API**: `https://api-staging.agameof.space/api/v1/`
-- **Production API**: `https://api.agameof.space/api/v1/`
+- **Staging API**: `https://staging-api.astralus.online/api/v1/`
+- **Production API**: `https://api.astralus.online/api/v1/`
 
 ## Environment Files
 
@@ -16,7 +16,7 @@ This document describes the deployment configuration for staging and production 
 Create this file in the project root for staging deployments:
 
 ```env
-VITE_API_URL=https://api-staging.agameof.space/api/v1/
+VITE_API_URL=https://staging-api.astralus.online/api/v1/
 VITE_PUSHER_KEY=33d7245f0190d9d32296
 VITE_PUSHER_CLUSTER=eu
 VITE_USE_PUSHER=true
@@ -27,7 +27,7 @@ VITE_USE_PUSHER=true
 Create this file in the project root for production deployments:
 
 ```env
-VITE_API_URL=https://api.agameof.space/api/v1/
+VITE_API_URL=https://api.astralus.online/api/v1/
 VITE_PUSHER_KEY=33d7245f0190d9d32296
 VITE_PUSHER_CLUSTER=eu
 VITE_USE_PUSHER=true

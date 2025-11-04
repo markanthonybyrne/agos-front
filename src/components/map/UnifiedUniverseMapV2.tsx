@@ -51,8 +51,12 @@ export function UnifiedUniverseMapV2() {
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
   // Support both old format (single grid_size) and new format (grid_width/grid_height)
   // If API returns single number, assume square; otherwise use separate width/height
-  const gridWidth = configData?.grid_width || (typeof configData?.grid_size === 'object' ? configData.grid_size.width : null) || (configData?.grid_size || DEFAULT_GRID_WIDTH)
-  const gridHeight = configData?.grid_height || (typeof configData?.grid_size === 'object' ? configData.grid_size.height : null) || (configData?.grid_size || DEFAULT_GRID_HEIGHT)
+  const gridWidth = configData?.grid_width 
+    || (typeof configData?.grid_size === 'object' && configData.grid_size !== null ? configData.grid_size.width : null) 
+    || (typeof configData?.grid_size === 'number' ? configData.grid_size : DEFAULT_GRID_WIDTH)
+  const gridHeight = configData?.grid_height 
+    || (typeof configData?.grid_size === 'object' && configData.grid_size !== null ? configData.grid_size.height : null) 
+    || (typeof configData?.grid_size === 'number' ? configData.grid_size : DEFAULT_GRID_HEIGHT)
   const maxPlanets = configData?.capacities?.max_planets || 24000
 
   // Use global planets from Redux store (loaded on login)

@@ -46,7 +46,7 @@ function getWebSocketConfig() {
     // For WSS, we typically don't need a port (uses 443) or can use 443 explicitly
     // Reverb WebSocket connection
     return {
-      host: host, // Use same hostname as API (e.g., api.agameof.space)
+      host: host, // Use same hostname as API (e.g., api.astralus.online)
       port: wsPort ? parseInt(wsPort) : (isHttps ? 443 : 8080), // Use 443 for WSS, 8080 for WS
       forceTLS: isHttps,
     }

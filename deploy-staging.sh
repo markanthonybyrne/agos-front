@@ -18,7 +18,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-SERVER_HOST="159.65.16.122"
+SERVER_HOST="144.126.199.15"
 SERVER_USER="root"
 DEPLOY_PATH="/var/www/agos-app/current/dist"
 BUILD_DIR="dist"
@@ -49,7 +49,7 @@ if [ ! -f ".env.staging" ]; then
     echo -e "${RED}❌ Error: .env.staging file not found!${NC}"
     echo -e "${YELLOW}Please create .env.staging with staging configuration:${NC}"
     echo ""
-    echo "VITE_API_URL=https://api-staging.agameof.space/api/v1/"
+    echo "VITE_API_URL=https://staging-api.astralus.online/api/v1/"
     echo "VITE_PUSHER_KEY=33d7245f0190d9d32296"
     echo "VITE_PUSHER_CLUSTER=eu"
     echo "VITE_USE_PUSHER=true"

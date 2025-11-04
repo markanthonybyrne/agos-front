@@ -10,6 +10,7 @@ import { InitialDataLoader } from '@/components/common/InitialDataLoader'
 import { useAchievementNotifications } from '@/hooks/useAchievementNotifications'
 import { useGlobalTickData } from '@/hooks/useGlobalTickData'
 import { useTutorialDetection } from '@/hooks/useTutorialDetection'
+import { useMapDataRefresh } from '@/hooks/useMapDataRefresh'
 import { TutorialManager } from '@/components/tutorial/TutorialManager'
 import { AdminGuard } from '@/features/admin/components/AdminGuard'
 import { LandingGuard } from '@/components/common/LandingGuard'
@@ -57,6 +58,9 @@ function AppContent() {
   
   // Detect and trigger tutorial for first-time users
   useTutorialDetection()
+  
+  // Refresh map data on tick events
+  useMapDataRefresh()
 
   return (
     <>

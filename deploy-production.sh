@@ -49,7 +49,7 @@ if [ ! -f ".env.production" ]; then
     echo -e "${RED}❌ Error: .env.production file not found!${NC}"
     echo -e "${YELLOW}Please create .env.production with production configuration:${NC}"
     echo ""
-    echo "VITE_API_URL=https://api.agameof.space/api/v1/"
+    echo "VITE_API_URL=https://api.astralus.online/api/v1/"
     echo "VITE_PUSHER_KEY=33d7245f0190d9d32296"
     echo "VITE_PUSHER_CLUSTER=eu"
     echo "VITE_USE_PUSHER=true"

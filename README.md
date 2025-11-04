@@ -40,7 +40,7 @@ VITE_WS_KEY=o714i1l2lrdflpgv7mwg
 **For staging (using Pusher):**
 
 ```env
-VITE_API_URL=https://api-staging.agameof.space/api/v1/
+VITE_API_URL=https://staging-api.astralus.online/api/v1/
 VITE_PUSHER_KEY=33d7245f0190d9d32296
 VITE_PUSHER_CLUSTER=eu
 VITE_USE_PUSHER=true
@@ -51,7 +51,7 @@ VITE_USE_PUSHER=true
 **For production (using Pusher):**
 
 ```env
-VITE_API_URL=https://api.agameof.space/api/v1/
+VITE_API_URL=https://api.astralus.online/api/v1/
 VITE_PUSHER_KEY=33d7245f0190d9d32296
 VITE_PUSHER_CLUSTER=eu
 VITE_USE_PUSHER=true
@@ -71,7 +71,7 @@ VITE_USE_PUSHER=true
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000` and will connect to the staging API (`https://api-staging.agameof.space/api/v1/`) by default.
+The app will be available at `http://localhost:3000` and will connect to the staging API (`https://staging-api.astralus.online/api/v1/`) by default.
 
 For local development with a local API:
 
@@ -144,7 +144,7 @@ This script will:
 - SSH key configured for passwordless login (recommended)
 - `.env.production` file with production configuration:
   ```env
-  VITE_API_URL=https://api.agameof.space/api/v1/
+  VITE_API_URL=https://api.astralus.online/api/v1/
   VITE_PUSHER_KEY=33d7245f0190d9d32296
   VITE_PUSHER_CLUSTER=eu
   VITE_USE_PUSHER=true
@@ -181,7 +181,7 @@ This script will:
 - SSH key configured for passwordless login (recommended)
 - `.env.staging` file with staging configuration:
   ```env
-  VITE_API_URL=https://api-staging.agameof.space/api/v1/
+  VITE_API_URL=https://staging-api.astralus.online/api/v1/
   VITE_PUSHER_KEY=33d7245f0190d9d32296
   VITE_PUSHER_CLUSTER=eu
   VITE_USE_PUSHER=true

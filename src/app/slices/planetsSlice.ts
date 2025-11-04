@@ -92,6 +92,31 @@ const planetsSlice = createSlice({
       )
       state.allPlanets = [...state.allPlanets, ...newPlanets]
     },
+    updatePlanets: (state, action: PayloadAction<Planet[]>) => {
+      // Update existing planets and add new ones
+      const updatedPlanets = new Map<number, Planet>()
+      
+      // Keep existing planets
+      state.allPlanets.forEach(planet => {
+        updatedPlanets.set(planet.id, planet)
+      })
+      
+      // Update or add new planets
+      action.payload.forEach(planet => {
+        updatedPlanets.set(planet.id, planet)
+      })
+      
+      state.allPlanets = Array.from(updatedPlanets.values())
+      state.lastLoadedAt = Date.now()
+      
+      // Update cache
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(state.allPlanets))
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+      } catch (error) {
+        console.error('Error caching planets:', error)
+      }
+    },
     clearPlanets: (state) => {
       state.allPlanets = []
       state.isLoaded = false
@@ -124,6 +149,7 @@ export const {
   setLoadingProgress,
   setAllPlanets,
   addPlanets,
+  updatePlanets,
   clearPlanets,
 } = planetsSlice.actions
 

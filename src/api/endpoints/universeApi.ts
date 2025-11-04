@@ -99,7 +99,9 @@ export const universeApi = apiSlice.injectEndpoints({
       providesTags: ['Universe'],
     }),
     getUniverseConfig: builder.query<{
-      grid_size: number
+      grid_size?: number | { width: number; height: number }
+      grid_width?: number
+      grid_height?: number
       universe_structure: {
         quadrant_count: number
         sectors_per_quadrant: number

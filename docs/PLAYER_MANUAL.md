@@ -677,7 +677,7 @@ EmpireQuest uses WebSocket technology for instant updates:
 Connect to WebSocket server at:
 
 -   **Development**: `ws://localhost:8080`
--   **Production**: `wss://api.agameof.space/reverb`
+-   **Production**: `wss://api.astralus.online/reverb`
 
 Subscribe to channels based on your empire and alliance membership.
 

@@ -340,7 +340,7 @@ const echo = new Echo({
     key: "33d7245f0190d9d32296",
     cluster: "eu",
     forceTLS: true,
-    authEndpoint: "https://api.agameof.space/broadcasting/auth",
+    authEndpoint: "https://api.astralus.online/broadcasting/auth",
     auth: {
         headers: {
             Authorization: `Bearer ${token}`,

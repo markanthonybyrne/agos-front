@@ -66,6 +66,8 @@ const authSlice = createSlice({
       // Clear global planets cache
       localStorage.removeItem('global_planets_cache')
       localStorage.removeItem('global_planets_cache_timestamp')
+      // Clear session flag so map data loads on next login
+      sessionStorage.removeItem('planets_session_loaded')
     },
     updateEmpire: (state, action: PayloadAction<Empire>) => {
       state.empire = action.payload
