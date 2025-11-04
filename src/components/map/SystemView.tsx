@@ -51,17 +51,24 @@ function SystemView({
   }, [system.planets, system.center])
   
   // Get unique orbit radii for drawing orbit lines
+  // At high zoom levels, reduce orbit line density to prevent visual clutter
   const uniqueOrbitRadii = useMemo(() => {
     const radii = new Set<number>()
+    // Adjust grouping threshold based on zoom level - larger threshold at high zoom
+    const groupingThreshold = scale >= 7.0 ? 20  // Very high zoom: group every 20 units
+      : scale >= 5.0 ? 15                         // High zoom: group every 15 units
+      : scale >= 3.0 ? 10                         // Medium-high: group every 10 units
+      : 5                                          // Normal: group every 5 units
+    
     planetOrbits.forEach(orbit => {
-      // Round to nearest 5 to group similar orbits
-      const roundedRadius = Math.round(orbit.radius / 5) * 5
+      // Round to nearest threshold to group similar orbits
+      const roundedRadius = Math.round(orbit.radius / groupingThreshold) * groupingThreshold
       if (roundedRadius > 0) {
         radii.add(roundedRadius)
       }
     })
     return Array.from(radii).sort((a, b) => a - b)
-  }, [planetOrbits])
+  }, [planetOrbits, scale])
   
   // Determine star size based on zoom scale - use logarithmic scaling for smoother growth
   // Like Google Earth: elements grow gradually, not linearly
@@ -76,9 +83,10 @@ function SystemView({
     : Math.max(12, Math.min(35, logScale * 10)) // Standard scaling below 400%
   
   // Determine planet size based on zoom scale - logarithmic scaling
+  // At very high zoom (700%+), reduce planet size slightly to reduce visual clutter
   const basePlanetSize = scale < 0.5
     ? Math.max(6, Math.min(12, logScale * 6))
-    : scale >= 7.0 ? 50  // Much larger at 700% zoom
+    : scale >= 7.0 ? 35  // Slightly smaller at 700% to reduce clutter
     : scale >= 6.0 ? 40  // Large at 600% zoom
     : scale >= 5.0 ? 32  // Larger at 500% zoom
     : scale >= 4.0 ? 28  // Increased at 400% zoom
@@ -88,13 +96,22 @@ function SystemView({
     <g className={cn('system-view', className)}>
       {/* Orbit lines - dashed circles around central star */}
       {/* Show orbit lines at system level zoom (scale >= 1.57, which is 157%) */}
+      {/* At very high zoom (700%+), reduce orbit line opacity and thickness to reduce clutter */}
       {scale >= 1.57 && uniqueOrbitRadii.map((radius, index) => {
-        // Increase orbit line stroke width at high zoom levels
-        const orbitStrokeWidth = scale >= 7.0 ? 4
-          : scale >= 6.0 ? 3.5
-          : scale >= 5.0 ? 3
+        // Reduce orbit line stroke width at very high zoom to prevent visual clutter
+        const orbitStrokeWidth = scale >= 7.0 ? 1.5  // Thinner at 700%+
+          : scale >= 6.0 ? 2
+          : scale >= 5.0 ? 2.5
           : scale >= 4.0 ? 2.5
           : 1.5
+        
+        // Reduce opacity at very high zoom levels
+        const orbitOpacity = scale >= 7.0 ? 0.25  // Very transparent at 700%+
+          : scale >= 6.0 ? 0.35
+          : scale >= 5.0 ? 0.4
+          : scale >= 4.0 ? 0.45
+          : 0.6
+        
         return (
           <circle
             key={`orbit-${system.key}-${radius}-${index}`}
@@ -104,9 +121,9 @@ function SystemView({
             fill="none"
             stroke="rgba(100, 200, 255, 0.5)"
             strokeWidth={orbitStrokeWidth}
-            strokeDasharray="4,4"
+            strokeDasharray={scale >= 7.0 ? "8,8" : "4,4"}  // Longer dashes at high zoom
             className="orbit-line"
-            style={{ opacity: 0.6 }}
+            style={{ opacity: orbitOpacity }}
           />
         )
       })}
@@ -223,7 +240,8 @@ function SystemView({
               </>
             )}
             {/* Planet label - only show at planet level zoom (scale >= 3.0) */}
-            {scale >= 3.0 && (
+            {/* At very high zoom (700%+), only show labels on hover to reduce clutter */}
+            {(scale >= 3.0 && scale < 7.0) && (
               <g>
                 <text
                   x={planetXY.x}
@@ -231,7 +249,7 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-white font-mono font-semibold"
                   style={{ 
-                    fontSize: `${scale >= 7.0 ? '2.5px' : scale >= 6.0 ? '3px' : scale >= 5.0 ? '3.5px' : scale >= 4.0 ? '4px' : Math.max(6, Math.min(8, logScale * 2))}px`, // Much smaller text at 400%+ zoom
+                    fontSize: `${scale >= 6.0 ? '8px' : scale >= 5.0 ? '9px' : scale >= 4.0 ? '10px' : Math.max(6, Math.min(8, logScale * 2))}px`,
                     textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
@@ -243,8 +261,37 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-gray-300 font-mono"
                   style={{ 
-                    fontSize: `${scale >= 7.0 ? '2px' : scale >= 6.0 ? '2.5px' : scale >= 5.0 ? '3px' : scale >= 4.0 ? '3.5px' : Math.max(5, Math.min(7, logScale * 1.5))}px`, // Much smaller text at 400%+ zoom
+                    fontSize: `${scale >= 6.0 ? '7px' : scale >= 5.0 ? '8px' : scale >= 4.0 ? '9px' : Math.max(5, Math.min(7, logScale * 1.5))}px`,
                     textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  {formatCoordinate(planet.coordinate)}
+                </text>
+              </g>
+            )}
+            {/* At 700%+ zoom, only show labels on hover to prevent clutter */}
+            {scale >= 7.0 && isHovered && (
+              <g>
+                <text
+                  x={planetXY.x}
+                  y={planetXY.y + planetSize / 2 + 14}
+                  textAnchor="middle"
+                  className="fill-white font-mono font-semibold"
+                  style={{ 
+                    fontSize: '10px',
+                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  Planet {formatCoordinate(planet.coordinate)}
+                </text>
+                <text
+                  x={planetXY.x}
+                  y={planetXY.y + planetSize / 2 + 24}
+                  textAnchor="middle"
+                  className="fill-gray-300 font-mono"
+                  style={{ 
+                    fontSize: '9px',
+                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
                   {formatCoordinate(planet.coordinate)}
@@ -270,10 +317,12 @@ function SystemView({
 // Memoize SystemView to prevent unnecessary re-renders during zoom
 export const SystemViewMemo = memo(SystemView, (prevProps, nextProps) => {
   // Only re-render if scale changes significantly or system data changes
+  // More aggressive memoization to reduce re-renders during panning
   return (
     prevProps.system.key === nextProps.system.key &&
-    Math.abs(prevProps.scale - nextProps.scale) < 0.1 && // Only re-render if scale changes by >10%
-    prevProps.hoveredPlanet?.id === nextProps.hoveredPlanet?.id
+    Math.abs(prevProps.scale - nextProps.scale) < 0.2 && // Only re-render if scale changes by >20%
+    prevProps.hoveredPlanet?.id === nextProps.hoveredPlanet?.id &&
+    prevProps.system.planets.length === nextProps.system.planets.length // Check if planets changed
   )
 })
 

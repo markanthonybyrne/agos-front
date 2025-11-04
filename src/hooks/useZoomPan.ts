@@ -90,6 +90,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
   const lastPanRef = useRef({ x: 0, y: 0 })
   const wheelTimeoutRef = useRef<number | null>(null)
   const pendingZoomRef = useRef<{ delta: number; centerX: number; centerY: number } | null>(null)
+  const panUpdateTimeoutRef = useRef<number | null>(null)
 
   // Get container dimensions
   const getContainerDimensions = useCallback(() => {
@@ -240,7 +241,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     dragStartRef.current = { x: clientX, y: clientY }
     lastPanRef.current = { x: state.panX, y: state.panY }
   }, [state.panX, state.panY])
-
+  
   const handleMove = useCallback((clientX: number, clientY: number) => {
     if (!isDraggingRef.current) return
 
@@ -254,17 +255,28 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
 
     const clamped = clampPan(newPanX, newPanY, state.scale)
 
-    // Use functional update to ensure we're using latest state
-    setState(prev => {
-      // Only update if values actually changed to prevent unnecessary re-renders
-      if (prev.panX === clamped.x && prev.panY === clamped.y) {
-        return prev
-      }
-      return {
-        ...prev,
-        panX: clamped.x,
-        panY: clamped.y
-      }
+    // Use requestAnimationFrame to throttle updates to 60fps for smooth panning
+    // This prevents lag by batching updates at the optimal frame rate
+    if (panUpdateTimeoutRef.current !== null) {
+      cancelAnimationFrame(panUpdateTimeoutRef.current)
+    }
+
+    // Store the clamped values for the next frame
+    const targetPan = { x: clamped.x, y: clamped.y }
+    
+    panUpdateTimeoutRef.current = requestAnimationFrame(() => {
+      setState(prev => {
+        // Only update if values actually changed significantly
+        if (Math.abs(prev.panX - targetPan.x) < 0.1 && Math.abs(prev.panY - targetPan.y) < 0.1) {
+          return prev
+        }
+        return {
+          ...prev,
+          panX: targetPan.x,
+          panY: targetPan.y
+        }
+      })
+      panUpdateTimeoutRef.current = null
     })
   }, [state.scale, clampPan])
 
@@ -356,11 +368,14 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     }
   }, [handleMove, handleEnd])
 
-  // Cleanup animation frame on unmount
+  // Cleanup animation frames on unmount
   useEffect(() => {
     return () => {
       if (wheelTimeoutRef.current !== null) {
         cancelAnimationFrame(wheelTimeoutRef.current)
+      }
+      if (panUpdateTimeoutRef.current !== null) {
+        cancelAnimationFrame(panUpdateTimeoutRef.current)
       }
     }
   }, [])

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   setLoading,
@@ -15,39 +15,54 @@ interface InitialDataLoaderProps {
 
 export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
   const dispatch = useAppDispatch()
-  const { allPlanets, isLoading, loadingProgress, loadingPhase, isLoaded } = useAppSelector(
+  const { allPlanets, isLoading, loadingProgress, loadingPhase, isLoaded, lastLoadedAt } = useAppSelector(
     (state) => state.planets
   )
   const token = useAppSelector((state) => state.auth.token)
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
-  const [started, setStarted] = useState(false)
   const [hasCompleted, setHasCompleted] = useState(false)
+  const hasLoadedOnceRef = useRef(false) // Track if we've loaded once this session
 
   useEffect(() => {
     // Only handle loading if authenticated
     if (!isAuthenticated || !token) {
       if (hasCompleted) {
         setHasCompleted(false)
+        hasLoadedOnceRef.current = false
       }
       return
     }
 
-    // If already loaded and not loading, complete immediately
-    if (isLoaded && allPlanets.length > 0 && !isLoading && !hasCompleted) {
-      setHasCompleted(true)
-      setTimeout(() => onComplete(), 300)
+    // If already loaded (from cache or previous load) and not loading, complete immediately
+    // This ensures we only load once per login session
+    if (isLoaded && allPlanets.length > 0 && !isLoading) {
+      if (!hasCompleted) {
+        setHasCompleted(true)
+        hasLoadedOnceRef.current = true
+        setTimeout(() => onComplete(), 300)
+      }
       return
     }
 
-    // If already started, don't start again
-    if (started || isLoading) {
+    // If we've already loaded once this session, don't load again
+    // Data will be refreshed via periodic updates or WebSocket events
+    if (hasLoadedOnceRef.current) {
+      if (!hasCompleted) {
+        setHasCompleted(true)
+        setTimeout(() => onComplete(), 300)
+      }
       return
     }
 
-    // Only start if we need to load planets
+    // If already loading, wait
+    if (isLoading) {
+      return
+    }
+
+    // Only start if we need to load planets (not loaded and no cache)
     if (!isLoaded || allPlanets.length === 0) {
       const loadAllPlanets = async () => {
-        setStarted(true)
+        hasLoadedOnceRef.current = true
         dispatch(setLoading(true))
         dispatch(setLoadingPhase('initializing'))
 
@@ -207,7 +222,7 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
 
       loadAllPlanets()
     }
-  }, [token, started, allPlanets.length, isLoading, isLoaded, isAuthenticated, hasCompleted, dispatch, onComplete])
+  }, [token, allPlanets.length, isLoading, isLoaded, isAuthenticated, hasCompleted, dispatch, onComplete, lastLoadedAt])
 
   // Only show loader if authenticated, loading, and not completed
   if (!isAuthenticated || !token || (!isLoading && isLoaded && allPlanets.length > 0) || hasCompleted) {

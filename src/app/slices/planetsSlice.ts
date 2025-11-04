@@ -13,7 +13,8 @@ interface PlanetsState {
 
 const CACHE_KEY = 'global_planets_cache'
 const CACHE_TIMESTAMP_KEY = 'global_planets_cache_timestamp'
-const CACHE_EXPIRY = 24 * 60 * 60 * 1000 // 24 hours
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000 // 24 hours - cache for 24 hours
+const SESSION_LOADED_KEY = 'planets_session_loaded' // Track if loaded this session
 
 const getInitialState = (): PlanetsState => {
   // Try to load from cache
@@ -76,10 +77,11 @@ const planetsSlice = createSlice({
       state.loadingProgress = 100
       state.loadingPhase = 'complete'
       
-      // Cache planets
+      // Cache planets and mark as loaded this session
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify(action.payload))
         localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+        localStorage.setItem(SESSION_LOADED_KEY, 'true')
       } catch (error) {
         console.error('Error caching planets:', error)
       }
@@ -98,6 +100,7 @@ const planetsSlice = createSlice({
       state.loadingPhase = null
       localStorage.removeItem(CACHE_KEY)
       localStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      localStorage.removeItem(SESSION_LOADED_KEY)
     },
   },
   extraReducers: (builder) => {
@@ -109,6 +112,8 @@ const planetsSlice = createSlice({
       state.loadingProgress = 0
       state.loadingPhase = null
       state.isLoading = false
+      // Clear session flag on logout
+      localStorage.removeItem(SESSION_LOADED_KEY)
     })
   },
 })

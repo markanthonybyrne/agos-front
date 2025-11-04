@@ -17,7 +17,7 @@ import {
 import { getPlanetImage } from '@/lib/planetImages'
 import { getGalaxyImage, getRandomGalaxyTypeForSystem } from '@/lib/galaxyImages'
 import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange, getSystemXyRange } from '@/lib/coordinateUtils'
-import { SystemViewMemo as SystemView } from './SystemView'
+import { SystemViewMemo } from './SystemView'
 import { GridOverlay } from './GridOverlay'
 import { QuadrantOverlay } from './QuadrantOverlay'
 import { SectorOverlay } from './SectorOverlay'
@@ -236,21 +236,28 @@ export function UnifiedUniverseMapV2() {
     return 'planet'  // Very high zoom for individual planet detail
   }, [zoomPan.scale])
 
-  // Filter entities visible in viewport
-  // At very high zoom (scale > 2.0), only show the system closest to viewport center
+  // Filter entities visible in viewport with smart limiting for performance
+  // Balance between showing everything and maintaining smooth performance
+  // Uses distance-based filtering to prevent systems from overlapping
   const visibleSystems = useMemo(() => {
     const bounds = zoomPan.viewportBounds
     const scale = zoomPan.scale
-    const visible: SystemData[] = []
+    const allInViewport: SystemData[] = []
     
+    // Padding based on zoom level - more padding at lower zoom for smoother panning
+    const padding = scale >= 7.0 ? 5   // Very high zoom: minimal padding, single system
+      : scale > 5.0 ? 15                // Very high zoom: small padding
+      : scale > 4.0 ? 25                // High zoom: moderate padding
+      : scale > 2.5 ? 40                // Medium-high: moderate padding
+      : scale > 1.5 ? 60                // Medium-high: generous padding
+      : scale > 0.5 ? 100               // Medium: very generous padding
+      : scale > 0.1 ? 150              // Low: very generous padding
+      : 200                              // Very low: maximum padding
+    
+    // First, collect all systems in viewport
     systemsByKey.forEach(system => {
-      // Check if system center is in viewport (simpler check)
       const centerX = system.center.x
       const centerY = system.center.y
-      
-      // Add padding to viewport bounds to include systems near edges
-      // Reduce padding at high zoom to show fewer systems and improve performance
-      const padding = scale > 2.5 ? 10 : scale > 1.5 ? 30 : 50
       
       if (
         centerX >= bounds.minX - padding &&
@@ -258,41 +265,46 @@ export function UnifiedUniverseMapV2() {
         centerY >= bounds.minY - padding &&
         centerY <= bounds.maxY + padding
       ) {
-        visible.push(system)
+        allInViewport.push(system)
       }
     })
     
-    // At high zoom (scale > 1.5), limit visible systems to reduce rendering load
-    // At very high zoom (scale > 2.5), only show the closest system
-    if (scale > 2.5 && visible.length > 1) {
-      const viewportCenterX = (bounds.minX + bounds.maxX) / 2
-      const viewportCenterY = (bounds.minY + bounds.maxY) / 2
-      
-      // Find the system closest to viewport center
-      let closestSystem = visible[0]
-      let closestDistance = Infinity
-      
-      visible.forEach(system => {
-        const dx = system.center.x - viewportCenterX
-        const dy = system.center.y - viewportCenterY
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        
-        if (distance < closestDistance) {
-          closestDistance = distance
-          closestSystem = system
-        }
-      })
-      
-      return [closestSystem]
-    }
+    // Calculate minimum distance between systems based on zoom level
+    // At higher zoom, systems need more space to avoid visual overlap
+    // This creates a smooth scale from 0% to 700%+
+    const minSystemDistance = scale >= 7.0 ? 200  // Very high zoom: large spacing (single system)
+      : scale > 5.6 ? 150                         // 560% zoom: large spacing for 2-3 systems
+      : scale > 4.48 ? 100                        // 448% zoom: medium-large spacing
+      : scale > 4.0 ? 80                          // 400% zoom: medium spacing
+      : scale > 3.0 ? 60                          // 300% zoom: medium spacing
+      : scale > 2.5 ? 50                          // 250% zoom: smaller spacing
+      : scale > 1.5 ? 40                          // 150% zoom: smaller spacing
+      : scale > 0.5 ? 30                          // 50% zoom: small spacing
+      : scale > 0.1 ? 20                          // 10% zoom: very small spacing
+      : 10                                         // Very low zoom: minimal spacing
     
-    // At medium-high zoom (1.5-2.5), limit to 10 closest systems for performance
-    if (scale > 1.5 && scale <= 2.5 && visible.length > 10) {
+    // Maximum number of systems to show at each zoom level
+    // Creates smooth progression from many systems at low zoom to few at high zoom
+    const maxSystems = scale >= 7.0 ? 1     // 700%+: 1 system (detailed planet view)
+      : scale > 5.6 ? 2                      // 560%: 2 systems (still very detailed)
+      : scale > 4.48 ? 4                     // 448%: 4 systems (detailed but more visible)
+      : scale > 4.0 ? 6                      // 400%: 6 systems
+      : scale > 3.0 ? 10                     // 300%: 10 systems
+      : scale > 2.5 ? 15                     // 250%: 15 systems
+      : scale > 1.5 ? 25                     // 150%: 25 systems
+      : scale > 0.5 ? 50                     // 50%: 50 systems
+      : scale > 0.1 ? 100                    // 10%: 100 systems
+      : 150                                  // Very low: 150 systems
+    
+    // If we have fewer systems than max, return them all
+    if (allInViewport.length <= maxSystems) {
+      // But still filter by minimum distance to prevent overlap
+      const filtered: SystemData[] = []
       const viewportCenterX = (bounds.minX + bounds.maxX) / 2
       const viewportCenterY = (bounds.minY + bounds.maxY) / 2
       
-      // Sort by distance and take closest 10
-      return visible
+      // Sort by distance from viewport center
+      const sorted = allInViewport
         .map(system => {
           const dx = system.center.x - viewportCenterX
           const dy = system.center.y - viewportCenterY
@@ -300,11 +312,60 @@ export function UnifiedUniverseMapV2() {
           return { system, distance }
         })
         .sort((a, b) => a.distance - b.distance)
-        .slice(0, 10)
-        .map(item => item.system)
+      
+      // Add systems, ensuring minimum distance between them
+      for (const { system } of sorted) {
+        if (filtered.length >= maxSystems) break
+        
+        // Check if this system is far enough from already included systems
+        const tooClose = filtered.some(addedSystem => {
+          const dx = system.center.x - addedSystem.center.x
+          const dy = system.center.y - addedSystem.center.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          return distance < minSystemDistance
+        })
+        
+        if (!tooClose) {
+          filtered.push(system)
+        }
+      }
+      
+      return filtered
     }
     
-    return visible
+    // If we have more systems than max, filter by distance and take closest ones
+    const viewportCenterX = (bounds.minX + bounds.maxX) / 2
+    const viewportCenterY = (bounds.minY + bounds.maxY) / 2
+    
+    // Sort by distance from viewport center
+    const sorted = allInViewport
+      .map(system => {
+        const dx = system.center.x - viewportCenterX
+        const dy = system.center.y - viewportCenterY
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        return { system, distance }
+      })
+      .sort((a, b) => a.distance - b.distance)
+    
+    // Take systems, ensuring minimum distance between them
+    const filtered: SystemData[] = []
+    for (const { system } of sorted) {
+      if (filtered.length >= maxSystems) break
+      
+      // Check if this system is far enough from already included systems
+      const tooClose = filtered.some(addedSystem => {
+        const dx = system.center.x - addedSystem.center.x
+        const dy = system.center.y - addedSystem.center.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        return distance < minSystemDistance
+      })
+      
+      if (!tooClose) {
+        filtered.push(system)
+      }
+    }
+    
+    return filtered
   }, [systemsByKey, zoomPan.viewportBounds, zoomPan.scale])
 
   const visiblePlanets = useMemo(() => {
@@ -384,6 +445,12 @@ export function UnifiedUniverseMapV2() {
   
   // Calculate dynamic viewBox based on actual container dimensions to ensure content always fills viewport
   // MUST be before early return to maintain hook order
+  // Round pan values aggressively to reduce update frequency and improve performance
+  // Round to nearest 5 pixels to batch updates and reduce re-renders
+  const roundedPanX = Math.round(zoomPan.panX / 5) * 5
+  const roundedPanY = Math.round(zoomPan.panY / 5) * 5
+  const roundedScale = Math.round(zoomPan.scale * 100) / 100
+  
   const dynamicViewBox = useMemo(() => {
     if (containerSize.width === 0 || containerSize.height === 0) {
       return { viewBox: `0 0 ${gridWidth} ${gridHeight}`, bounds: { minX: 0, minY: 0, maxX: gridWidth, maxY: gridHeight } }
@@ -394,22 +461,16 @@ export function UnifiedUniverseMapV2() {
     const containerAspectRatio = containerWidth / containerHeight
     
     // Calculate what grid coordinates are visible based on current scale and pan
-    // Since we removed the transform scale, we need to calculate based on viewBox mapping
-    const scale = zoomPan.scale
-    const panX = zoomPan.panX
-    const panY = zoomPan.panY
-    
-    // Calculate visible grid area: the viewBox shows this area of the grid
-    // The viewBox width/height in grid coordinates depends on the scale
-    // At scale 1.0, 1 grid unit = 1 screen pixel (roughly)
-    // But we need to account for the container size
+    // Use rounded values to reduce calculation complexity and improve performance
+    const scale = roundedScale
+    const panX = roundedPanX
+    const panY = roundedPanY
     
     // Calculate center point in grid coordinates
     const centerX = gridWidth / 2 - panX / scale
     const centerY = gridHeight / 2 - panY / scale
     
     // Calculate visible width/height in grid coordinates
-    // The container size divided by scale gives us grid units visible
     const visibleGridWidth = containerWidth / scale
     const visibleGridHeight = containerHeight / scale
     
@@ -440,15 +501,17 @@ export function UnifiedUniverseMapV2() {
       maxY = Math.min(gridHeight, maxY + heightDiff / 2)
     }
     
-    // Add small padding to ensure content at edges is visible
-    const padding = Math.max(width, height) * 0.05
+    // Add generous padding to prevent items from popping in/out during pan
+    // Reduced slightly for better performance while maintaining smoothness
+    const padding = Math.max(width, height) * 0.10
     const viewBoxX = Math.max(0, minX - padding)
     const viewBoxY = Math.max(0, minY - padding)
     const viewBoxWidth = Math.min(gridWidth, width + padding * 2)
     const viewBoxHeight = Math.min(gridHeight, height + padding * 2)
     
+    // Round values to prevent micro-updates that cause visual "clicking"
     return {
-      viewBox: `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`,
+      viewBox: `${Math.round(viewBoxX * 10) / 10} ${Math.round(viewBoxY * 10) / 10} ${Math.round(viewBoxWidth * 10) / 10} ${Math.round(viewBoxHeight * 10) / 10}`,
       bounds: {
         minX: viewBoxX,
         minY: viewBoxY,
@@ -456,7 +519,7 @@ export function UnifiedUniverseMapV2() {
         maxY: viewBoxY + viewBoxHeight
       }
     }
-  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, containerSize, gridWidth, gridHeight])
+  }, [roundedScale, roundedPanX, roundedPanY, containerSize.width, containerSize.height, gridWidth, gridHeight])
 
   // Show loading state only if actively loading config or planets
   if (isLoadingConfig || isLoadingPlanets || allPlanets.length === 0) {
@@ -518,7 +581,10 @@ export function UnifiedUniverseMapV2() {
           width: '100%',
           height: '100%',
           position: 'relative',
-          backgroundColor: 'transparent'
+          backgroundColor: 'transparent',
+          // Performance optimizations for smooth panning
+          willChange: 'transform',
+          transform: 'translateZ(0)', // Force GPU acceleration
         }}
       >
         {/* SVG overlay for rendering entities */}
@@ -527,7 +593,13 @@ export function UnifiedUniverseMapV2() {
           className="absolute inset-0 w-full h-full"
           style={{
             width: '100%',
-            height: '100%'
+            height: '100%',
+            // Performance optimizations for smooth rendering
+            willChange: 'contents',
+            transform: 'translateZ(0)', // Force GPU acceleration
+            backfaceVisibility: 'hidden',
+            // Smooth transitions for panning
+            transition: 'none', // Disable CSS transitions - we handle updates manually
           }}
           viewBox={dynamicViewBox.viewBox}
           preserveAspectRatio="none"
@@ -616,7 +688,7 @@ export function UnifiedUniverseMapV2() {
           {zoomLevel === 'galaxy' && visibleSystems.length > 0 && (
             <g className="systems-layer">
               {visibleSystems.map(system => (
-                <SystemView
+                <SystemViewMemo
                   key={system.key}
                   system={system}
                   scale={zoomPan.scale}
@@ -632,7 +704,7 @@ export function UnifiedUniverseMapV2() {
           {(zoomLevel === 'system' || zoomLevel === 'planet') && (
             <g className="systems-layer">
               {visibleSystems.map(system => (
-                <SystemView
+                <SystemViewMemo
                   key={system.key}
                   system={system}
                   scale={zoomPan.scale}
