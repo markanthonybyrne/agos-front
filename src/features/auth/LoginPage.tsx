@@ -224,7 +224,7 @@ export function LoginPage() {
               <img 
                 src={BRAND.logo} 
                 alt="Astralus" 
-                className="h-64 lg:h-96 w-auto object-contain filter drop-shadow-[0_0_20px_rgba(25,234,253,0.5)]"
+                className="h-64 lg:h-96 w-auto object-contain"
               />
             </div>
           </div>
