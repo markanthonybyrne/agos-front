@@ -379,11 +379,81 @@ export function useWebSocket() {
     }
     
     // Handle research completed event
+    // Handle era progression event
+    const handleEraProgressionEvent = (data: any) => {
+      if (data.empire) {
+        dispatch(updateEmpire(data.empire))
+      }
+      
+      notifyWithToast(dispatch, {
+        type: 'success',
+        title: 'Era Progression!',
+        message: `You have progressed to Era ${data.empire?.active_era || data.new_era}!`,
+        category: 'general',
+      })
+      
+      // Invalidate empire and related tags
+      dispatch(apiSlice.util.invalidateTags(['Empire', 'Buildable', 'Facility', 'Research', 'Ship', 'Defence']))
+      
+      // Dispatch custom event
+      window.dispatchEvent(new CustomEvent('era:progression', { detail: data }))
+    }
+
+    // Handle specialization unlock event
+    const handleSpecializationUnlockEvent = (data: any) => {
+      if (data.empire) {
+        dispatch(updateEmpire(data.empire))
+      }
+      
+      notifyWithToast(dispatch, {
+        type: 'success',
+        title: 'Specialization Unlocked!',
+        message: `${data.specialization || 'Specialization'} path unlocked!`,
+        category: 'general',
+      })
+      
+      // Invalidate empire and related tags
+      dispatch(apiSlice.util.invalidateTags(['Empire', 'Buildable', 'Facility', 'Research', 'Ship', 'Defence']))
+      
+      // Dispatch custom event
+      window.dispatchEvent(new CustomEvent('specialization:unlocked', { detail: data }))
+    }
+
+    // Handle facility deactivation event
+    const handleFacilityDeactivationEvent = (data: any) => {
+      const planetId = data.planet_id || data.planet?.id
+      
+      notifyWithToast(dispatch, {
+        type: 'warning',
+        title: 'Facility Deactivated',
+        message: `${data.facility_name || 'Facility'} deactivated due to insufficient upkeep`,
+        category: 'construction',
+      })
+      
+      // Invalidate facility and planet tags
+      if (planetId) {
+        dispatch(apiSlice.util.invalidateTags([
+          { type: 'Facility', id: planetId },
+          { type: 'Planet', id: planetId },
+          { type: 'Resource', id: planetId },
+        ]))
+      }
+      
+      // Dispatch custom event
+      window.dispatchEvent(new CustomEvent('facility:deactivated', { detail: data }))
+    }
+
     const handleResearchCompletedEvent = (data: any) => {
       dispatch(handleResearchCompleted({
         researchName: data.research_name || data.research_slug?.replace(/_/g, ' '),
         planetId: data.planet_id,
       }))
+      
+      // Update empire if research effects changed
+      if (data.empire) {
+        dispatch(updateEmpire(data.empire))
+      }
+      
       const tags: any[] = ['Research', 'Planet', 'Buildable', 'Empire', 'Universe']
       if (data.planet_id) {
         tags.push({ type: 'Research', id: Number(data.planet_id) })
@@ -397,6 +467,8 @@ export function useWebSocket() {
         detail: { 
           researchSlug: data.research_slug,
           planetId: data.planet_id,
+          effects: data.effects,
+          active_research_effects: data.empire?.active_research_effects,
         } 
       }))
     }
@@ -859,6 +931,25 @@ export function useWebSocket() {
       privateChannel.listen('ResearchCompleted', handleResearchCompletedEvent)
       privateChannel.listen('App\\Events\\ResearchCompleted', handleResearchCompletedEvent)
       privateChannel.listen('App.Events.ResearchCompleted', handleResearchCompletedEvent)
+
+      // Tech Tree System Events
+      privateChannel.listen('era.progression', handleEraProgressionEvent)
+      privateChannel.listen('.era.progression', handleEraProgressionEvent)
+      privateChannel.listen('EraProgression', handleEraProgressionEvent)
+      privateChannel.listen('App\\Events\\EraProgression', handleEraProgressionEvent)
+      privateChannel.listen('App.Events.EraProgression', handleEraProgressionEvent)
+
+      privateChannel.listen('specialization.unlocked', handleSpecializationUnlockEvent)
+      privateChannel.listen('.specialization.unlocked', handleSpecializationUnlockEvent)
+      privateChannel.listen('SpecializationUnlocked', handleSpecializationUnlockEvent)
+      privateChannel.listen('App\\Events\\SpecializationUnlocked', handleSpecializationUnlockEvent)
+      privateChannel.listen('App.Events.SpecializationUnlocked', handleSpecializationUnlockEvent)
+
+      privateChannel.listen('facility.deactivated', handleFacilityDeactivationEvent)
+      privateChannel.listen('.facility.deactivated', handleFacilityDeactivationEvent)
+      privateChannel.listen('FacilityDeactivated', handleFacilityDeactivationEvent)
+      privateChannel.listen('App\\Events\\FacilityDeactivated', handleFacilityDeactivationEvent)
+      privateChannel.listen('App.Events.FacilityDeactivated', handleFacilityDeactivationEvent)
       privateChannelEvents.push('research.completed', '.research.completed', 'ResearchCompleted', 'App\\Events\\ResearchCompleted', 'App.Events.ResearchCompleted')
 
       // Handle alliance message event

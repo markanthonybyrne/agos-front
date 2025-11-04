@@ -115,6 +115,12 @@ export interface Empire {
   planets?: any[]
   fleets?: any[]
   alliance?: { name?: string } | null
+  // New tech tree fields
+  active_era?: number // Current era (1-5)
+  specializations_unlocked?: string[] // Array of specializations: 'industrial', 'military', 'relic'
+  dark_matter_current?: number // Current dark matter amount
+  dark_matter_capacity?: number // Maximum dark matter capacity
+  active_research_effects?: Record<string, number | boolean> // Active research effects aggregated
 }
 
 export interface Planet {
@@ -631,10 +637,13 @@ export interface DefenceDefinition {
   init: number
   build_time_ticks: number
   era?: number // Era required for this defence
+  specialization?: 'general' | 'industrial' | 'military' | 'relic' // Specialization path
   // Note: Attack/defence power and energy consumption fields may not be in the API response
   attack_power?: number
   defence_power?: number
   energy_consumption?: number
+  effects?: Record<string, number | boolean> // Defence effects
+  notes?: string // Developer notes/UI hints
 }
 
 export interface Defence {
@@ -658,10 +667,15 @@ export interface FacilityDefinition {
   build_time_ticks: number
   prerequisites: string[]
   era?: number // Era required for this facility
+  specialization?: 'general' | 'industrial' | 'military' | 'relic' // Specialization path
   // Note: Production and energy consumption fields may not be in the API response
   production_tellerium?: number
   production_krypton?: number
   energy_consumption?: number
+  // New tech tree fields
+  per_tick?: Record<string, number> // JSON object with resource production per tick (e.g., {"tellerium": 10, "krypton": 5, "dark_matter": 2})
+  upkeep?: Record<string, number> // JSON object with upkeep costs per tick (e.g., {"tellerium": 5, "krypton": 3})
+  notes?: string // Developer notes/UI hints
 }
 
 export interface Facility {
@@ -684,7 +698,10 @@ export interface ResearchDefinition {
   cost_research_points: number
   prerequisites: string[]
   era?: number // Era required for this research
-  effects: Record<string, number>
+  specialization?: 'general' | 'industrial' | 'military' | 'relic' // Specialization path
+  effects: Record<string, number | boolean> // Research effects (multipliers, bonuses, boolean unlocks)
+  prerequisite_research?: string[] // Array of research slugs required
+  notes?: string // Developer notes/UI hints
 }
 
 export interface ResearchProgress {
@@ -714,7 +731,9 @@ export interface PlanetResearchItem {
   prerequisite_facilities: string[] // Required facilities (checked on planet)
   prerequisite_research: string[] // Required research (checked empire-wide)
   era?: number // Era required for this research
-  effects?: Record<string, number>
+  specialization?: 'general' | 'industrial' | 'military' | 'relic' // Specialization path
+  effects?: Record<string, number | boolean>
+  notes?: string // Developer notes/UI hints
 }
 
 // Ship Types
@@ -735,7 +754,9 @@ export interface ShipDefinition {
   build_time_ticks: number
   prerequisites: string[] | null
   era?: number // Era required for this ship
+  specialization?: 'general' | 'industrial' | 'military' | 'relic' // Specialization path
   abilities: string[]
+  notes?: string // Developer notes/UI hints
 }
 
 export interface Ship {
@@ -2212,5 +2233,73 @@ export interface RollbackDefinitionRequest {
 
 export interface RollbackDefinitionResponse {
   message: string
+}
+
+// ============================================================================
+// Tech Tree System Types
+// ============================================================================
+
+// Empire State - Summary of empire tech tree state
+export interface EmpireState {
+  active_era: number
+  specializations_unlocked: string[]
+  dark_matter_current: number
+  dark_matter_capacity: number
+  dark_matter_production_per_tick?: number
+  active_research_effects: Record<string, number | boolean>
+  should_prompt_specialization?: boolean
+}
+
+// Era Progression Status
+export interface EraProgression {
+  current_era: number
+  next_era: number
+  can_progress: boolean
+  requirements: {
+    facilities: Array<{
+      slug: string
+      name: string
+      completed: boolean
+    }>
+    message: string
+  }
+  progress_percentage: number
+}
+
+// Dark Matter Information
+export interface DarkMatterInfo {
+  dark_matter_current: number
+  dark_matter_capacity: number
+  production_per_tick: number
+  capacity_utilization: number
+  production_by_planet?: Array<{
+    planet_id: number
+    planet_name: string
+    production_per_tick: number
+    facilities: Array<{
+      facility_slug: string
+      production: number
+    }>
+  }>
+}
+
+// Research Effects Summary
+export interface ResearchEffectsSummary {
+  active_effects: Record<string, number | boolean>
+  effects_by_research?: Record<string, Record<string, number | boolean>>
+}
+
+// Specialization Selection
+export interface SelectSpecializationRequest {
+  specialization: 'industrial' | 'military' | 'relic'
+}
+
+export interface SelectSpecializationResponse {
+  status: 'success' | 'error'
+  message: string
+  specialization?: string
+  specializations_unlocked?: string[]
+  code?: string
+  errors?: string[]
 }
 

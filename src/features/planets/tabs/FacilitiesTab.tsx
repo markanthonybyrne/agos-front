@@ -14,14 +14,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BuildingPanel } from '@/components/planet/BuildingPanel'
 import { VisualItemGrid } from '@/components/planet/VisualItemGrid'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Planet } from '@/types/api.types'
+import { Planet, FacilityDefinition } from '@/types/api.types'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { formatResource, formatNumber } from '@/lib/formatters'
 import { toast } from 'sonner'
-import { Settings, Zap, Shield, Building, AlertCircle, CheckCircle, Plus, TrendingUp, Trash2, Loader2 } from 'lucide-react'
+import { Settings, Zap, Shield, Building, AlertCircle, CheckCircle, Plus, TrendingUp, Trash2, Loader2, Eye } from 'lucide-react'
+import { FacilityPreviewDialog } from '@/components/planet/FacilityPreviewDialog'
+import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getFacilityImage } from '@/lib/facilityImages'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import {
+  calculateNetProduction,
+  previewFacilityProduction,
+  previewFacilityUpkeep,
+  wouldCauseNegativeNetProduction,
+} from '@/lib/productionHelpers'
 
 interface FacilitiesTabProps {
   planet: Planet
@@ -36,8 +44,10 @@ type BuildFacilityFormData = z.infer<typeof buildFacilitySchema>
 
 export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
   const [upgradeFacilityId, setUpgradeFacilityId] = useState<number | null>(null)
   const [destroyFacilityId, setDestroyFacilityId] = useState<number | null>(null)
+  const [prerequisiteErrors, setPrerequisiteErrors] = useState<string[]>([])
 
   const { data: definitions, isLoading: isLoadingDefinitions } = useGetFacilityDefinitionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -66,6 +76,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   const [upgradeFacility, { isLoading: isUpgrading }] = useUpgradeFacilityMutation()
   const [upgradeFacilityBySlug] = useUpgradeFacilityBySlugMutation()
   const [destroyFacility, { isLoading: isDestroying }] = useDestroyFacilityMutation()
+  const [checkPrerequisites, { isLoading: isCheckingPrerequisites }] = useCheckPrerequisitesMutation()
 
   // Get all facility definitions for prerequisite checking
   const allFacilityDefinitions = (definitions?.facilities || []) as any[]
@@ -153,6 +164,20 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
 
   const handleBuildFacility = async (data: BuildFacilityFormData) => {
     try {
+      // Check prerequisites first
+      const checkResult = await checkPrerequisites({
+        type: 'facility',
+        slug: data.facility_slug,
+      }).unwrap()
+
+      if (!checkResult.data?.can_build) {
+        setPrerequisiteErrors(checkResult.data?.errors || [])
+        toast.error('Cannot build facility: Missing prerequisites')
+        return
+      }
+
+      setPrerequisiteErrors([])
+
       const result = await buildFacility({
         planetId: Number(planet.id),
         data: {
@@ -164,7 +189,11 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
       toast.success(`Facility queued for construction!`)
       setBuildDialogOpen(false)
       buildForm.reset()
+      setPrerequisiteErrors([])
     } catch (error: any) {
+      if (error?.data?.errors) {
+        setPrerequisiteErrors(error.data.errors)
+      }
       toast.error(error?.data?.message || 'Failed to build facility')
     }
   }
@@ -267,6 +296,51 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   const productionBonus = getProductionBonus()
   const selectedFacilitySlug = buildForm.watch('facility_slug')
   const selectedFacilityDef = selectedFacilitySlug ? getFacilityDefinition(selectedFacilitySlug) : null
+
+  // Calculate net production for all facilities
+  const facilityDefinitionsMap = useMemo(() => {
+    const map = new Map<string, FacilityDefinition>()
+    definitions?.facilities?.forEach(fac => {
+      map.set(fac.slug, fac)
+    })
+    return map
+  }, [definitions?.facilities])
+
+  const researchEffects = meData?.empire?.active_research_effects || {}
+  const netProduction = useMemo(() => {
+    if (facilitiesList.length === 0 || facilityDefinitionsMap.size === 0) {
+      return null
+    }
+    return calculateNetProduction(
+      facilitiesList as any[],
+      facilityDefinitionsMap,
+      researchEffects
+    )
+  }, [facilitiesList, facilityDefinitionsMap, researchEffects])
+
+  // Helper to get era badge color
+  const getEraBadgeColor = (era?: number): 'default' | 'secondary' | 'outline' | 'destructive' => {
+    if (!era) return 'default'
+    const colors: Record<number, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+      1: 'default',
+      2: 'secondary',
+      3: 'outline',
+      4: 'default',
+      5: 'default',
+    }
+    return colors[era] || 'default'
+  }
+
+  // Helper to get specialization badge color
+  const getSpecializationBadgeColor = (specialization?: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
+    if (!specialization || specialization === 'general') return 'default'
+    const colors: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+      industrial: 'secondary',
+      military: 'destructive',
+      relic: 'outline',
+    }
+    return colors[specialization] || 'default'
+  }
 
   if (isLoadingDefinitions || isLoadingFacilities) {
     return (
@@ -423,7 +497,113 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                 </div>
               </div>
 
-              {(selectedFacilityDef.production_tellerium || selectedFacilityDef.production_krypton || selectedFacilityDef.energy_consumption) && (
+              {/* Era and Specialization Badges */}
+              <div className="flex gap-2 flex-wrap mb-2">
+                {selectedFacilityDef.era && (
+                  <Badge variant={getEraBadgeColor(selectedFacilityDef.era)}>
+                    Era {selectedFacilityDef.era}
+                  </Badge>
+                )}
+                {selectedFacilityDef.specialization && selectedFacilityDef.specialization !== 'general' && (
+                  <Badge variant={getSpecializationBadgeColor(selectedFacilityDef.specialization)}>
+                    {selectedFacilityDef.specialization.charAt(0).toUpperCase() + selectedFacilityDef.specialization.slice(1)}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Production and Upkeep from per_tick/upkeep fields */}
+              {(selectedFacilityDef.per_tick || selectedFacilityDef.upkeep) && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  {/* Production */}
+                  {selectedFacilityDef.per_tick && Object.keys(selectedFacilityDef.per_tick).length > 0 && (
+                    <>
+                      <h5 className="text-sm font-semibold">Production:</h5>
+                      {selectedFacilityDef.per_tick.tellerium !== undefined && (
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-1.5">
+                            <img
+                              src={getTelleriumImage()}
+                              alt="T"
+                              className="w-4 h-4 object-contain"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            <span className="text-tellerium">Tellerium:</span>
+                          </div>
+                          <span className="text-tellerium">
+                            +{formatNumber(selectedFacilityDef.per_tick.tellerium || 0)}/tick
+                          </span>
+                        </div>
+                      )}
+                      {selectedFacilityDef.per_tick.krypton !== undefined && (
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-1.5">
+                            <img
+                              src={getKryptonImage()}
+                              alt="K"
+                              className="w-4 h-4 object-contain"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            <span className="text-krypton">Krypton:</span>
+                          </div>
+                          <span className="text-krypton">
+                            +{formatNumber(selectedFacilityDef.per_tick.krypton || 0)}/tick
+                          </span>
+                        </div>
+                      )}
+                      {selectedFacilityDef.per_tick.dark_matter !== undefined && (
+                        <div className="flex justify-between text-sm">
+                          <span>Dark Matter:</span>
+                          <span className="text-purple-400">
+                            +{formatNumber(selectedFacilityDef.per_tick.dark_matter || 0)}/tick
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Upkeep */}
+                  {selectedFacilityDef.upkeep && Object.keys(selectedFacilityDef.upkeep).length > 0 && (
+                    <>
+                      <h5 className="text-sm font-semibold text-yellow-400 mt-2">Upkeep:</h5>
+                      {selectedFacilityDef.upkeep.tellerium !== undefined && selectedFacilityDef.upkeep.tellerium > 0 && (
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-1.5">
+                            <img
+                              src={getTelleriumImage()}
+                              alt="T"
+                              className="w-4 h-4 object-contain"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            <span className="text-tellerium">Tellerium:</span>
+                          </div>
+                          <span className="text-yellow-400">
+                            -{formatNumber(selectedFacilityDef.upkeep.tellerium || 0)}/tick
+                          </span>
+                        </div>
+                      )}
+                      {selectedFacilityDef.upkeep.krypton !== undefined && selectedFacilityDef.upkeep.krypton > 0 && (
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-1.5">
+                            <img
+                              src={getKryptonImage()}
+                              alt="K"
+                              className="w-4 h-4 object-contain"
+                              style={{ imageRendering: 'auto' }}
+                            />
+                            <span className="text-krypton">Krypton:</span>
+                          </div>
+                          <span className="text-yellow-400">
+                            -{formatNumber(selectedFacilityDef.upkeep.krypton || 0)}/tick
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Fallback to old production fields */}
+              {!selectedFacilityDef.per_tick && (selectedFacilityDef.production_tellerium || selectedFacilityDef.production_krypton || selectedFacilityDef.energy_consumption) && (
                 <div className="space-y-2 pt-2 border-t border-border">
                   <h5 className="text-sm font-semibold">Production:</h5>
                   {selectedFacilityDef.production_tellerium && (
@@ -469,6 +649,23 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                 </div>
               )}
 
+              {/* Prerequisite Errors */}
+              {prerequisiteErrors.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-destructive" />
+                    <span className="text-sm font-semibold text-destructive">
+                      Missing Prerequisites:
+                    </span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-destructive ml-4">
+                    {prerequisiteErrors.map((error, idx) => (
+                      <li key={idx}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {((planet.tellerium_balance < selectedFacilityDef.base_tellerium_cost) ||
                 (planet.krypton_balance < selectedFacilityDef.base_krypton_cost)) && (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -478,6 +675,21 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                   </span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Preview Button */}
+          {selectedFacilityDef && (
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPreviewDialogOpen(true)}
+                className="w-full"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Production & Upkeep
+              </Button>
             </div>
           )}
 
@@ -497,16 +709,18 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
               type="submit"
               disabled={
                 isBuilding ||
+                isCheckingPrerequisites ||
                 !selectedFacilityDef ||
                 planet.tellerium_balance < (selectedFacilityDef?.base_tellerium_cost || 0) ||
-                planet.krypton_balance < (selectedFacilityDef?.base_krypton_cost || 0)
+                planet.krypton_balance < (selectedFacilityDef?.base_krypton_cost || 0) ||
+                prerequisiteErrors.length > 0
               }
               className="flex-1"
             >
-              {isBuilding ? (
+              {isBuilding || isCheckingPrerequisites ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Building...
+                  {isCheckingPrerequisites ? 'Checking...' : 'Building...'}
                 </>
               ) : (
                 <>
@@ -575,7 +789,117 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                         </Badge>
                       </div>
 
-                      {(productionT > 0 || productionK > 0) && (
+                      {/* Era and Specialization Badges */}
+                      <div className="flex gap-2 flex-wrap">
+                        {definition?.era && (
+                          <Badge variant={getEraBadgeColor(definition.era)}>
+                            Era {definition.era}
+                          </Badge>
+                        )}
+                        {definition?.specialization && definition.specialization !== 'general' && (
+                          <Badge variant={getSpecializationBadgeColor(definition.specialization)}>
+                            {definition.specialization.charAt(0).toUpperCase() + definition.specialization.slice(1)}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Production and Upkeep from per_tick/upkeep fields */}
+                      {(definition?.per_tick || definition?.upkeep) && (
+                        <div className="p-3 bg-muted/20 rounded-lg space-y-3">
+                          {/* Production */}
+                          {definition.per_tick && Object.keys(definition.per_tick).length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium mb-2">Production</p>
+                              <div className="space-y-2 text-sm">
+                                {definition.per_tick.tellerium !== undefined && (
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getTelleriumImage()}
+                                        alt="T"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-tellerium">Tellerium:</span>
+                                    </div>
+                                    <span className="text-tellerium font-semibold">
+                                      +{formatNumber((definition.per_tick.tellerium || 0) * facility.level)}/tick
+                                    </span>
+                                  </div>
+                                )}
+                                {definition.per_tick.krypton !== undefined && (
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getKryptonImage()}
+                                        alt="K"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-krypton">Krypton:</span>
+                                    </div>
+                                    <span className="text-krypton font-semibold">
+                                      +{formatNumber((definition.per_tick.krypton || 0) * facility.level)}/tick
+                                    </span>
+                                  </div>
+                                )}
+                                {definition.per_tick.dark_matter !== undefined && (
+                                  <div className="flex justify-between items-center">
+                                    <span>Dark Matter:</span>
+                                    <span className="text-purple-400 font-semibold">
+                                      +{formatNumber((definition.per_tick.dark_matter || 0) * facility.level)}/tick
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Upkeep */}
+                          {definition.upkeep && Object.keys(definition.upkeep).length > 0 && (
+                            <div className="pt-2 border-t border-border">
+                              <p className="text-sm font-medium mb-2 text-yellow-400">Upkeep</p>
+                              <div className="space-y-2 text-sm">
+                                {definition.upkeep.tellerium !== undefined && definition.upkeep.tellerium > 0 && (
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getTelleriumImage()}
+                                        alt="T"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-tellerium">Tellerium:</span>
+                                    </div>
+                                    <span className="text-yellow-400 font-semibold">
+                                      -{formatNumber((definition.upkeep.tellerium || 0) * facility.level)}/tick
+                                    </span>
+                                  </div>
+                                )}
+                                {definition.upkeep.krypton !== undefined && definition.upkeep.krypton > 0 && (
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <img
+                                        src={getKryptonImage()}
+                                        alt="K"
+                                        className="w-4 h-4 object-contain"
+                                        style={{ imageRendering: 'auto' }}
+                                      />
+                                      <span className="text-krypton">Krypton:</span>
+                                    </div>
+                                    <span className="text-yellow-400 font-semibold">
+                                      -{formatNumber((definition.upkeep.krypton || 0) * facility.level)}/tick
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Fallback to old production fields if per_tick not available */}
+                      {!definition?.per_tick && (productionT > 0 || productionK > 0) && (
                         <div className="p-3 bg-muted/20 rounded-lg">
                           <p className="text-sm font-medium mb-2">Production</p>
                           <div className="space-y-2 text-sm">
@@ -623,6 +947,27 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                             )}
                           </div>
                         </div>
+                      )}
+
+                      {/* Warning if upkeep would cause negative net production */}
+                      {definition?.upkeep && netProduction && (facility as any)?.is_active && (
+                        (() => {
+                          const facilityUpkeep = previewFacilityUpkeep(definition, facility.level, researchEffects)
+                          const facilityProduction = previewFacilityProduction(definition, facility.level, researchEffects)
+                          const wouldCauseNegative = wouldCauseNegativeNetProduction(
+                            netProduction,
+                            facilityProduction,
+                            facilityUpkeep
+                          )
+                          return wouldCauseNegative ? (
+                            <div className="flex items-center gap-2 p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
+                              <AlertCircle className="w-4 h-4 text-destructive" />
+                              <span className="text-xs text-destructive">
+                                Upkeep may exceed production
+                              </span>
+                            </div>
+                          ) : null
+                        })()
                       )}
 
                       {energyUse > 0 && (
@@ -793,6 +1138,14 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Facility Preview Dialog */}
+      <FacilityPreviewDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        planetId={Number(planet.id)}
+        facility={selectedFacilityDef}
+      />
     </div>
   )
 }

@@ -8,8 +8,14 @@ import {
 
 export const shipsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getShipDefinitions: builder.query<{ ships: ShipDefinition[] }, void>({
-      query: () => '/ships/definitions',
+    getShipDefinitions: builder.query<
+      { ships: ShipDefinition[] },
+      { era?: number; specialization?: string } | void
+    >({
+      query: (params) => ({
+        url: '/ships/definitions',
+        params: params ? { era: params.era, specialization: params.specialization } : {},
+      }),
       providesTags: ['Ship'],
     }),
     getPlanetShips: builder.query<{ ships: Ship[] }, number>({

@@ -135,6 +135,8 @@ export function FacilityTechTree({ planetId, className }: FacilityTechTreeProps)
         costKrypton: facility.base_krypton_cost,
         productionTellerium: facility.production_tellerium,
         productionKrypton: facility.production_krypton,
+        upkeepTellerium: facility.upkeep?.tellerium,
+        upkeepKrypton: facility.upkeep?.krypton,
         buildTime: facility.build_time_ticks,
       }
     })

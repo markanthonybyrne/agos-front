@@ -5,12 +5,19 @@ import {
   ResearchProgress,
   StartResearchRequest,
   PlanetResearchItem,
+  ResearchEffectsSummary,
 } from '@/types/api.types'
 
 export const researchApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getResearchDefinitions: builder.query<{ research: ResearchDefinition[] }, void>({
-      query: () => '/research/definitions',
+    getResearchDefinitions: builder.query<
+      { research: ResearchDefinition[] },
+      { era?: number; specialization?: string } | void
+    >({
+      query: (params) => ({
+        url: '/research/definitions',
+        params: params ? { era: params.era, specialization: params.specialization } : {},
+      }),
       providesTags: ['Research'],
     }),
     getMyResearch: builder.query<ResearchProgress, void>({
@@ -64,6 +71,10 @@ export const researchApi = apiSlice.injectEndpoints({
         'Resource', // Invalidate for resource balance updates
       ],
     }),
+    getResearchEffects: builder.query<ResearchEffectsSummary, void>({
+      query: () => '/research/effects',
+      providesTags: ['Research', 'Empire'],
+    }),
   }),
 })
 
@@ -73,4 +84,5 @@ export const {
   useGetPlanetAvailableResearchQuery,
   useStartResearchMutation,
   useCancelResearchMutation,
+  useGetResearchEffectsQuery,
 } = researchApi

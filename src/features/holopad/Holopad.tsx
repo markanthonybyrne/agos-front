@@ -24,6 +24,11 @@ import { QuantumCreditsWidget } from '@/components/holopad/QuantumCreditsWidget'
 import { BoostersWidget } from '@/components/holopad/BoostersWidget'
 import { AchievementsWidget } from '@/components/holopad/AchievementsWidget'
 import { MarketTrendsWidget } from '@/components/holopad/MarketTrendsWidget'
+import { EraProgressionWidget } from '@/components/holopad/EraProgressionWidget'
+import { DarkMatterWidget } from '@/components/holopad/DarkMatterWidget'
+import { ResearchEffectsWidget } from '@/components/holopad/ResearchEffectsWidget'
+import { SpecializationSelectionModal } from '@/components/specialization/SpecializationSelectionModal'
+import { useGetEmpireStateQuery } from '@/api/endpoints/empiresApi'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -48,6 +53,11 @@ export function Holopad() {
   const { data: planetsData, isLoading: planetsLoading, refetch: refetchPlanets } = useGetPlanetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
+  const { data: empireState } = useGetEmpireStateQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+    skip: !isAuthenticated,
+  })
+  const [showSpecializationModal, setShowSpecializationModal] = useState(false)
   
   // Listen for tick processed events to immediately refetch data
   useEffect(() => {
@@ -150,6 +160,13 @@ export function Holopad() {
   // Get active research
   const activeResearch = researchData?.research || []
 
+  // Check if should show specialization modal
+  useEffect(() => {
+    if (empireState?.should_prompt_specialization) {
+      setShowSpecializationModal(true)
+    }
+  }, [empireState?.should_prompt_specialization])
+
   // Widget layout state - load from localStorage or use default
   const [layout, setLayout] = useState(() => {
     const savedLayout = localStorage.getItem('holopad-layout')
@@ -163,13 +180,16 @@ export function Holopad() {
     return [
       { i: 'operations', x: 0, y: 0, w: 6, h: 4 },
       { i: 'resources', x: 6, y: 0, w: 6, h: 4 },
-      { i: 'market_trends', x: 0, y: 4, w: 6, h: 4 },
-      { i: 'quantum_credits', x: 6, y: 4, w: 3, h: 4 },
-      { i: 'boosters', x: 9, y: 4, w: 3, h: 4 },
-      { i: 'achievements', x: 0, y: 8, w: 4, h: 4 },
-      { i: 'planets', x: 4, y: 8, w: 6, h: 5 },
-      { i: 'status', x: 10, y: 8, w: 2, h: 5 },
-      { i: 'announcements', x: 0, y: 13, w: 6, h: 6 },
+      { i: 'era_progression', x: 0, y: 4, w: 4, h: 4 },
+      { i: 'dark_matter', x: 4, y: 4, w: 4, h: 4 },
+      { i: 'research_effects', x: 8, y: 4, w: 4, h: 4 },
+      { i: 'market_trends', x: 0, y: 8, w: 6, h: 4 },
+      { i: 'quantum_credits', x: 6, y: 8, w: 3, h: 4 },
+      { i: 'boosters', x: 9, y: 8, w: 3, h: 4 },
+      { i: 'achievements', x: 0, y: 12, w: 4, h: 4 },
+      { i: 'planets', x: 4, y: 12, w: 6, h: 5 },
+      { i: 'status', x: 10, y: 12, w: 2, h: 5 },
+      { i: 'announcements', x: 0, y: 17, w: 6, h: 6 },
     ]
   })
 
@@ -292,6 +312,33 @@ export function Holopad() {
           />
         </div>
 
+        {/* Era Progression Widget */}
+        <div key="era_progression">
+          <EraProgressionWidget
+            onMinimize={() => handleMinimizeWidget('era_progression')}
+            onClose={() => handleCloseWidget('era_progression')}
+            isMinimized={minimizedWidgets.has('era_progression')}
+          />
+        </div>
+
+        {/* Dark Matter Widget */}
+        <div key="dark_matter">
+          <DarkMatterWidget
+            onMinimize={() => handleMinimizeWidget('dark_matter')}
+            onClose={() => handleCloseWidget('dark_matter')}
+            isMinimized={minimizedWidgets.has('dark_matter')}
+          />
+        </div>
+
+        {/* Research Effects Widget */}
+        <div key="research_effects">
+          <ResearchEffectsWidget
+            onMinimize={() => handleMinimizeWidget('research_effects')}
+            onClose={() => handleCloseWidget('research_effects')}
+            isMinimized={minimizedWidgets.has('research_effects')}
+          />
+        </div>
+
         {/* Empire Status Widget */}
         <div key="status">
           <EmpireStatusWidget
@@ -299,6 +346,8 @@ export function Holopad() {
             planetCount={planets.length}
             maxPlanets={6}
             fleetCount={fleets.length}
+            activeEra={empireState?.active_era || empireData?.active_era}
+            specializationsUnlocked={empireState?.specializations_unlocked || empireData?.specializations_unlocked || []}
             onMinimize={() => handleMinimizeWidget('status')}
             onClose={() => handleCloseWidget('status')}
             isMinimized={minimizedWidgets.has('status')}
@@ -360,6 +409,13 @@ export function Holopad() {
           />
         </div>
       )}
+
+      {/* Specialization Selection Modal */}
+      <SpecializationSelectionModal
+        open={showSpecializationModal}
+        onClose={() => setShowSpecializationModal(false)}
+        availableSpecializations={['industrial', 'military', 'relic']}
+      />
     </div>
   )
 }

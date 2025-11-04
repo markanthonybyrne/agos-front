@@ -19,6 +19,8 @@ import { Ship, Zap, Shield, Target, Plus, AlertCircle, Loader2 } from 'lucide-re
 import { Skeleton } from '@/components/ui/skeleton'
 import { getShipImage } from '@/lib/shipImages'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
+import { useGetMeQuery } from '@/api/endpoints/authApi'
 
 interface ShipsTabProps {
   planet: Planet
@@ -33,14 +35,28 @@ type BuildShipFormData = z.infer<typeof buildShipSchema>
 
 export function ShipsTab({ planet }: ShipsTabProps) {
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+  const [prerequisiteErrors, setPrerequisiteErrors] = useState<string[]>([])
 
-  const { data: definitions, isLoading: isLoadingDefinitions } = useGetShipDefinitionsQuery(undefined, {
-    refetchOnMountOrArgChange: true,
-  })
+  // Get empire era and specializations for filtering
+  const { data: meData } = useGetMeQuery()
+  const activeEra = meData?.empire?.active_era || 1
+  const specializationsUnlocked = meData?.empire?.specializations_unlocked || []
+
+  // Fetch ship definitions filtered by era and specialization
+  const { data: definitions, isLoading: isLoadingDefinitions } = useGetShipDefinitionsQuery(
+    {
+      era: activeEra,
+      // Note: Backend should filter by specializations automatically if authenticated
+    },
+    {
+      refetchOnMountOrArgChange: true,
+    }
+  )
   const { data: planetShips, isLoading: isLoadingShips } = useGetPlanetShipsQuery(Number(planet.id), {
     refetchOnMountOrArgChange: true,
   })
   const [buildShips, { isLoading: isBuilding }] = useBuildShipsMutation()
+  const [checkPrerequisites, { isLoading: isCheckingPrerequisites }] = useCheckPrerequisitesMutation()
 
   // Debug logging for ship definitions
   console.log('Full definitions response:', definitions)
@@ -147,12 +163,27 @@ export function ShipsTab({ planet }: ShipsTabProps) {
       return []
     }
     
-    // Fallback: Show all ship definitions if buildable ships aren't available
-    // Backend will validate prerequisites when building
-    console.log('✅ Using all ship definitions (buildable ships not available or not extracted):', allShipDefinitions.length)
-    console.log('Available ships:', allShipDefinitions.map(s => s.name || s.slug))
-    return allShipDefinitions
-  }, [isLoadingDefinitions, definitions?.ships, allShipDefinitions, buildableShips])
+    // Fallback: Filter ships by era and specialization
+    const filtered = allShipDefinitions.filter((ship: any) => {
+      // Era filter: era <= activeEra
+      if (ship.era !== undefined && ship.era > activeEra) {
+        return false
+      }
+      
+      // Specialization filter: specialization == 'general' OR in specializationsUnlocked
+      if (ship.specialization && ship.specialization !== 'general') {
+        if (!specializationsUnlocked.includes(ship.specialization)) {
+          return false
+        }
+      }
+      
+      return true
+    })
+    
+    console.log('⚠️ Using fallback: filtered ship definitions by era/specialization', filtered.length)
+    console.log('Available ships:', filtered.map(s => s.name || s.slug))
+    return filtered
+  }, [isLoadingDefinitions, definitions?.ships, allShipDefinitions, buildableShips, activeEra, specializationsUnlocked])
   
   console.log('🎯 FINAL Available ships for dropdown:', availableShips.length)
   if (availableShips.length > 0) {
@@ -203,6 +234,20 @@ export function ShipsTab({ planet }: ShipsTabProps) {
         return
       }
       
+      // Check prerequisites first
+      const checkResult = await checkPrerequisites({
+        type: 'ship',
+        slug: data.ship_slug,
+      }).unwrap()
+
+      if (!checkResult.data?.can_build) {
+        setPrerequisiteErrors(checkResult.data?.errors || [])
+        toast.error('Cannot build ships: Missing prerequisites')
+        return
+      }
+
+      setPrerequisiteErrors([])
+      
       // Log the ship definition to see what fields are available
       console.log('Ship definition for validation:', shipDef)
       
@@ -225,8 +270,12 @@ export function ShipsTab({ planet }: ShipsTabProps) {
       toast.success(`Queued ${data.quantity} ${shipDef.name} for construction!`)
       setBuildDialogOpen(false)
       buildForm.reset()
+      setPrerequisiteErrors([])
     } catch (error: any) {
       console.error('Build ships error:', error)
+      if (error?.data?.errors) {
+        setPrerequisiteErrors(error.data.errors)
+      }
       toast.error(error?.data?.message || 'Failed to build ships')
     }
   }
@@ -450,6 +499,20 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                     </div>
                   </div>
                   
+                  {/* Era and Specialization Badges */}
+                  <div className="flex gap-2 flex-wrap mb-2">
+                    {selectedShipDef.era && (
+                      <Badge variant={selectedShipDef.era === 1 ? 'default' : selectedShipDef.era === 2 ? 'secondary' : 'outline'}>
+                        Era {selectedShipDef.era}
+                      </Badge>
+                    )}
+                    {selectedShipDef.specialization && selectedShipDef.specialization !== 'general' && (
+                      <Badge variant={selectedShipDef.specialization === 'military' ? 'destructive' : selectedShipDef.specialization === 'industrial' ? 'secondary' : 'outline'}>
+                        {selectedShipDef.specialization.charAt(0).toUpperCase() + selectedShipDef.specialization.slice(1)}
+                      </Badge>
+                    )}
+                  </div>
+
                   <div className="space-y-2 pt-2 border-t border-border">
                     <h5 className="text-sm font-semibold">Cost:</h5>
                     <div className="flex justify-between text-sm items-center">
@@ -558,6 +621,23 @@ export function ShipsTab({ planet }: ShipsTabProps) {
                     </div>
                   </div>
 
+                  {/* Prerequisite Errors */}
+                  {prerequisiteErrors.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <AlertCircle className="w-4 h-4 text-destructive" />
+                        <span className="text-sm font-semibold text-destructive">
+                          Missing Prerequisites:
+                        </span>
+                      </div>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-destructive ml-4">
+                        {prerequisiteErrors.map((error, idx) => (
+                          <li key={idx}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {((planet.tellerium_balance < selectedShipDef.tellerium_cost * buildQuantity) ||
                     (planet.krypton_balance < selectedShipDef.krypton_cost * buildQuantity)) && (
                     <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -592,10 +672,10 @@ export function ShipsTab({ planet }: ShipsTabProps) {
               }
               className="flex-1"
             >
-              {isBuilding ? (
+              {isBuilding || isCheckingPrerequisites ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Building...
+                  {isCheckingPrerequisites ? 'Checking...' : 'Building...'}
                 </>
               ) : (
                 <>

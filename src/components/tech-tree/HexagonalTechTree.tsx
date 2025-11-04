@@ -11,6 +11,7 @@ export interface TechTreeItem {
   status: HexagonStatus
   prerequisites?: string[] // IDs of prerequisite items
   era?: number // Era this item belongs to
+  specialization?: 'general' | 'industrial' | 'military' | 'relic' // Specialization path
   position?: { row: number; col: number } // Optional manual positioning
   quantity?: number // Quantity of built items (for items that allow multiples)
   // Additional info for tooltips
@@ -19,6 +20,8 @@ export interface TechTreeItem {
   costKrypton?: number
   productionTellerium?: number
   productionKrypton?: number
+  upkeepTellerium?: number // Upkeep cost per tick
+  upkeepKrypton?: number // Upkeep cost per tick
   buildTime?: number
 }
 
@@ -32,6 +35,8 @@ interface HexagonalTechTreeProps {
   onItemClick?: (item: TechTreeItem) => void
   className?: string
   hexagonSize?: number
+  activeEra?: number // Current empire era for filtering
+  specializationsUnlocked?: string[] // Unlocked specializations for filtering
 }
 
 // Calculate hexagonal grid positions grouped by era
@@ -112,14 +117,35 @@ export function HexagonalTechTree({
   onItemClick,
   className,
   hexagonSize = 120,
+  activeEra = 5,
+  specializationsUnlocked = [],
 }: HexagonalTechTreeProps) {
+  // Filter items by era and specialization
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      // Era filter: item.era <= activeEra
+      if (item.era !== undefined && item.era > activeEra) {
+        return false
+      }
+      
+      // Specialization filter: specialization == 'general' OR specialization IN specializationsUnlocked
+      if (item.specialization && item.specialization !== 'general') {
+        if (!specializationsUnlocked.includes(item.specialization)) {
+          return false
+        }
+      }
+      
+      return true
+    })
+  }, [items, activeEra, specializationsUnlocked])
+
   const { positions, connections, bounds, eraHeaders } = useMemo(() => {
-    const pos = calculatePositions(items, hexagonSize)
-    const conn = calculateConnections(items, pos, hexagonSize)
+    const pos = calculatePositions(filteredItems, hexagonSize)
+    const conn = calculateConnections(filteredItems, pos, hexagonSize)
     
     // Group items by era for headers
     const eraGroups: Map<number, TechTreeItem[]> = new Map()
-    items.forEach(item => {
+    filteredItems.forEach(item => {
       const era = item.era || 1
       if (!eraGroups.has(era)) {
         eraGroups.set(era, [])
@@ -177,7 +203,7 @@ export function HexagonalTechTree({
     }
     
     return { positions: pos, connections: conn, bounds, eraHeaders }
-  }, [items, hexagonSize])
+  }, [filteredItems, hexagonSize])
 
   return (
     <div className={cn('relative w-full h-full overflow-auto', className)}>
@@ -271,7 +297,7 @@ export function HexagonalTechTree({
           height: bounds.height,
         }}
       >
-        {items.map(item => {
+        {filteredItems.map(item => {
           const pos = positions.get(item.id)
           if (!pos) return null
           
@@ -312,7 +338,7 @@ export function HexagonalTechTree({
                       )}
                       {(item.costTellerium !== undefined || item.costKrypton !== undefined) && (
                         <div className="pt-3 border-t border-cyan-500/20 space-y-2">
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Cost</div>
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Build Cost</div>
                           {item.costTellerium !== undefined && item.costTellerium > 0 && (
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-2">
@@ -329,6 +355,30 @@ export function HexagonalTechTree({
                                 <span className="text-xs font-medium">Krypton</span>
                               </div>
                               <span className="text-xs font-mono font-bold text-krypton">{item.costKrypton.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Upkeep Costs */}
+                      {(item.upkeepTellerium !== undefined || item.upkeepKrypton !== undefined) && (
+                        <div className="pt-3 border-t border-yellow-500/20 space-y-2">
+                          <div className="text-xs font-semibold text-yellow-400 uppercase tracking-wider mb-2">Upkeep (per tick)</div>
+                          {item.upkeepTellerium !== undefined && item.upkeepTellerium > 0 && (
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <img src={getTelleriumImage()} alt="T" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
+                                <span className="text-xs font-medium">Tellerium</span>
+                              </div>
+                              <span className="text-xs font-mono font-bold text-yellow-400">-{item.upkeepTellerium.toLocaleString()}/tick</span>
+                            </div>
+                          )}
+                          {item.upkeepKrypton !== undefined && item.upkeepKrypton > 0 && (
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <img src={getKryptonImage()} alt="K" className="w-4 h-4" style={{ imageRendering: 'auto' }} />
+                                <span className="text-xs font-medium">Krypton</span>
+                              </div>
+                              <span className="text-xs font-mono font-bold text-yellow-400">-{item.upkeepKrypton.toLocaleString()}/tick</span>
                             </div>
                           )}
                         </div>

@@ -8,8 +8,14 @@ import {
 
 export const defencesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getDefenceDefinitions: builder.query<{ defences: DefenceDefinition[] }, void>({
-      query: () => '/defences/definitions',
+    getDefenceDefinitions: builder.query<
+      { defences: DefenceDefinition[] },
+      { era?: number; specialization?: string } | void
+    >({
+      query: (params) => ({
+        url: '/defences/definitions',
+        params: params ? { era: params.era, specialization: params.specialization } : {},
+      }),
       providesTags: ['Defence'],
     }),
     getPlanetDefences: builder.query<{ defences: Defence[] }, number>({

@@ -17,10 +17,11 @@ import { BuildingPanel } from '@/components/planet/BuildingPanel'
 import { Planet } from '@/types/api.types'
 import { formatResource, formatNumber } from '@/lib/formatters'
 import { toast } from 'sonner'
-import { Shield, Zap, AlertTriangle, Target, Bomb, Plus, Trash2, Loader2 } from 'lucide-react'
+import { Shield, Zap, AlertTriangle, Target, Bomb, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getDefenseImage } from '@/lib/defenseImages'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
 
 interface DefensesTabProps {
   planet: Planet
@@ -37,14 +38,28 @@ export function DefensesTab({ planet }: DefensesTabProps) {
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
   const [destroyDefenceId, setDestroyDefenceId] = useState<number | null>(null)
   const [destroyQuantity, setDestroyQuantity] = useState<number>(1)
+  const [prerequisiteErrors, setPrerequisiteErrors] = useState<string[]>([])
 
-  const { data: definitions, isLoading: isLoadingDefinitions } = useGetDefenceDefinitionsQuery(undefined, {
-    refetchOnMountOrArgChange: true,
-  })
+  const { data: meData } = useGetMeQuery()
+  
+  // Get empire era and specializations for filtering
+  const activeEra = meData?.empire?.active_era || 1
+  const specializationsUnlocked = meData?.empire?.specializations_unlocked || []
+  
+  // Fetch defense definitions filtered by era and specialization
+  const { data: definitions, isLoading: isLoadingDefinitions } = useGetDefenceDefinitionsQuery(
+    {
+      era: activeEra,
+      // Note: Backend should filter by specializations automatically if authenticated
+      // But we can also filter client-side as a fallback
+    },
+    {
+      refetchOnMountOrArgChange: true,
+    }
+  )
   const { data: planetDefences, isLoading: isLoadingDefences } = useGetPlanetDefencesQuery(Number(planet.id), {
     refetchOnMountOrArgChange: true,
   })
-  const { data: meData } = useGetMeQuery()
 
   // Get buildable items to see what can be built on this planet
   const { data: buildableItemsData } = useGetBuildableItemsQuery(Number(planet.id), {
@@ -63,6 +78,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
   
   const [buildDefences, { isLoading: isBuilding }] = useBuildDefencesMutation()
   const [destroyDefences, { isLoading: isDestroying }] = useDestroyDefencesMutation()
+  const [checkPrerequisites, { isLoading: isCheckingPrerequisites }] = useCheckPrerequisitesMutation()
 
   // Get all defence definitions for prerequisite checking
   const allDefenceDefinitions = (definitions?.defences || []) as any[]
@@ -116,11 +132,26 @@ export function DefensesTab({ planet }: DefensesTabProps) {
       return []
     }
     
-    // Fallback: Show all defence definitions if buildable defences aren't available
-    // Backend will validate prerequisites when building
-    console.log('⚠️ Using fallback: all defence definitions')
-    return allDefenceDefinitions
-  }, [buildableDefences, isLoadingDefinitions, definitions?.defences, allDefenceDefinitions])
+    // Fallback: Filter defences by era and specialization
+    const filtered = allDefenceDefinitions.filter((def: any) => {
+      // Era filter: era <= activeEra
+      if (def.era !== undefined && def.era > activeEra) {
+        return false
+      }
+      
+      // Specialization filter: specialization == 'general' OR in specializationsUnlocked
+      if (def.specialization && def.specialization !== 'general') {
+        if (!specializationsUnlocked.includes(def.specialization)) {
+          return false
+        }
+      }
+      
+      return true
+    })
+    
+    console.log('⚠️ Using fallback: filtered defence definitions by era/specialization', filtered.length)
+    return filtered
+  }, [buildableDefences, isLoadingDefinitions, definitions?.defences, allDefenceDefinitions, activeEra, specializationsUnlocked])
 
   const buildForm = useForm<BuildDefenceFormData>({
     resolver: zodResolver(buildDefenceSchema),
@@ -148,6 +179,20 @@ export function DefensesTab({ planet }: DefensesTabProps) {
 
   const handleBuildDefences = async (data: BuildDefenceFormData) => {
     try {
+      // Check prerequisites first
+      const checkResult = await checkPrerequisites({
+        type: 'defence',
+        slug: data.defence_slug,
+      }).unwrap()
+
+      if (!checkResult.data?.can_build) {
+        setPrerequisiteErrors(checkResult.data?.errors || [])
+        toast.error('Cannot build defences: Missing prerequisites')
+        return
+      }
+
+      setPrerequisiteErrors([])
+
       await buildDefences({
         planetId: Number(planet.id),
         data: {
@@ -159,7 +204,11 @@ export function DefensesTab({ planet }: DefensesTabProps) {
       toast.success(`Queued ${data.quantity} ${getDefenceDefinition(data.defence_slug)?.name || 'defences'} for construction!`)
       setBuildDialogOpen(false)
       buildForm.reset()
+      setPrerequisiteErrors([])
     } catch (error: any) {
+      if (error?.data?.errors) {
+        setPrerequisiteErrors(error.data.errors)
+      }
       toast.error(error?.data?.message || 'Failed to build defences')
     }
   }
@@ -351,6 +400,20 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                     </div>
                   </div>
                   
+                  {/* Era and Specialization Badges */}
+                  <div className="flex gap-2 flex-wrap mb-2">
+                    {selectedDefenceDef.era && (
+                      <Badge variant={selectedDefenceDef.era === 1 ? 'default' : selectedDefenceDef.era === 2 ? 'secondary' : 'outline'}>
+                        Era {selectedDefenceDef.era}
+                      </Badge>
+                    )}
+                    {selectedDefenceDef.specialization && selectedDefenceDef.specialization !== 'general' && (
+                      <Badge variant={selectedDefenceDef.specialization === 'military' ? 'destructive' : selectedDefenceDef.specialization === 'industrial' ? 'secondary' : 'outline'}>
+                        {selectedDefenceDef.specialization.charAt(0).toUpperCase() + selectedDefenceDef.specialization.slice(1)}
+                      </Badge>
+                    )}
+                  </div>
+                  
                   <div className="space-y-2 pt-2 border-t border-border">
                     <h5 className="text-sm font-semibold">Cost:</h5>
                     <div className="flex justify-between text-sm items-center">
@@ -437,6 +500,23 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                     )}
                   </div>
 
+                  {/* Prerequisite Errors */}
+                  {prerequisiteErrors.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <AlertCircle className="w-4 h-4 text-destructive" />
+                        <span className="text-sm font-semibold text-destructive">
+                          Missing Prerequisites:
+                        </span>
+                      </div>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-destructive ml-4">
+                        {prerequisiteErrors.map((error, idx) => (
+                          <li key={idx}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {((planet.tellerium_balance < selectedDefenceDef.tellerium_cost * buildQuantity) ||
                     (planet.krypton_balance < selectedDefenceDef.krypton_cost * buildQuantity)) && (
                     <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -465,16 +545,18 @@ export function DefensesTab({ planet }: DefensesTabProps) {
               type="submit"
               disabled={
                 isBuilding ||
+                isCheckingPrerequisites ||
                 !selectedDefenceDef ||
                 planet.tellerium_balance < ((selectedDefenceDef?.tellerium_cost || 0) * buildQuantity) ||
-                planet.krypton_balance < ((selectedDefenceDef?.krypton_cost || 0) * buildQuantity)
+                planet.krypton_balance < ((selectedDefenceDef?.krypton_cost || 0) * buildQuantity) ||
+                prerequisiteErrors.length > 0
               }
               className="flex-1"
             >
-              {isBuilding ? (
+              {isBuilding || isCheckingPrerequisites ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Building...
+                  {isCheckingPrerequisites ? 'Checking...' : 'Building...'}
                 </>
               ) : (
                 <>

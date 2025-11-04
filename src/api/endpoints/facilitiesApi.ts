@@ -8,8 +8,14 @@ import {
 
 export const facilitiesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getFacilityDefinitions: builder.query<{ facilities: FacilityDefinition[] }, void>({
-      query: () => '/facilities/definitions',
+    getFacilityDefinitions: builder.query<
+      { facilities: FacilityDefinition[] },
+      { era?: number; specialization?: string } | void
+    >({
+      query: (params) => ({
+        url: '/facilities/definitions',
+        params: params ? { era: params.era, specialization: params.specialization } : {},
+      }),
       providesTags: ['Facility'],
     }),
     getPlanetFacilities: builder.query<{ facilities: Facility[] }, number>({
@@ -95,6 +101,44 @@ export const facilitiesApi = apiSlice.injectEndpoints({
         'Resource',
       ],
     }),
+    previewFacility: builder.query<
+      {
+        facility: {
+          slug: string
+          name: string
+          per_tick: Record<string, number>
+          upkeep: Record<string, number>
+        }
+        projected_production: {
+          tellerium_per_tick: number
+          krypton_per_tick: number
+          dark_matter_per_tick?: number
+        }
+        projected_upkeep: {
+          tellerium_per_tick: number
+          krypton_per_tick: number
+        }
+        net_production: {
+          tellerium_per_tick: number
+          krypton_per_tick: number
+          dark_matter_per_tick?: number
+        }
+        applied_multipliers: Record<string, number>
+      },
+      { planetId: number; facilitySlug: string }
+    >({
+      query: ({ planetId, facilitySlug }) => ({
+        url: '/facilities/preview',
+        params: {
+          planet_id: planetId,
+          facility_slug: facilitySlug,
+        },
+      }),
+      providesTags: (result, error, { planetId }) => [
+        { type: 'Facility', id: planetId },
+        'Empire',
+      ],
+    }),
   }),
 })
 
@@ -106,4 +150,5 @@ export const {
   useUpgradeFacilityBySlugMutation,
   useDestroyFacilityMutation,
   useCancelFacilityConstructionMutation,
+  usePreviewFacilityQuery,
 } = facilitiesApi

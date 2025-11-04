@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { ResearchTree } from '@/components/research/ResearchTree'
 import { Planet } from '@/types/api.types'
-import { formatResource } from '@/lib/formatters'
+import { formatResource, formatNumber } from '@/lib/formatters'
 import { toast } from 'sonner'
 import { FlaskConical, CheckCircle, Lock, Loader2, AlertCircle, Building2, Zap } from 'lucide-react'
+import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
@@ -30,9 +31,23 @@ export function ResearchTab({ planet }: ResearchTabProps) {
     refetchOnMountOrArgChange: true,
   })
   const [startResearch, { isLoading: isStarting }] = useStartResearchMutation()
+  const [checkPrerequisites, { isLoading: isCheckingPrerequisites }] = useCheckPrerequisitesMutation()
 
   const handleStartResearch = async (researchSlug: string) => {
     try {
+      // Check prerequisites first
+      const checkResult = await checkPrerequisites({
+        type: 'research',
+        slug: researchSlug,
+      }).unwrap()
+
+      if (!checkResult.data?.can_build) {
+        toast.error('Cannot start research: Missing prerequisites', {
+          description: checkResult.data?.errors?.join(', ') || 'Check requirements',
+        })
+        return
+      }
+
       await startResearch({ 
         planet_id: Number(planet.id),
         research_slug: researchSlug 
@@ -41,7 +56,13 @@ export function ResearchTab({ planet }: ResearchTabProps) {
       setStartResearchDialogOpen(false)
       setSelectedResearchSlug(null)
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to start research')
+      if (error?.data?.errors) {
+        toast.error('Cannot start research', {
+          description: error.data.errors.join(', '),
+        })
+      } else {
+        toast.error(error?.data?.message || 'Failed to start research')
+      }
     }
   }
 
@@ -136,8 +157,18 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                   <div key={slug} className="flex items-start gap-3 p-3 bg-green/10 rounded-lg border border-green/20">
                     <CheckCircle className="w-5 h-5 text-green-400 mt-0.5" />
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="font-medium">{research.name}</h4>
+                        {research.era && (
+                          <Badge variant="outline" className="text-xs">
+                            Era {research.era}
+                          </Badge>
+                        )}
+                        {research.specialization && research.specialization !== 'general' && (
+                          <Badge variant={research.specialization === 'military' ? 'destructive' : research.specialization === 'industrial' ? 'secondary' : 'outline'} className="text-xs">
+                            {research.specialization.charAt(0).toUpperCase() + research.specialization.slice(1)}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
                           Completed
                         </Badge>
@@ -231,11 +262,23 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <FlaskConical className="w-5 h-5 text-cyan-400" />
                         {research.name}
-                        {research.completed && (
-                          <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30 ml-auto">
-                            Completed
-                          </Badge>
-                        )}
+                        <div className="flex gap-2 ml-auto">
+                          {research.era && (
+                            <Badge variant="outline">
+                              Era {research.era}
+                            </Badge>
+                          )}
+                          {research.specialization && research.specialization !== 'general' && (
+                            <Badge variant={research.specialization === 'military' ? 'destructive' : research.specialization === 'industrial' ? 'secondary' : 'outline'}>
+                              {research.specialization.charAt(0).toUpperCase() + research.specialization.slice(1)}
+                            </Badge>
+                          )}
+                          {research.completed && (
+                            <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                              Completed
+                            </Badge>
+                          )}
+                        </div>
                       </CardTitle>
                       <CardDescription>
                         {research.description}
@@ -361,18 +404,40 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                         </div>
                       )}
 
+                      {/* Effects */}
                       {research.effects && Object.keys(research.effects).length > 0 && (
-                        <div className="p-3 bg-cyan/10 rounded-lg">
-                          <p className="text-sm font-medium text-cyan-400 mb-1">Effects:</p>
-                          <div className="space-y-1 text-sm">
-                            {Object.entries(research.effects).map(([key, value]) => (
-                              <div key={key} className="flex justify-between">
-                                <span>{key.replace(/_/g, ' ')}:</span>
-                                <span className="text-green-400">
-                                  {typeof value === 'number' && value < 1 ? `+${(value * 100).toFixed(0)}%` : `+${value}`}
-                                </span>
-                              </div>
-                            ))}
+                        <div className="p-3 bg-cyan/10 rounded-lg border border-cyan/20">
+                          <p className="text-sm font-medium text-cyan-400 mb-2 flex items-center gap-2">
+                            <Zap className="w-4 h-4" />
+                            Research Effects:
+                          </p>
+                          <div className="space-y-2 text-sm">
+                            {Object.entries(research.effects).map(([key, value]) => {
+                              const isMultiplier = key.includes('_mul') || key.includes('reduction')
+                              const isBoolean = typeof value === 'boolean'
+                              const displayValue = isBoolean
+                                ? (value ? 'Enabled' : 'Disabled')
+                                : isMultiplier
+                                ? (value < 1 
+                                    ? `${(value * 100).toFixed(1)}% reduction` 
+                                    : `+${((value - 1) * 100).toFixed(1)}% increase`)
+                                : `+${formatNumber(value as number)}`
+                              
+                              const effectName = key
+                                .replace(/_/g, ' ')
+                                .replace(/\b\w/g, l => l.toUpperCase())
+                                .replace('Mul', 'Multiplier')
+                                .replace('Per Tick', '/Tick')
+                              
+                              return (
+                                <div key={key} className="flex justify-between items-center p-2 bg-muted/20 rounded">
+                                  <span className="text-muted-foreground">{effectName}:</span>
+                                  <Badge variant="outline" className="text-green-400 border-green-500/30">
+                                    {displayValue}
+                                  </Badge>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )}
@@ -500,9 +565,9 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                                 </Button>
                                 <Button
                                   onClick={() => handleStartResearch(research.slug)}
-                                  disabled={isStarting || !canAfford}
+                                  disabled={isStarting || isCheckingPrerequisites || !canAfford}
                                 >
-                                  {isStarting ? (
+                                  {isStarting || isCheckingPrerequisites ? (
                                     <>
                                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                       Starting...

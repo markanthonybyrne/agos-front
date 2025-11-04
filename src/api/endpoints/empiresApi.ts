@@ -1,5 +1,18 @@
 import { apiSlice } from '../apiSlice'
-import { ApiResponse, Empire, Planet, Fleet, PaginatedResponse, CombatLog } from '@/types/api.types'
+import {
+  ApiResponse,
+  Empire,
+  Planet,
+  Fleet,
+  PaginatedResponse,
+  CombatLog,
+  EmpireState,
+  EraProgression,
+  DarkMatterInfo,
+  ResearchEffectsSummary,
+  SelectSpecializationRequest,
+  SelectSpecializationResponse,
+} from '@/types/api.types'
 
 export const empiresApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -26,8 +39,45 @@ export const empiresApi = apiSlice.injectEndpoints({
         { type: 'CombatLog', id: `empire-${empireId}` },
       ],
     }),
+    // Tech Tree System Endpoints
+    getEmpireState: builder.query<EmpireState, void>({
+      query: () => '/empire/state',
+      providesTags: ['Empire'],
+    }),
+    selectSpecialization: builder.mutation<
+      ApiResponse<SelectSpecializationResponse>,
+      SelectSpecializationRequest
+    >({
+      query: (data) => ({
+        url: '/empire/specializations/select',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Empire'],
+    }),
+    getEraProgression: builder.query<EraProgression, void>({
+      query: () => '/empire/era-progression',
+      providesTags: ['Empire'],
+    }),
+    getDarkMatterInfo: builder.query<DarkMatterInfo, void>({
+      query: () => '/empire/dark-matter',
+      providesTags: ['Empire'],
+    }),
+    getTechTree: builder.query<any, void>({
+      query: () => '/empire/tech-tree',
+      providesTags: ['Empire', 'Facility', 'Research', 'Ship', 'Defence'],
+    }),
   }),
 })
 
-export const { useGetEmpiresQuery, useGetEmpireQuery, useGetCombatLogsQuery } = empiresApi
+export const {
+  useGetEmpiresQuery,
+  useGetEmpireQuery,
+  useGetCombatLogsQuery,
+  useGetEmpireStateQuery,
+  useSelectSpecializationMutation,
+  useGetEraProgressionQuery,
+  useGetDarkMatterInfoQuery,
+  useGetTechTreeQuery,
+} = empiresApi
 
