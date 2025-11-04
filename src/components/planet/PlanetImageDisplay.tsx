@@ -76,6 +76,9 @@ export function PlanetImageDisplay({
     }
   }
 
+  // Calculate planet display size (25% larger than grid)
+  const planetDisplaySize = planetSize * 1.25
+
   return (
     <div 
       ref={containerRef}
@@ -93,8 +96,8 @@ export function PlanetImageDisplay({
           )}
           style={{ 
             imageRendering: 'auto',
-            width: `${planetSize}px`,
-            height: `${planetSize}px`,
+            width: `${planetDisplaySize}px`,
+            height: `${planetDisplaySize}px`,
             maxWidth: '100%',
             maxHeight: '100%',
             transform: 'translateX(60px)', // Move to the right
@@ -108,13 +111,13 @@ export function PlanetImageDisplay({
           "absolute inset-0 blur-2xl rounded-full -z-10 pointer-events-none",
           getPlanetGlowColor(planetSlug).replace('shadow-', 'bg-').replace('/50', '/20')
         )} style={{
-          width: `${planetSize}px`,
-          height: `${planetSize}px`,
+          width: `${planetDisplaySize}px`,
+          height: `${planetDisplaySize}px`,
           left: '50%',
           top: '50%',
           transform: 'translate(calc(-50% + 60px), -50%)', // Move to the right
         }} />
-        {/* Geodesic grid overlay */}
+        {/* Geodesic grid overlay - keep original size */}
         <GeodesicGrid planetId={planetId} planetSize={planetSize} />
       </div>
 

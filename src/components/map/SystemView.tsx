@@ -2,7 +2,7 @@ import { useMemo, memo } from 'react'
 import { Planet } from '@/types/api.types'
 import { SystemData, calculateOrbitRadius, calculateOrbitAngle } from '@/lib/systemUtils'
 import { getPlanetXY } from '@/lib/coordinates'
-import { getPlanetImage, getRandomSolImageForSystem } from '@/lib/planetImages'
+import { getPlanetImage, getRandomSolImageForSystem, getRandomAsteroidImageForPlanet } from '@/lib/planetImages'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
 
@@ -196,7 +196,14 @@ function SystemView({
             planetSlug === 'sol_massive' || planetSlug === 'sol-massive') {
           planetSlug = undefined // Will fall back to aridImg
         }
-        const planetImage = getPlanetImage(planetSlug)
+        
+        // For asteroid belt planets, use random asteroid images from universe folder
+        let planetImage: string | undefined
+        if (planetSlug === 'asteroid' || planetSlug === 'asteroid_belt' || planetSlug === 'asteroid-belt') {
+          planetImage = getRandomAsteroidImageForPlanet(planet.coordinate)
+        } else {
+          planetImage = getPlanetImage(planetSlug)
+        }
         const isHovered = hoveredPlanet?.id === planet.id
         // Keep planet size constant to prevent jumping on hover
         const planetSize = basePlanetSize
@@ -240,8 +247,8 @@ function SystemView({
               </>
             )}
             {/* Planet label - only show at planet level zoom (scale >= 3.0) */}
-            {/* At very high zoom (700%+), only show labels on hover to reduce clutter */}
-            {(scale >= 3.0 && scale < 7.0) && (
+            {/* At 300-400% zoom, show labels normally */}
+            {(scale >= 3.0 && scale < 4.0) && (
               <g>
                 <text
                   x={planetXY.x}
@@ -249,7 +256,7 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-white font-mono font-semibold"
                   style={{ 
-                    fontSize: `${scale >= 6.0 ? '8px' : scale >= 5.0 ? '9px' : scale >= 4.0 ? '10px' : Math.max(6, Math.min(8, logScale * 2))}px`,
+                    fontSize: `${Math.max(6, Math.min(8, logScale * 2))}px`,
                     textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
@@ -261,8 +268,37 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-gray-300 font-mono"
                   style={{ 
-                    fontSize: `${scale >= 6.0 ? '7px' : scale >= 5.0 ? '8px' : scale >= 4.0 ? '9px' : Math.max(5, Math.min(7, logScale * 1.5))}px`,
+                    fontSize: `${Math.max(5, Math.min(7, logScale * 1.5))}px`,
                     textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  {formatCoordinate(planet.coordinate)}
+                </text>
+              </g>
+            )}
+            {/* At 400%+ zoom, only show labels on hover to reduce clutter */}
+            {(scale >= 4.0 && scale < 7.0) && isHovered && (
+              <g>
+                <text
+                  x={planetXY.x}
+                  y={planetXY.y + planetSize / 2 + 14}
+                  textAnchor="middle"
+                  className="fill-white font-mono font-semibold"
+                  style={{ 
+                    fontSize: '7px',
+                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                  }}
+                >
+                  Planet {formatCoordinate(planet.coordinate)}
+                </text>
+                <text
+                  x={planetXY.x}
+                  y={planetXY.y + planetSize / 2 + 24}
+                  textAnchor="middle"
+                  className="fill-gray-300 font-mono"
+                  style={{ 
+                    fontSize: '6px',
+                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
                   {formatCoordinate(planet.coordinate)}
@@ -278,7 +314,7 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-white font-mono font-semibold"
                   style={{ 
-                    fontSize: '10px',
+                    fontSize: '7px',
                     textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
@@ -290,7 +326,7 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-gray-300 font-mono"
                   style={{ 
-                    fontSize: '9px',
+                    fontSize: '6px',
                     textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >

@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { formatCoordinate } from '@/lib/coordinates'
+import { getSystemXyRange } from '@/lib/coordinateUtils'
+import { useAuth } from '@/hooks/useAuth'
 import { 
   Send, 
   MapPin, 
@@ -22,6 +24,7 @@ const signalFormSchema = z.object({
   target_quadrant: z.number().min(1, 'Quadrant must be at least 1'),
   target_sector: z.number().min(1, 'Sector must be at least 1'),
   target_galaxy: z.number().min(1, 'Galaxy must be at least 1'),
+  target_system: z.number().min(1, 'System must be at least 1'),
   target_planet: z.number().min(1, 'Planet must be at least 1'),
   type: z.enum(['fleet', 'orbital_defence', 'planetary', 'all_frequency', 'events']),
 })
@@ -29,7 +32,7 @@ const signalFormSchema = z.object({
 type SignalFormData = z.infer<typeof signalFormSchema>
 
 interface SignalFormProps {
-  onLaunch: (data: { target_quadrant: number; target_sector: number; target_galaxy: number; target_planet: number; type: string }) => void | Promise<void>
+  onLaunch: (data: { origin_planet_id: number; target_quadrant: number; target_sector: number; target_galaxy: number; target_system: number; target_planet: number; target_x: number; target_y: number; type: string }) => void | Promise<void>
   isLoading: boolean
 }
 
@@ -72,8 +75,9 @@ const signalTypes = [
 ]
 
 export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
+  const { empire } = useAuth()
   const [coordinateInput, setCoordinateInput] = useState('')
-  const [parsedCoordinate, setParsedCoordinate] = useState<{quadrant: number, sector: number, galaxy: number, planet: number} | null>(null)
+  const [parsedCoordinate, setParsedCoordinate] = useState<{quadrant: number, sector: number, galaxy: number, system: number, planet: number} | null>(null)
 
   const {
     register,
@@ -88,6 +92,7 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
       target_quadrant: 1,
       target_sector: 1,
       target_galaxy: 1,
+      target_system: 1,
       target_planet: 1
     }
   })
@@ -96,13 +101,24 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
   const selectedSignalType = signalTypes.find(t => t.value === selectedType)
 
   const parseCoordinate = (input: string) => {
-    // Parse coordinate format: Q:S:G:P (e.g., "1:2:3:4")
+    // Parse coordinate format: Q:S:G:SY:P (e.g., "1:1:1:1:1") - 5-level system
     const parts = input.split(':').map(p => parseInt(p.trim()))
+    if (parts.length === 5 && parts.every(p => !isNaN(p) && p > 0)) {
+      return {
+        quadrant: parts[0],
+        sector: parts[1],
+        galaxy: parts[2],
+        system: parts[3],
+        planet: parts[4]
+      }
+    }
+    // Fallback for 4-level format (legacy) - assume system 1
     if (parts.length === 4 && parts.every(p => !isNaN(p) && p > 0)) {
       return {
         quadrant: parts[0],
         sector: parts[1],
         galaxy: parts[2],
+        system: 1, // Default to system 1 for legacy format
         planet: parts[3]
       }
     }
@@ -118,20 +134,42 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
       setValue('target_quadrant', parsed.quadrant)
       setValue('target_sector', parsed.sector)
       setValue('target_galaxy', parsed.galaxy)
+      setValue('target_system', parsed.system)
       setValue('target_planet', parsed.planet)
     }
   }
 
   const onSubmit = (data: SignalFormData) => {
     if (!parsedCoordinate) {
-      toast.error('Invalid coordinate format. Use Q:S:G:P (e.g., 1:2:3:4)')
+      toast.error('Invalid coordinate format. Use Q:S:G:SY:P (e.g., 1:1:1:1:1)')
       return
     }
+    if (!empire?.homeworld_planet_id) {
+      toast.error('Unable to determine origin planet. Please ensure you are logged in.')
+      return
+    }
+    
+    // Get system X/Y range and use center point for target coordinates
+    const systemRange = getSystemXyRange(
+      data.target_quadrant,
+      data.target_sector,
+      data.target_galaxy,
+      data.target_system
+    )
+    
+    // Use center of system range as target coordinates
+    const target_x = Math.floor((systemRange.x_min + systemRange.x_max) / 2)
+    const target_y = Math.floor((systemRange.y_min + systemRange.y_max) / 2)
+    
     onLaunch({
+      origin_planet_id: empire.homeworld_planet_id,
       target_quadrant: data.target_quadrant,
       target_sector: data.target_sector,
       target_galaxy: data.target_galaxy,
+      target_system: data.target_system,
       target_planet: data.target_planet,
+      target_x: target_x,
+      target_y: target_y,
       type: data.type
     })
   }
@@ -144,20 +182,20 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
         <div className="space-y-2">
           <Input
             id="coordinate_input"
-            placeholder="Enter coordinate (e.g., 1:2:3:4)"
+            placeholder="Enter coordinate (e.g., 1:1:1:1:1)"
             value={coordinateInput}
             onChange={(e) => handleCoordinateChange(e.target.value)}
           />
           {parsedCoordinate && (
             <div className="flex items-center gap-2 text-sm text-green-400">
               <MapPin className="w-4 h-4" />
-              <span>Valid coordinate: {parsedCoordinate.quadrant}:{parsedCoordinate.sector}:{parsedCoordinate.galaxy}:{parsedCoordinate.planet}</span>
+              <span>Valid coordinate: {parsedCoordinate.quadrant}:{parsedCoordinate.sector}:{parsedCoordinate.galaxy}:{parsedCoordinate.system}:{parsedCoordinate.planet}</span>
             </div>
           )}
           {coordinateInput && !parsedCoordinate && (
             <div className="flex items-center gap-2 text-sm text-destructive">
               <AlertCircle className="w-4 h-4" />
-              <span>Invalid format. Use Q:S:G:P (e.g., 1:2:3:4)</span>
+              <span>Invalid format. Use Q:S:G:SY:P (e.g., 1:1:1:1:1)</span>
             </div>
           )}
         </div>
@@ -220,7 +258,7 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
               <div>
                 <span className="text-muted-foreground">Target:</span>
                 <span className="ml-2 font-medium font-mono">
-                  {parsedCoordinate ? `${parsedCoordinate.quadrant}:${parsedCoordinate.sector}:${parsedCoordinate.galaxy}:${parsedCoordinate.planet}` : 'Invalid coordinate'}
+                  {parsedCoordinate ? `${parsedCoordinate.quadrant}:${parsedCoordinate.sector}:${parsedCoordinate.galaxy}:${parsedCoordinate.system}:${parsedCoordinate.planet}` : 'Invalid coordinate'}
                 </span>
               </div>
               <div>

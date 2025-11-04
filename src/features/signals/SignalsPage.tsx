@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useGetSignalsQuery, useLaunchSignalMutation, useGetSignalStatisticsQuery } from '@/api/endpoints/signalsApi'
 import { formatDate, formatDateTime } from '@/lib/formatters'
+import { formatCoordinate } from '@/lib/coordinates'
+import { xyToHierarchical } from '@/lib/coordinateUtils'
 import { 
   Scan, 
   Send, 
@@ -48,13 +50,22 @@ export function SignalsPage() {
   console.log('SignalsPage - signals:', signals)
   
   const filteredSignals = signals.filter(signal => {
-    const coordinateString = `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_planet}`
+    // Format coordinate - prefer target_x and target_y if available (source of truth)
+    let coordinateString = ''
+    if (signal.target_x !== undefined && signal.target_y !== undefined) {
+      const coord = xyToHierarchical(signal.target_x, signal.target_y)
+      coordinateString = `${coord.quadrant}:${coord.sector}:${coord.galaxy}:${coord.system}:${coord.planet}`
+    } else if (signal.target_system && signal.target_system > 0) {
+      coordinateString = `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_system}:${signal.target_planet}`
+    } else {
+      coordinateString = `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_planet}`
+    }
     const matchesSearch = coordinateString.includes(searchTerm)
     const matchesType = signalTypeFilter === 'all' || signal.type === signalTypeFilter
     return matchesSearch && matchesType
   })
 
-  const handleLaunchSignal = async (data: { target_quadrant: number; target_sector: number; target_galaxy: number; target_planet: number; type: string }) => {
+  const handleLaunchSignal = async (data: { origin_planet_id: number; target_quadrant: number; target_sector: number; target_galaxy: number; target_system: number; target_planet: number; target_x: number; target_y: number; type: string }) => {
     try {
       await launchSignal({
         ...data,

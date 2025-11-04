@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useGetSignalDetailsQuery } from '@/api/endpoints/signalsApi'
 import { formatDateTime } from '@/lib/formatters'
+import { xyToHierarchical } from '@/lib/coordinateUtils'
 import { 
   X, 
   MapPin, 
@@ -161,7 +162,18 @@ export function SignalResults({ signalId, onClose }: SignalResultsProps) {
                   <div>
                     <span className="text-muted-foreground">Target:</span>
                     <span className="ml-2 font-medium font-mono">
-                      {signal.target_quadrant}:{signal.target_sector}:{signal.target_galaxy}:{signal.target_planet}
+                      {(() => {
+                        // Prefer target_x and target_y if available (source of truth)
+                        if (signal.target_x !== undefined && signal.target_y !== undefined) {
+                          const coord = xyToHierarchical(signal.target_x, signal.target_y)
+                          return `${coord.quadrant}:${coord.sector}:${coord.galaxy}:${coord.system}:${coord.planet}`
+                        }
+                        // Fallback to hierarchical fields if X/Y not available
+                        if (signal.target_system && signal.target_system > 0) {
+                          return `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_system}:${signal.target_planet}`
+                        }
+                        return `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_planet}`
+                      })()}
                     </span>
                   </div>
                   <div>

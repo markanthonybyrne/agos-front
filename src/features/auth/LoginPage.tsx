@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowRight, BookOpen, UserPlus, Mail, Lock, User, Crown, Globe } from 'lucide-react'
+import { ArrowRight, BookOpen, UserPlus, Mail, Lock, User, Crown, Globe, ArrowBigRightDash } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/brandImages'
 // Import background images so Vite bundles them
@@ -223,8 +223,8 @@ export function LoginPage() {
             <div className="flex justify-center lg:justify-start">
               <img 
                 src={BRAND.logo} 
-                alt="agameof.space" 
-                className="h-40 lg:h-48 w-auto object-contain filter drop-shadow-[0_0_20px_rgba(25,234,253,0.5)]"
+                alt="Astralus" 
+                className="h-64 lg:h-96 w-auto object-contain filter drop-shadow-[0_0_20px_rgba(25,234,253,0.5)]"
               />
             </div>
           </div>
@@ -241,7 +241,7 @@ export function LoginPage() {
               <CardHeader className="space-y-3 pb-6 border-b border-border/50 relative">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-2xl font-heading glow-cyan">
-                    {authMode === 'login' ? 'Access Portal' : 'Create Empire'}
+                    {authMode === 'login' ? 'Login' : 'Create a New Account'}
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-lg shadow-green-400/50" />
@@ -250,8 +250,8 @@ export function LoginPage() {
                 </div>
                 <CardDescription className="text-sm">
                   {authMode === 'login' 
-                    ? 'Enter your credentials to access your command center'
-                    : 'Join the galaxy and establish your empire'}
+                    ? 'The time is now, commander! Enter Astralus.'
+                    : 'Join the galaxy and assert your dominance, commander!'}
                 </CardDescription>
               </CardHeader>
               
@@ -332,8 +332,8 @@ export function LoginPage() {
                             </span>
                           ) : (
                             <span className="flex items-center gap-2">
-                              Access Command Center
-                              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                              Login to Astralus
+                              <ArrowBigRightDash className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </span>
                           )}
                         </Button>
@@ -360,7 +360,7 @@ export function LoginPage() {
                           onClick={() => setAuthMode('register')}
                         >
                           <UserPlus className="w-4 h-4 mr-2" />
-                          Create New Empire
+                          Create New Account
                         </Button>
                         
                         <Button
@@ -370,7 +370,7 @@ export function LoginPage() {
                           onClick={() => navigate('/manual')}
                         >
                           <BookOpen className="w-4 h-4 mr-2" />
-                          Read Player Manual
+                          Read Manual
                         </Button>
                       </div>
                     </div>
@@ -498,8 +498,8 @@ export function LoginPage() {
                             </span>
                           ) : (
                             <span className="flex items-center gap-2">
-                              Establish Empire
-                              <Globe className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                             Create Account
+                              <ArrowBigRightDash className="w-4 h-4 group-hover:rotate-12 transition-transform" />
                             </span>
                           )}
                         </Button>

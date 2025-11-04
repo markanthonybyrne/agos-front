@@ -33,6 +33,10 @@ import swampImg from '../../assets/images/planets/swamp.png'
 import tropicalImg from '../../assets/images/planets/tropical.png'
 import tundraImg from '../../assets/images/planets/tundra.png'
 import yellowImg from '../../assets/images/planets/yellow.png'
+// Asteroid belt images from universe folder
+import asteroidUniverseImg from '../../assets/images/universe/asteroid.png'
+import meteorClusterImg from '../../assets/images/universe/meteor-cluster.png'
+import meteorImg from '../../assets/images/universe/meteor.png'
 
 const imageBySlug: Record<string, string> = {
   arid: aridImg,
@@ -104,6 +108,15 @@ const solImages = [
 
 const MAX_SOL_TYPES = solImages.length
 
+// Asteroid belt images for random selection
+const asteroidImages = [
+  asteroidUniverseImg,
+  meteorClusterImg,
+  meteorImg,
+]
+
+const MAX_ASTEROID_TYPES = asteroidImages.length
+
 /**
  * Get a deterministic random sol image based on system coordinates
  * This ensures the same system always gets the same sol image
@@ -124,6 +137,40 @@ export function getRandomSolImageForSystem(systemKey: string): string {
   const index = hash % MAX_SOL_TYPES
   
   return solImages[index]
+}
+
+/**
+ * Get a deterministic random asteroid image based on planet coordinates
+ * This ensures the same planet always gets the same asteroid image
+ * Uses asteroid.png, meteor-cluster.png, and meteor.png from assets/images/universe
+ */
+export function getRandomAsteroidImageForPlanet(planetCoordinate: string | { quadrant?: number; sector?: number; galaxy?: number; system?: number; planet?: number }): string {
+  let hash = 0
+  
+  // Parse coordinate - handle both string and object formats
+  if (typeof planetCoordinate === 'string') {
+    const parts = planetCoordinate.split(':').map(Number)
+    if (parts.length >= 5) {
+      const [quadrant, sector, galaxy, system, planet] = parts
+      hash = quadrant * 100000 + sector * 10000 + galaxy * 1000 + system * 100 + planet
+    } else if (parts.length >= 4) {
+      const [quadrant, sector, galaxy, planet] = parts
+      hash = quadrant * 10000 + sector * 1000 + galaxy * 100 + planet
+    }
+  } else if (typeof planetCoordinate === 'object' && planetCoordinate !== null) {
+    const coord = planetCoordinate as any
+    const quadrant = coord.quadrant ?? 0
+    const sector = coord.sector ?? 0
+    const galaxy = coord.galaxy ?? 0
+    const system = coord.system ?? 0
+    const planet = coord.planet ?? 0
+    hash = quadrant * 100000 + sector * 10000 + galaxy * 1000 + system * 100 + planet
+  }
+  
+  // Map hash to 0-2 range (3 asteroid images)
+  const index = hash % MAX_ASTEROID_TYPES
+  
+  return asteroidImages[index]
 }
 
 // Export sol images for use in system rendering

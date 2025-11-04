@@ -55,9 +55,9 @@ function crc32(str: string): number {
 /**
  * Convert X/Y coordinates to hierarchical coordinates
  * 
- * @param x X coordinate (0-999)
+ * @param x X coordinate (0-1999)
  * @param y Y coordinate (0-999)
- * @returns Hierarchical coordinate object
+ * @returns Hierarchical coordinate object (includes system number)
  */
 export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
   // Ensure coordinates are within valid range
@@ -89,6 +89,24 @@ export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
   // Clamp to valid range (1-10 per sector)
   const galaxyClamped = Math.max(1, Math.min(10, galaxy))
 
+  // System: Calculate which system (1-10) within the galaxy
+  // Get galaxy range to determine system position
+  const galaxyRange = getGalaxyXyRange(quadrant, sector, galaxyClamped)
+  const galaxyWidth = galaxyRange.x_max - galaxyRange.x_min
+  const galaxyHeight = galaxyRange.y_max - galaxyRange.y_min
+  const systemWidth = galaxyWidth / 10
+  const systemHeight = galaxyHeight / 10
+  
+  // Calculate which system cell the X/Y falls into
+  const xWithinGalaxy = clampedX - galaxyRange.x_min
+  const yWithinGalaxy = clampedY - galaxyRange.y_min
+  const systemXComponent = Math.min(9, Math.floor(xWithinGalaxy / systemWidth))
+  const systemYComponent = Math.min(9, Math.floor(yWithinGalaxy / systemHeight))
+  
+  // Convert 2D system position to linear system number (1-10)
+  const system = (systemYComponent * 10) + systemXComponent + 1
+  const systemClamped = Math.max(1, Math.min(10, system))
+
   // Planet: Deterministic hash-based assignment
   // hash = CRC32("X-Y")
   // planet = (abs(hash) % 15) + 1
@@ -100,6 +118,7 @@ export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
     quadrant,
     sector,
     galaxy: galaxyClamped,
+    system: systemClamped,
     planet
   }
 }

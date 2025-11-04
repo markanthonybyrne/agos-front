@@ -809,7 +809,10 @@ export interface TachyonSignal {
   target_quadrant: number
   target_sector: number
   target_galaxy: number
+  target_system?: number  // System level (5-level hierarchy)
   target_planet: number
+  target_x?: number  // X coordinate (source of truth)
+  target_y?: number  // Y coordinate (source of truth)
   type: 'fleet' | 'orbital_defence' | 'planetary' | 'all_frequency' | 'events'
   status: 'processing' | 'completed' | 'failed'
   signal_strength: number
@@ -938,10 +941,14 @@ export interface ColonizePlanetRequest {
 }
 
 export interface CreateSignalRequest {
+  origin_planet_id: number
   target_quadrant: number
   target_sector: number
   target_galaxy: number
+  target_system: number
   target_planet: number
+  target_x: number
+  target_y: number
   type: 'fleet' | 'orbital_defence' | 'planetary' | 'all_frequency' | 'events'
 }
 

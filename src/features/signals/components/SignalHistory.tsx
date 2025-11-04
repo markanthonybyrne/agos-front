@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatDateTime } from '@/lib/formatters'
+import { formatCoordinate } from '@/lib/coordinates'
+import { xyToHierarchical } from '@/lib/coordinateUtils'
 import { 
   Clock, 
   MapPin, 
@@ -162,7 +164,20 @@ export function SignalHistory({
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
-                      <span className="font-mono">{signal.target_quadrant}:{signal.target_sector}:{signal.target_galaxy}:{signal.target_planet}</span>
+                      <span className="font-mono">
+                        {(() => {
+                          // Prefer target_x and target_y if available (source of truth)
+                          if (signal.target_x !== undefined && signal.target_y !== undefined) {
+                            const coord = xyToHierarchical(signal.target_x, signal.target_y)
+                            return `${coord.quadrant}:${coord.sector}:${coord.galaxy}:${coord.system}:${coord.planet}`
+                          }
+                          // Fallback to hierarchical fields if X/Y not available
+                          if (signal.target_system && signal.target_system > 0) {
+                            return `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_system}:${signal.target_planet}`
+                          }
+                          return `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_planet}`
+                        })()}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
