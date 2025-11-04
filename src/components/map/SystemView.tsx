@@ -13,6 +13,7 @@ interface SystemViewProps {
   onPlanetHover?: (planet: Planet | null) => void
   hoveredPlanet?: Planet | null
   className?: string
+  systemName?: string | null
 }
 
 /**
@@ -30,7 +31,8 @@ function SystemView({
   onPlanetClick,
   onPlanetHover,
   hoveredPlanet,
-  className = ''
+  className = '',
+  systemName
 }: SystemViewProps) {
   // Calculate orbit information for each planet
   const planetOrbits = useMemo(() => {
@@ -162,26 +164,28 @@ function SystemView({
               x={system.center.x}
               y={system.center.y - starSize - 6}
               textAnchor="middle"
-              className="fill-blue-300 font-mono font-semibold"
+              className="fill-cyan-300 font-mono font-semibold"
               style={{ 
                 fontSize: `${Math.max(7, Math.min(9, logScale * 2.5))}px`, // Much smaller text for system level
                 textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
               }}
             >
-              Planet {system.key}
+              {(systemName && systemName.trim()) || system.key}
             </text>
-            <text
-              x={system.center.x}
-              y={system.center.y - starSize + 6}
-              textAnchor="middle"
-              className="fill-blue-400 font-mono"
-              style={{ 
-                fontSize: `${Math.max(6, Math.min(8, logScale * 2))}px`, // Much smaller text for system level
-                textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
-              }}
-            >
-              {system.key}
-            </text>
+            {(!systemName || !systemName.trim()) && (
+              <text
+                x={system.center.x}
+                y={system.center.y - starSize + 6}
+                textAnchor="middle"
+                className="fill-blue-400 font-mono"
+                style={{ 
+                  fontSize: `${Math.max(6, Math.min(8, logScale * 2))}px`, // Much smaller text for system level
+                  textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                }}
+              >
+                {system.key}
+              </text>
+            )}
           </g>
         )}
       </g>
@@ -358,7 +362,8 @@ export const SystemViewMemo = memo(SystemView, (prevProps, nextProps) => {
     prevProps.system.key === nextProps.system.key &&
     Math.abs(prevProps.scale - nextProps.scale) < 0.2 && // Only re-render if scale changes by >20%
     prevProps.hoveredPlanet?.id === nextProps.hoveredPlanet?.id &&
-    prevProps.system.planets.length === nextProps.system.planets.length // Check if planets changed
+    prevProps.system.planets.length === nextProps.system.planets.length && // Check if planets changed
+    prevProps.systemName === nextProps.systemName // Check if system name changed
   )
 })
 

@@ -1,12 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useGetUniverseConfigQuery } from '@/api/endpoints/universeApi'
+import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { useAuth } from '@/hooks/useAuth'
 import { useZoomPan } from '@/hooks/useZoomPan'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { useAppSelector } from '@/app/hooks'
-import { getPlanetXY } from '@/lib/coordinates'
+import { getPlanetXY, parseCoordinate } from '@/lib/coordinates'
 import { 
   groupPlanetsBySystem,
   convertSystemGroupsToData,
@@ -61,6 +61,112 @@ export function UnifiedUniverseMapV2() {
 
   // Use global planets from Redux store (loaded on login)
   const { allPlanets, isLoading: isLoadingPlanets } = useAppSelector((state) => state.planets)
+  
+  // Fetch map data to get planets with galaxy_name and system_name
+  const { data: mapData, isLoading: isLoadingMapData } = useGetMapQuery({})
+  
+  // Debug: Log mapData when it loads
+  useEffect(() => {
+    if (mapData) {
+      console.log('[UnifiedUniverseMapV2] MapData loaded:', {
+        hasPlanets: !!mapData.planets,
+        planetsCount: mapData.planets?.length || 0,
+        hasGalaxies: !!mapData.galaxies,
+        galaxiesCount: mapData.galaxies?.length || 0,
+        samplePlanet: mapData.planets?.[0] ? {
+          id: mapData.planets[0].id,
+          galaxy_name: mapData.planets[0].galaxy_name,
+          system_name: mapData.planets[0].system_name,
+          coordinate: mapData.planets[0].coordinate
+        } : null,
+        sampleGalaxy: mapData.galaxies?.[0] || null
+      })
+    }
+  }, [mapData])
+  
+  // Create a lookup map for planet names (by ID and by coordinate)
+  const planetNameLookup = useMemo(() => {
+    const lookupById = new Map<number, { galaxy_name: string | null; system_name: string | null }>()
+    const lookupByCoord = new Map<string, { galaxy_name: string | null; system_name: string | null }>()
+    
+    if (mapData?.planets) {
+      console.log('[UnifiedUniverseMapV2] MapData planets count:', mapData.planets.length)
+      mapData.planets.forEach(planet => {
+        // Store by ID
+        if (planet.id) {
+          const galaxyName = (planet.galaxy_name && planet.galaxy_name.trim()) || null
+          const systemName = (planet.system_name && planet.system_name.trim()) || null
+          if (galaxyName || systemName) {
+            lookupById.set(planet.id, {
+              galaxy_name: galaxyName,
+              system_name: systemName
+            })
+          }
+        }
+        
+        // Also store by coordinate for fallback matching
+        if (planet.coordinate) {
+          const coordKey = typeof planet.coordinate === 'string' 
+            ? planet.coordinate 
+            : `${planet.coordinate.quadrant}:${planet.coordinate.sector}:${planet.coordinate.galaxy}:${planet.coordinate.system}:${planet.coordinate.planet}`
+          const galaxyName = (planet.galaxy_name && planet.galaxy_name.trim()) || null
+          const systemName = (planet.system_name && planet.system_name.trim()) || null
+          if (galaxyName || systemName) {
+            lookupByCoord.set(coordKey, {
+              galaxy_name: galaxyName,
+              system_name: systemName
+            })
+          }
+        }
+      })
+      
+      // Log sample of what we found
+      if (lookupById.size > 0) {
+        const sample = Array.from(lookupById.entries())[0]
+        console.log('[UnifiedUniverseMapV2] Sample planet name from mapData:', {
+          id: sample[0],
+          names: sample[1]
+        })
+      }
+    } else {
+      console.warn('[UnifiedUniverseMapV2] No planets in mapData:', mapData)
+    }
+    
+    return { lookupById, lookupByCoord }
+  }, [mapData])
+  
+  // Enrich planets with names from map data
+  const enrichedPlanets = useMemo(() => {
+    let enrichedCount = 0
+    const enriched = allPlanets.map(planet => {
+      // Try ID match first
+      let names = planetNameLookup.lookupById.get(planet.id)
+      
+      // Fallback to coordinate match if ID doesn't match
+      if (!names) {
+        const coordKey = typeof planet.coordinate === 'string' 
+          ? planet.coordinate 
+          : `${planet.coordinate.quadrant}:${planet.coordinate.sector}:${planet.coordinate.galaxy}:${planet.coordinate.system}:${planet.coordinate.planet}`
+        names = planetNameLookup.lookupByCoord.get(coordKey)
+      }
+      
+      if (names) {
+        enrichedCount++
+        return {
+          ...planet,
+          galaxy_name: names.galaxy_name,
+          system_name: names.system_name
+        }
+      }
+      return planet
+    })
+    
+    if (enrichedCount > 0) {
+      console.log(`[UnifiedUniverseMapV2] Enriched ${enrichedCount} planets with names`)
+    }
+    
+    return enriched
+  }, [allPlanets, planetNameLookup])
 
   // Zoom and pan hook
   // Extended max scale to allow very high zoom (700%) for detailed system viewing
@@ -75,9 +181,9 @@ export function UnifiedUniverseMapV2() {
 
   // Group planets by system
   const systemsByKey = useMemo(() => {
-    if (allPlanets.length === 0) return new Map<string, SystemData>()
+    if (enrichedPlanets.length === 0) return new Map<string, SystemData>()
     
-    const systemGroups = groupPlanetsBySystem(allPlanets)
+    const systemGroups = groupPlanetsBySystem(enrichedPlanets)
     const systems = convertSystemGroupsToData(systemGroups)
     
     const systemsMap = new Map<string, SystemData>()
@@ -86,7 +192,7 @@ export function UnifiedUniverseMapV2() {
     })
     
     return systemsMap
-  }, [allPlanets])
+  }, [enrichedPlanets])
 
   // Removed auto-centering on homeworld system
   // User can pan freely without any snapping behavior
@@ -105,6 +211,39 @@ export function UnifiedUniverseMapV2() {
     
     return grouped
   }, [systemsByKey])
+
+  // Create galaxy name lookup map from planets and galaxies array
+  const galaxyNames = useMemo(() => {
+    const names = new Map<string, string | null>()
+    
+    // First, try to get names from the galaxies array in mapData (most reliable)
+    if (mapData?.galaxies) {
+      mapData.galaxies.forEach(galaxy => {
+        const key = `${galaxy.quadrant}:${galaxy.sector}:${galaxy.galaxy}`
+        // Only store non-empty names
+        if (galaxy.name && galaxy.name.trim()) {
+          names.set(key, galaxy.name.trim())
+        }
+      })
+    }
+    
+    // Fallback: extract from enriched planets (group by quadrant:sector:galaxy)
+    enrichedPlanets.forEach(planet => {
+      const coord = typeof planet.coordinate === 'string' 
+        ? parseCoordinate(planet.coordinate)
+        : planet.coordinate
+      
+      if (coord && typeof coord.quadrant === 'number' && typeof coord.sector === 'number' && typeof coord.galaxy === 'number') {
+        const key = `${coord.quadrant}:${coord.sector}:${coord.galaxy}`
+        // Only set if not already set and name is non-empty
+        if (!names.has(key) && planet.galaxy_name && planet.galaxy_name.trim()) {
+          names.set(key, planet.galaxy_name.trim())
+        }
+      }
+    })
+    
+    return names
+  }, [enrichedPlanets, mapData])
 
   // Determine current zoom level
   // System view should show at scale >= 0.5, planet detail at scale >= 3.0
@@ -254,13 +393,13 @@ export function UnifiedUniverseMapV2() {
     if (zoomLevel !== 'planet') return []
     
     const bounds = zoomPan.viewportBounds
-    return allPlanets.filter(planet => {
+    return enrichedPlanets.filter(planet => {
       const xy = getPlanetXY(planet)
       if (!xy) return false
       return xy.x >= bounds.minX && xy.x <= bounds.maxX &&
              xy.y >= bounds.minY && xy.y <= bounds.maxY
     })
-  }, [allPlanets, zoomPan.viewportBounds, zoomLevel])
+  }, [enrichedPlanets, zoomPan.viewportBounds, zoomLevel])
 
   // Handle planet click - open sliding panel with planet info and actions
   const handlePlanetClick = (planet: Planet) => {
@@ -272,16 +411,54 @@ export function UnifiedUniverseMapV2() {
   // Debug logging - MUST be before early return to maintain hook order
   useEffect(() => {
     if (!isLoadingConfig && !isLoadingPlanets && allPlanets.length > 0) {
+      const planetsWithNames = enrichedPlanets.filter(p => p.galaxy_name || p.system_name).length
       console.log('[UnifiedUniverseMapV2] Render state:', {
         allPlanetsCount: allPlanets.length,
+        enrichedPlanetsCount: enrichedPlanets.length,
+        planetsWithNames,
+        mapDataPlanets: mapData?.planets?.length || 0,
+        mapDataGalaxies: mapData?.galaxies?.length || 0,
+        galaxyNamesMapSize: galaxyNames.size,
         systemsCount: systemsByKey.size,
         zoomLevel,
         scale: zoomPan.scale,
         visibleSystems: visibleSystems.length,
         visiblePlanets: visiblePlanets.length
       })
+      
+      // Log sample of enriched planets with names
+      if (planetsWithNames > 0) {
+        const sample = enrichedPlanets.find(p => p.galaxy_name || p.system_name)
+        if (sample) {
+          console.log('[UnifiedUniverseMapV2] Sample planet with names:', {
+            id: sample.id,
+            galaxy_name: sample.galaxy_name,
+            system_name: sample.system_name,
+            coordinate: sample.coordinate
+          })
+        }
+        
+        // Log sample system with names
+        const sampleSystem = Array.from(systemsByKey.values()).find(s => s.system_name || s.galaxy_name)
+        if (sampleSystem) {
+          console.log('[UnifiedUniverseMapV2] Sample system with names:', {
+            key: sampleSystem.key,
+            galaxy_name: sampleSystem.galaxy_name,
+            system_name: sampleSystem.system_name
+          })
+        }
+      }
+      
+      // Log galaxy names map sample
+      if (galaxyNames.size > 0) {
+        const sampleGalaxy = Array.from(galaxyNames.entries())[0]
+        console.log('[UnifiedUniverseMapV2] Sample galaxy name:', {
+          key: sampleGalaxy[0],
+          name: sampleGalaxy[1]
+        })
+      }
     }
-  }, [allPlanets.length, systemsByKey.size, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingPlanets])
+  }, [allPlanets.length, enrichedPlanets, mapData, galaxyNames.size, systemsByKey.size, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingPlanets])
 
   // Handle system click
   const handleSystemClick = (system: SystemData) => {
@@ -404,6 +581,7 @@ export function UnifiedUniverseMapV2() {
   }, [roundedScale, roundedPanX, roundedPanY, containerSize.width, containerSize.height, gridWidth, gridHeight])
 
   // Show loading state only if actively loading config or planets
+  // Note: mapData loading is optional - we can show the map without it, names will appear when it loads
   if (isLoadingConfig || isLoadingPlanets || allPlanets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full">
@@ -548,8 +726,27 @@ export function UnifiedUniverseMapV2() {
                       onClick={() => handleSystemClick(system)}
                       style={{ pointerEvents: 'all' }}
                     />
-                    {/* Show system identifier */}
-                    {zoomPan.scale > 0.06 && (
+                    {/* Show galaxy name when zoomed in enough */}
+                    {zoomPan.scale > 0.08 && (() => {
+                      const galaxyKey = `${system.quadrant}:${system.sector}:${system.galaxy}`
+                      const galaxyName = galaxyNames.get(galaxyKey)
+                      return galaxyName && galaxyName.trim() ? (
+                        <text
+                          x={system.center.x}
+                          y={system.center.y + imageSize / 2 + 12}
+                          textAnchor="middle"
+                          className="fill-cyan-300 font-mono font-semibold pointer-events-none"
+                          style={{ 
+                            fontSize: '11px',
+                            textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                          }}
+                        >
+                          {galaxyName}
+                        </text>
+                      ) : null
+                    })()}
+                    {/* Show system identifier below galaxy name (only if no galaxy name shown) */}
+                    {zoomPan.scale > 0.06 && !(zoomPan.scale > 0.08 && galaxyNames.get(`${system.quadrant}:${system.sector}:${system.galaxy}`)?.trim()) && (
                       <text
                         x={system.center.x}
                         y={system.center.y + imageSize / 2 + 12}
@@ -577,6 +774,7 @@ export function UnifiedUniverseMapV2() {
                   onPlanetClick={handlePlanetClick}
                   onPlanetHover={setHoveredPlanet}
                   hoveredPlanet={hoveredPlanet}
+                  systemName={(system.system_name && system.system_name.trim()) || null}
                 />
               ))}
             </g>
@@ -593,6 +791,7 @@ export function UnifiedUniverseMapV2() {
                   onPlanetClick={handlePlanetClick}
                   onPlanetHover={setHoveredPlanet}
                   hoveredPlanet={hoveredPlanet}
+                  systemName={(system.system_name && system.system_name.trim()) || null}
                 />
               ))}
             </g>
@@ -627,16 +826,23 @@ export function UnifiedUniverseMapV2() {
                       height={40}
                       className="cursor-pointer opacity-80 hover:opacity-100"
                     />
-                    {zoomPan.scale > 0.2 && (
-                      <text
-                        x={centerX}
-                        y={centerY + 30}
-                        textAnchor="middle"
-                        className="text-xs fill-blue-300 font-mono"
-                      >
-                        Galaxy {galaxyKey}
-                      </text>
-                    )}
+                    {zoomPan.scale > 0.2 && (() => {
+                      const galaxyName = galaxyNames.get(galaxyKey)
+                      const displayName = (galaxyName && galaxyName.trim()) ? galaxyName : `Galaxy ${galaxyKey}`
+                      return (
+                        <text
+                          x={centerX}
+                          y={centerY + 30}
+                          textAnchor="middle"
+                          className="text-xs fill-cyan-300 font-mono font-semibold"
+                          style={{ 
+                            textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
+                          }}
+                        >
+                          {displayName}
+                        </text>
+                      )
+                    })()}
                   </g>
                 )
               })}

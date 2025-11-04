@@ -147,6 +147,9 @@ export interface Planet {
   // X/Y coordinates (0-999 grid) - source of truth for positioning
   x?: number
   y?: number
+  // Galaxy and system names for map display
+  galaxy_name?: string | null
+  system_name?: string | null
 }
 
 export interface Fleet {
@@ -476,6 +479,7 @@ export interface VisibleGalaxy extends VisibilityItem {
   quadrant: number
   sector: number
   galaxy: number
+  name?: string | null
 }
 
 export interface UniverseMap {

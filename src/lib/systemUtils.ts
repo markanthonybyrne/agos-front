@@ -19,6 +19,8 @@ export interface SystemData {
   center: { x: number; y: number }
   bounds: XYRanges
   planets: Planet[]
+  galaxy_name?: string | null
+  system_name?: string | null
 }
 
 /**
@@ -155,6 +157,11 @@ export function createSystemData(
   
   if (!center || !bounds) return null
   
+  // Extract galaxy and system names from first planet (all planets in a system should have the same names)
+  const firstPlanet = planets[0]
+  const galaxy_name = firstPlanet?.galaxy_name ?? null
+  const system_name = firstPlanet?.system_name ?? null
+  
   return {
     key: getSystemKey(quadrant, sector, galaxy, system),
     quadrant,
@@ -163,7 +170,9 @@ export function createSystemData(
     system,
     center,
     bounds,
-    planets
+    planets,
+    galaxy_name,
+    system_name
   }
 }
 

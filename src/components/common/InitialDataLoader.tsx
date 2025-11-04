@@ -223,7 +223,7 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           
           if (remainingPages > 0) {
             // Create all fetch promises upfront
-            const allFetchPromises: Promise<{ planets: Planet[]; offset: number }>[] = []
+            const allFetchPromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
             
             // Create fetch promises for all remaining pages
             // Use effectiveLimit (actual API limit) not requested limit for offset calculation
