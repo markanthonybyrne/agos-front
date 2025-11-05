@@ -3,6 +3,8 @@
  * Unified type system for facilities, research, ships, and defences
  */
 
+import { TechTreePosition } from './api.types'
+
 export type TechNodeType = 'facility' | 'research' | 'ship' | 'defence'
 
 export type TechNodeStatus = 
@@ -84,6 +86,9 @@ export interface TechNodeData {
   
   // Layout position (optional - calculated if not provided)
   position?: RadialPosition
+  
+  // Backend-provided tech tree position (optional)
+  tech_tree_position?: TechTreePosition
   
   // Quantity (for items that allow multiples like facilities)
   quantity?: number

@@ -79,6 +79,7 @@ export const NodesLayer = memo(function NodesLayer({
         return (
           <div
             key={node.id}
+            data-node-id={node.id}
             className="absolute"
             style={{
               left: position.x,

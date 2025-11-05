@@ -119,17 +119,104 @@ export function HexNode({
   const isHighlighted = status === 'highlighted'
   const isPathPreview = status === 'path-preview'
   
-  // Glass effect classes
+  // Get type-based colors
+  const getTypeColor = () => {
+    switch (node.type) {
+      case 'facility':
+        return {
+          border: 'border-purple-500/60',
+          bgFrom: 'from-purple-500/20',
+          bgTo: 'to-purple-500/5',
+          shadow: 'rgba(168, 85, 247, 0.6)',
+          glow: 'rgba(168, 85, 247, 0.4)',
+          gradientFrom: 'rgba(168, 85, 247, 0.2)',
+          gradientTo: 'rgba(168, 85, 247, 0.05)',
+        }
+      case 'research':
+        return {
+          border: 'border-green-500/60',
+          bgFrom: 'from-green-500/20',
+          bgTo: 'to-green-500/5',
+          shadow: 'rgba(34, 197, 94, 0.6)',
+          glow: 'rgba(34, 197, 94, 0.4)',
+          gradientFrom: 'rgba(34, 197, 94, 0.2)',
+          gradientTo: 'rgba(34, 197, 94, 0.05)',
+        }
+      case 'ship':
+        return {
+          border: 'border-blue-500/60',
+          bgFrom: 'from-blue-500/20',
+          bgTo: 'to-blue-500/5',
+          shadow: 'rgba(59, 130, 246, 0.6)',
+          glow: 'rgba(59, 130, 246, 0.4)',
+          gradientFrom: 'rgba(59, 130, 246, 0.2)',
+          gradientTo: 'rgba(59, 130, 246, 0.05)',
+        }
+      case 'defence':
+        return {
+          border: 'border-red-500/60',
+          bgFrom: 'from-red-500/20',
+          bgTo: 'to-red-500/5',
+          shadow: 'rgba(239, 68, 68, 0.6)',
+          glow: 'rgba(239, 68, 68, 0.4)',
+          gradientFrom: 'rgba(239, 68, 68, 0.2)',
+          gradientTo: 'rgba(239, 68, 68, 0.05)',
+        }
+      default:
+        return {
+          border: 'border-cyan-500/40',
+          bgFrom: 'from-primary/10',
+          bgTo: 'to-primary/5',
+          shadow: 'rgba(6,182,212,0.6)',
+          glow: 'rgba(6,182,212,0.4)',
+          gradientFrom: 'rgba(6,182,212,0.2)',
+          gradientTo: 'rgba(6,182,212,0.05)',
+        }
+    }
+  }
+
+  // Get specialization accent colors
+  const getSpecializationAccent = () => {
+    switch (node.specialization) {
+      case 'industrial':
+        return {
+          border: 'border-orange-500/40',
+          glow: 'rgba(249, 115, 22, 0.5)',
+        }
+      case 'military':
+        return {
+          border: 'border-red-500/50',
+          glow: 'rgba(239, 68, 68, 0.6)',
+        }
+      case 'relic':
+        return {
+          border: 'border-yellow-500/50',
+          glow: 'rgba(234, 179, 8, 0.7)',
+        }
+      default:
+        return null
+    }
+  }
+
+  const typeColors = getTypeColor()
+  const specAccent = getSpecializationAccent()
+
+  // Glass effect classes with type and specialization styling
+  const shadowStyle = (isAvailable || isHighlighted) 
+    ? { boxShadow: `0 0 20px ${specAccent?.glow || typeColors.shadow}` }
+    : (isQueued || isPathPreview)
+    ? { boxShadow: `0 0 15px ${specAccent?.glow || typeColors.glow}` }
+    : isLocked
+    ? { boxShadow: '0 0 10px rgba(107,114,128,0.3)' }
+    : isCompleted
+    ? { boxShadow: '0 0 15px rgba(34,197,94,0.5)' }
+    : {}
+
   const glassClasses = cn(
     'backdrop-blur-md',
-    'bg-gradient-to-br from-primary/10 to-primary/5',
-    'border border-cyan-500/40',
-    {
-      'shadow-[0_0_20px_rgba(6,182,212,0.6)]': isAvailable || isHighlighted,
-      'shadow-[0_0_15px_rgba(6,182,212,0.4)]': isQueued || isPathPreview,
-      'shadow-[0_0_10px_rgba(107,114,128,0.3)]': isLocked,
-      'shadow-[0_0_15px_rgba(34,197,94,0.5)]': isCompleted,
-    }
+    `bg-gradient-to-br ${typeColors.bgFrom} ${typeColors.bgTo}`,
+    `border ${specAccent?.border || typeColors.border}`,
+    specAccent && node.specialization === 'relic' && 'animate-pulse'
   )
   
   return (
@@ -159,17 +246,18 @@ export function HexNode({
         width={size}
         height={size}
         className="absolute inset-0"
-        style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.3))' }}
+        style={{ filter: `drop-shadow(0 0 8px ${typeColors.gradientFrom})` }}
       >
         <defs>
           <linearGradient id={`hexGradient-${node.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(6,182,212,0.2)" />
-            <stop offset="100%" stopColor="rgba(6,182,212,0.05)" />
+            <stop offset="0%" stopColor={typeColors.gradientFrom} />
+            <stop offset="100%" stopColor={typeColors.gradientTo} />
           </linearGradient>
         </defs>
         <polygon
           points={hexPoints}
           className={glassClasses}
+          style={shadowStyle}
           fill={`url(#hexGradient-${node.id})`}
           stroke="currentColor"
           strokeWidth={isHighlighted ? 2 : 1.5}

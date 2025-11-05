@@ -2393,6 +2393,115 @@ export interface TechTreeApiResponse {
   }>
 }
 
+// Tech Tree Position (shared with tech-tree.types.ts)
+export interface TechTreePosition {
+  row: number
+  column: number
+  column_offsets: {
+    industrial: number
+    military: number
+    relic: number
+  }
+}
+
+// Tech Tree Definitions API Response
+export interface TechTreeDefinitionsResponse {
+  facilities: Array<{
+    id: number
+    slug: string
+    name: string
+    description?: string
+    era: number
+    specialization: string
+    tech_tree_position?: TechTreePosition
+    type: 'facility'
+    unlocked: boolean
+    available: boolean
+    can_build?: boolean
+    missing_prerequisites?: string[]
+    completed?: boolean
+    prerequisites?: string[]
+    base_tellerium_cost?: number
+    base_krypton_cost?: number
+    per_tick?: {
+      tellerium?: number
+      krypton?: number
+    }
+    upkeep?: {
+      tellerium?: number
+      krypton?: number
+      energy?: number
+    }
+    build_time_ticks?: number
+    effects?: Record<string, any>
+    quantity?: number
+  }>
+  research: Array<{
+    id: number
+    slug: string
+    name: string
+    description?: string
+    era: number
+    specialization: string
+    tech_tree_position?: TechTreePosition
+    type: 'research'
+    unlocked: boolean
+    available: boolean
+    can_research?: boolean
+    missing_prerequisites?: string[]
+    completed?: boolean
+    prerequisite_facilities?: string[]
+    prerequisite_research?: string[]
+    cost_tellerium?: number
+    cost_krypton?: number
+    cost_research_points?: number
+    build_time_ticks?: number
+    effects?: Record<string, any>
+  }>
+  ships: Array<{
+    id: number
+    slug: string
+    name: string
+    description?: string
+    era: number
+    specialization: string
+    tech_tree_position?: TechTreePosition
+    type: 'ship'
+    unlocked: boolean
+    available: boolean
+    can_build?: boolean
+    missing_prerequisites?: string[]
+    completed?: boolean
+    prerequisites?: string[]
+    tellerium_cost?: number
+    krypton_cost?: number
+    build_time_ticks?: number
+  }>
+  defences: Array<{
+    id: number
+    slug: string
+    name: string
+    description?: string
+    era: number
+    specialization: string
+    tech_tree_position?: TechTreePosition
+    type: 'defence'
+    unlocked: boolean
+    available: boolean
+    can_build?: boolean
+    missing_prerequisites?: string[]
+    completed?: boolean
+    prerequisites?: string[]
+    tellerium_cost?: number
+    krypton_cost?: number
+    build_time_ticks?: number
+  }>
+  empire: {
+    active_era: number
+    specializations_unlocked: string[]
+  }
+}
+
 // Tech Path API Request/Response
 export interface TechPathRequest {
   target_node_id: string

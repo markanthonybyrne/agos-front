@@ -15,6 +15,7 @@ import {
 
 /**
  * Build graph structure from API data
+ * Handles both old TechTreeApiResponse and new TechTreeDefinitionsResponse formats
  */
 export function buildGraph(
   apiData: any,
@@ -25,23 +26,54 @@ export function buildGraph(
   const nodes: TechNodeData[] = []
   const edges: TechTreeEdge[] = []
   
+  // Detect if this is the new definitions API format (has empire.active_era and empire.specializations_unlocked)
+  const isDefinitionsFormat = apiData.empire && typeof apiData.empire.active_era === 'number'
+  
   // Process facilities
   if (apiData.facilities) {
     apiData.facilities.forEach((facility: any) => {
       const nodeId = `facility-${facility.slug}`
       
-      // Determine status
+      // Determine status - handle both old and new API formats
       let status: TechNodeData['status'] = 'locked'
-      if (completedNodes.includes(nodeId)) {
-        status = 'completed'
-      } else if (inProgressNodes.includes(nodeId)) {
-        status = 'building'
-      } else if (queuedNodes.includes(nodeId)) {
-        status = 'queued'
-      } else if (facility.can_build && facility.unlocked) {
-        status = 'available'
-      } else if (facility.unlocked) {
-        status = 'locked'
+      
+      if (isDefinitionsFormat) {
+        // New format: use completed, can_build, available, unlocked fields
+        // When planet_id is provided, can_build indicates planet-specific availability
+        if (facility.completed) {
+          status = 'completed'
+        } else if (inProgressNodes.includes(nodeId)) {
+          status = 'building'
+        } else if (queuedNodes.includes(nodeId)) {
+          status = 'queued'
+        } else if (facility.can_build !== undefined) {
+          // Planet context: use can_build if provided (more accurate for planet-specific view)
+          if (facility.can_build) {
+            status = 'available'
+          } else {
+            status = 'locked'
+          }
+        } else if (facility.available && facility.unlocked) {
+          // No planet context: use available and unlocked
+          status = 'available'
+        } else if (facility.unlocked) {
+          status = 'locked' // Unlocked but not available (missing prerequisites)
+        } else {
+          status = 'locked' // Not unlocked
+        }
+      } else {
+        // Old format: use completedNodes array
+        if (completedNodes.includes(nodeId)) {
+          status = 'completed'
+        } else if (inProgressNodes.includes(nodeId)) {
+          status = 'building'
+        } else if (queuedNodes.includes(nodeId)) {
+          status = 'queued'
+        } else if (facility.can_build && facility.unlocked) {
+          status = 'available'
+        } else if (facility.unlocked) {
+          status = 'locked'
+        }
       }
       
       const node: TechNodeData = {
@@ -70,6 +102,8 @@ export function buildGraph(
         description: facility.description,
         effects: facility.effects,
         quantity: facility.quantity,
+        // Include tech_tree_position from new API format
+        tech_tree_position: facility.tech_tree_position,
       }
       
       nodes.push(node)
@@ -95,16 +129,43 @@ export function buildGraph(
       const nodeId = `research-${research.slug}`
       
       let status: TechNodeData['status'] = 'locked'
-      if (completedNodes.includes(nodeId)) {
-        status = 'researched'
-      } else if (inProgressNodes.includes(nodeId)) {
-        status = 'researching'
-      } else if (queuedNodes.includes(nodeId)) {
-        status = 'queued'
-      } else if (research.can_research && research.unlocked) {
-        status = 'available'
-      } else if (research.unlocked) {
-        status = 'locked'
+      
+      if (isDefinitionsFormat) {
+        // New format
+        if (research.completed) {
+          status = 'researched'
+        } else if (inProgressNodes.includes(nodeId)) {
+          status = 'researching'
+        } else if (queuedNodes.includes(nodeId)) {
+          status = 'queued'
+        } else if (research.can_research !== undefined) {
+          // Planet context: use can_research if provided
+          if (research.can_research) {
+            status = 'available'
+          } else {
+            status = 'locked'
+          }
+        } else if (research.available && research.unlocked) {
+          // No planet context: use available and unlocked
+          status = 'available'
+        } else if (research.unlocked) {
+          status = 'locked'
+        } else {
+          status = 'locked'
+        }
+      } else {
+        // Old format
+        if (completedNodes.includes(nodeId)) {
+          status = 'researched'
+        } else if (inProgressNodes.includes(nodeId)) {
+          status = 'researching'
+        } else if (queuedNodes.includes(nodeId)) {
+          status = 'queued'
+        } else if (research.can_research && research.unlocked) {
+          status = 'available'
+        } else if (research.unlocked) {
+          status = 'locked'
+        }
       }
       
       const node: TechNodeData = {
@@ -131,6 +192,7 @@ export function buildGraph(
         build_time_ticks: research.build_time_ticks,
         description: research.description,
         effects: research.effects,
+        tech_tree_position: research.tech_tree_position,
       }
       
       nodes.push(node)
@@ -152,10 +214,35 @@ export function buildGraph(
       const nodeId = `ship-${ship.slug}`
       
       let status: TechNodeData['status'] = 'locked'
-      if (ship.can_build && ship.unlocked) {
-        status = 'available'
-      } else if (ship.unlocked) {
-        status = 'locked'
+      
+      if (isDefinitionsFormat) {
+        if (ship.completed) {
+          status = 'completed'
+        } else if (inProgressNodes.includes(nodeId)) {
+          status = 'building'
+        } else if (queuedNodes.includes(nodeId)) {
+          status = 'queued'
+        } else if (ship.can_build !== undefined) {
+          // Planet context: use can_build if provided
+          if (ship.can_build) {
+            status = 'available'
+          } else {
+            status = 'locked'
+          }
+        } else if (ship.available && ship.unlocked) {
+          // No planet context: use available and unlocked
+          status = 'available'
+        } else if (ship.unlocked) {
+          status = 'locked'
+        } else {
+          status = 'locked'
+        }
+      } else {
+        if (ship.can_build && ship.unlocked) {
+          status = 'available'
+        } else if (ship.unlocked) {
+          status = 'locked'
+        }
       }
       
       const node: TechNodeData = {
@@ -175,6 +262,7 @@ export function buildGraph(
         },
         build_time_ticks: ship.build_time_ticks,
         description: ship.description,
+        tech_tree_position: ship.tech_tree_position,
       }
       
       nodes.push(node)
@@ -196,10 +284,35 @@ export function buildGraph(
       const nodeId = `defence-${defence.slug}`
       
       let status: TechNodeData['status'] = 'locked'
-      if (defence.can_build && defence.unlocked) {
-        status = 'available'
-      } else if (defence.unlocked) {
-        status = 'locked'
+      
+      if (isDefinitionsFormat) {
+        if (defence.completed) {
+          status = 'completed'
+        } else if (inProgressNodes.includes(nodeId)) {
+          status = 'building'
+        } else if (queuedNodes.includes(nodeId)) {
+          status = 'queued'
+        } else if (defence.can_build !== undefined) {
+          // Planet context: use can_build if provided
+          if (defence.can_build) {
+            status = 'available'
+          } else {
+            status = 'locked'
+          }
+        } else if (defence.available && defence.unlocked) {
+          // No planet context: use available and unlocked
+          status = 'available'
+        } else if (defence.unlocked) {
+          status = 'locked'
+        } else {
+          status = 'locked'
+        }
+      } else {
+        if (defence.can_build && defence.unlocked) {
+          status = 'available'
+        } else if (defence.unlocked) {
+          status = 'locked'
+        }
       }
       
       const node: TechNodeData = {
@@ -219,6 +332,7 @@ export function buildGraph(
         },
         build_time_ticks: defence.build_time_ticks,
         description: defence.description,
+        tech_tree_position: defence.tech_tree_position,
       }
       
       nodes.push(node)
@@ -234,12 +348,26 @@ export function buildGraph(
     })
   }
   
+  // Extract empire state - handle both formats
+  let activeEra = 1
+  let specializationsUnlocked: string[] = []
+  
+  if (isDefinitionsFormat) {
+    // New format
+    activeEra = apiData.empire?.active_era || 1
+    specializationsUnlocked = apiData.empire?.specializations_unlocked || []
+  } else {
+    // Old format
+    activeEra = apiData.empire?.active_era || 1
+    specializationsUnlocked = apiData.empire?.specializations_unlocked || []
+  }
+  
   return {
     nodes,
     edges,
     empireState: {
-      active_era: apiData.empire?.active_era || 1,
-      specializations_unlocked: apiData.empire?.specializations_unlocked || [],
+      active_era: activeEra,
+      specializations_unlocked: specializationsUnlocked as any[],
       completed_nodes: completedNodes,
       queued_nodes: queuedNodes,
       in_progress_nodes: inProgressNodes,

@@ -99,3 +99,5 @@ export function resolveCoordinate(coordinate: string): CoordinateResolution {
   return { centerX, centerY, normalizedZoom }
 }
 
+
+

@@ -46,6 +46,7 @@ export function SlidingPanel({
   zIndex = 50,
   hideBackdrop = false,
 }: SlidingPanelProps) {
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   const panelRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
   const [isAnimating, setIsAnimating] = useState(false)
@@ -96,13 +97,18 @@ export function SlidingPanel({
     }
   }, [isOpen])
 
-  if (!isOpen && !isVisible) return null
+  // Early returns AFTER all hooks - these control visibility, not hook execution
+  if (!mounted) {
+    return null
+  }
 
-  // Don't render minimized panels here - they're handled by PanelManager as tabs
-  if (panelState === PanelState.MINIMIZED) return null
+  if (panelState === PanelState.MINIMIZED) {
+    return null
+  }
 
-  // Only render portal after mounting (client-side only)
-  if (!mounted) return null
+  if (!isOpen && !isVisible) {
+    return null
+  }
 
   const panelContent = (
     <>

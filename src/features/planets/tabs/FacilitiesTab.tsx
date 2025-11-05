@@ -1159,7 +1159,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
       </TabsContent>
       
       <TabsContent value="tree" className="mt-6">
-        <TechTreeEmbedded nodeType="facility" planetId={Number(planet.id)} height="600px" />
+        <TechTreeEmbedded key={`facility-${planet.id}`} nodeType="facility" planetId={Number(planet.id)} height="600px" />
       </TabsContent>
     </Tabs>
   )

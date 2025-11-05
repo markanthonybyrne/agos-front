@@ -800,7 +800,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
       </TabsContent>
       
       <TabsContent value="tree" className="mt-6">
-        <TechTreeEmbedded nodeType="defence" planetId={Number(planet.id)} height="600px" />
+        <TechTreeEmbedded key={`defence-${planet.id}`} nodeType="defence" planetId={Number(planet.id)} height="600px" />
       </TabsContent>
     </Tabs>
   )

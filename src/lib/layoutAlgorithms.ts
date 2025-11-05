@@ -208,10 +208,15 @@ export function calculateHierarchicalLayout(
   const nodeHeight = 140 // Hex node height
   const padding = 40
   const eraSpacing = 250 // Vertical spacing between eras
-  const horizontalPadding = 100
+  const topBottomPadding = 100
   
   const centerX = config.width / 2
-  let currentY = 100 // Start from top
+  
+  // Calculate total height needed for all eras
+  const totalHeight = eras.length * eraSpacing - eraSpacing + topBottomPadding * 2
+  
+  // Center vertically by starting from the middle minus half the content height
+  const startY = (config.height - totalHeight) / 2 + topBottomPadding
   
   eras.forEach((era, eraIndex) => {
     const eraNodes = eraGroups.get(era)!
@@ -221,6 +226,9 @@ export function calculateHierarchicalLayout(
     // Calculate horizontal spacing
     const totalWidth = eraNodes.length * (nodeWidth + padding) - padding
     const startX = centerX - totalWidth / 2
+    
+    // Calculate Y position for this era
+    const currentY = startY + eraIndex * eraSpacing
     
     // Position nodes horizontally
     eraNodes.forEach((node, index) => {
@@ -233,9 +241,6 @@ export function calculateHierarchicalLayout(
         radius: 0,
       })
     })
-    
-    // Move to next era
-    currentY += eraSpacing
   })
   
   return positions

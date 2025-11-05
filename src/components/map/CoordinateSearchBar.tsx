@@ -132,3 +132,5 @@ export function CoordinateSearchBar({ onSearch, className }: CoordinateSearchBar
   )
 }
 
+
+

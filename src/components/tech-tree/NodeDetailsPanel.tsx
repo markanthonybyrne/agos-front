@@ -1,6 +1,6 @@
 import { Clock, CheckCircle2, Lock, ArrowRight, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TechNodeData } from '@/types/tech-tree.types'
+import { TechNodeData, TechTreeGraphData } from '@/types/tech-tree.types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { SlidingPanel } from '@/components/common/SlidingPanel'
@@ -9,6 +9,8 @@ import { HexNode } from './HexNode'
 
 interface NodeDetailsPanelProps {
   node: TechNodeData | null
+  planetId?: number
+  graphData?: TechTreeGraphData | null
   onClose: () => void
   onQueue?: (nodeId: string) => void
   onViewPath?: (nodeId: string) => void
@@ -27,6 +29,8 @@ function formatTicks(ticks: number): string {
 
 export function NodeDetailsPanel({
   node,
+  planetId,
+  graphData,
   onClose,
   onQueue,
   onViewPath,
@@ -34,19 +38,18 @@ export function NodeDetailsPanel({
   isMobile = false,
   className,
 }: NodeDetailsPanelProps) {
-  if (!node) return null
-  
-  const isLocked = node.status === 'locked'
-  const isAvailable = node.status === 'available'
-  const isCompleted = node.status === 'completed' || node.status === 'researched'
-  const isQueued = node.status === 'queued' || node.status === 'researching' || node.status === 'building'
+  // Always render SlidingPanel to maintain hook order, use isOpen to control visibility
+  const isLocked = node?.status === 'locked'
+  const isAvailable = node?.status === 'available'
+  const isCompleted = node?.status === 'completed' || node?.status === 'researched'
+  const isQueued = node?.status === 'queued' || node?.status === 'researching' || node?.status === 'building'
   
   // Format costs for display
   const totalCost = {
-    tellerium: node.costs?.tellerium || 0,
-    krypton: node.costs?.krypton || 0,
-    dark_matter: node.costs?.dark_matter || 0,
-    research_points: node.costs?.research_points || 0,
+    tellerium: node?.costs?.tellerium || 0,
+    krypton: node?.costs?.krypton || 0,
+    dark_matter: node?.costs?.dark_matter || 0,
+    research_points: node?.costs?.research_points || 0,
   }
   
   return (
@@ -54,34 +57,37 @@ export function NodeDetailsPanel({
       isOpen={!!node}
       onClose={onClose}
       title={
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <HexNode
-              node={node}
-              size={48}
-              variant={node.status}
-            />
+        node ? (
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <HexNode
+                node={node}
+                size={48}
+                variant={node.status}
+              />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                {node.name}
+              </h2>
+              {node.specialization && node.specialization !== 'general' && (
+                <span className="inline-flex items-center px-2 py-0.5 mt-1 text-xs font-semibold rounded-full bg-primary/20 text-primary border border-primary/30">
+                  {node.specialization}
+                </span>
+              )}
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              {node.name}
-            </h2>
-            {node.specialization && node.specialization !== 'general' && (
-              <span className="inline-flex items-center px-2 py-0.5 mt-1 text-xs font-semibold rounded-full bg-primary/20 text-primary border border-primary/30">
-                {node.specialization}
-              </span>
-            )}
-          </div>
-        </div>
+        ) : null
       }
       size={PanelSize.MEDIUM}
       zIndex={9999}
       className={cn('w-full sm:w-96 md:w-[420px]', className)}
     >
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="p-6 space-y-6">
-          {/* Hero Visual */}
-          {node.imageUrl && (
+        {node ? (
+          <div className="p-6 space-y-6">
+            {/* Hero Visual */}
+            {node.imageUrl && (
             <div className="relative w-full h-48 rounded-lg overflow-hidden border border-cyan-500/20 bg-gradient-to-br from-primary/10 to-primary/5">
               <img
                 src={node.imageUrl}
@@ -242,67 +248,68 @@ export function NodeDetailsPanel({
               </ul>
             </div>
           )}
-        </div>
-      </div>
-      
-      {/* Footer - Actions */}
-      <div className="p-4 border-t border-cyan-500/20 space-y-2 bg-muted/20 backdrop-blur-sm">
-        {/* Primary Action */}
-        {!isCompleted && (
-          <Button
-            onClick={() => onQueue?.(node.id)}
-            disabled={isLocked}
-            className="w-full glow-cyan"
-            size="lg"
-          >
-            {isLocked ? (
-              <>
-                <Lock className="w-4 h-4 mr-2" />
-                Locked
-              </>
-            ) : isQueued ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Queued
-              </>
-            ) : (
-              <>
-                <ArrowRight className="w-4 h-4 mr-2" />
-                Queue {node.type === 'research' ? 'Research' : 'Build'}
-              </>
+          
+          {/* Footer - Actions */}
+          <div className="p-4 border-t border-cyan-500/20 space-y-2 bg-muted/20 backdrop-blur-sm">
+            {/* Primary Action */}
+            {!isCompleted && (
+              <Button
+                onClick={() => onQueue?.(node.id)}
+                disabled={isLocked}
+                className="w-full glow-cyan"
+                size="lg"
+              >
+                {isLocked ? (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Locked
+                  </>
+                ) : isQueued ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Queued
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Queue {node.type === 'research' ? 'Research' : 'Build'}
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
-        )}
-        
-        {/* Secondary Actions */}
-        <div className="flex gap-2">
-          {isLocked && onViewPath && (
-            <Button
-              onClick={() => onViewPath(node.id)}
-              variant="outline"
-              className="flex-1"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              View Path
-            </Button>
-          )}
-          {node.prerequisites && node.prerequisites.length > 0 && (
-            <Button
-              onClick={() => {
-                // Navigate to first prerequisite
-                const firstPrereq = node.prerequisites?.[0]
-                if (firstPrereq && onJumpToNode) {
-                  onJumpToNode(firstPrereq)
-                }
-              }}
-              variant="ghost"
-              size="sm"
-              className="flex-1"
-            >
-              Jump to Prereq
-            </Button>
-          )}
+            
+            {/* Secondary Actions */}
+            <div className="flex gap-2">
+              {isLocked && onViewPath && (
+                <Button
+                  onClick={() => onViewPath(node.id)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View Path
+                </Button>
+              )}
+              {node.prerequisites && node.prerequisites.length > 0 && (
+                <Button
+                  onClick={() => {
+                    // Navigate to first prerequisite
+                    const firstPrereq = node.prerequisites?.[0]
+                    if (firstPrereq && onJumpToNode) {
+                      onJumpToNode(firstPrereq)
+                    }
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1"
+                >
+                  Jump to Prereq
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
+        ) : null}
       </div>
     </SlidingPanel>
   )

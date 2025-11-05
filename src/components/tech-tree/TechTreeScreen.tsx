@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
-import { useGetTechTreeQuery } from '@/api/endpoints/empiresApi'
+import { useGetTechTreeDefinitionsQuery } from '@/api/endpoints/empiresApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectNode, setHighlightedPath, setFilters } from '@/app/slices/techTreeSlice'
 import { TechNodeType } from '@/types/tech-tree.types'
 import { buildGraph } from '@/lib/graphEngine'
-import { calculateRadialLayout, calculateHierarchicalLayout, getDefaultLayoutConfig } from '@/lib/layoutAlgorithms'
+import { calculateHierarchicalLayout } from '@/lib/layoutAlgorithms'
 import { filterBySpecialization, filterByEra, filterByType, findPath } from '@/lib/graphEngine'
 import { TechTreeGraphData } from '@/types/tech-tree.types'
 import { useTechNodeDetails } from '@/hooks/useTechNodeDetails'
@@ -13,77 +13,64 @@ import { useZoomPan } from '@/hooks/useZoomPan'
 import { ConnectionsCanvas } from '@/components/tech-tree/ConnectionsCanvas'
 import { NodesLayer } from '@/components/tech-tree/NodesLayer'
 import { NodeDetailsPanel } from '@/components/tech-tree/NodeDetailsPanel'
-import { Button } from '@/components/ui/button'
+import { TechTreeFilterBar } from '@/components/tech-tree/TechTreeFilterBar'
 import { Loader2 } from 'lucide-react'
 
 export function TechTreeScreen() {
   const dispatch = useAppDispatch()
   const [searchParams] = useSearchParams()
   const location = useLocation()
-  const { data: apiData, isLoading, error } = useGetTechTreeQuery()
-  const { selectedNodeId, highlightedPath, activeFilters } = useAppSelector((state) => state.techTree)
-  const { selectedNode, openDetails, closeDetails } = useTechNodeDetails()
   
   // Get filter from URL params or location state (optional - full tree shows all by default)
   const urlNodeType = searchParams.get('type') as TechNodeType | null
   const stateNodeType = (location.state as any)?.nodeType as TechNodeType | null
   const filterNodeType = urlNodeType || stateNodeType
+  const planetId = (location.state as any)?.planetId as number | undefined
   
-  // Apply node type filter from URL/state only if explicitly provided
-  // Otherwise, clear nodeType filter to show ALL definitions
-  useEffect(() => {
-    if (filterNodeType && ['facility', 'research', 'ship', 'defence'].includes(filterNodeType)) {
-      // Apply filter if explicitly requested
-      dispatch(setFilters({ nodeTypes: [filterNodeType] }))
-    } else {
-      // Clear nodeType filter to show all definitions in full tech tree
-      dispatch(setFilters({ nodeTypes: [] }))
-    }
-  }, [filterNodeType, dispatch])
-  
-  // Camera controls
-  const canvasRef = useRef<HTMLDivElement>(null)
-  const { scale, panX, panY, setPan, onWheel, reset } = useZoomPan({
-    minScale: 0.5,
-    maxScale: 2,
-    initialScale: 1,
+  // Use new definitions endpoint
+  // When no planetId: fetch ALL definitions (no type filter)
+  // When planetId exists: fetch with type filter if provided (from planet detail tab)
+  const { data: apiData, isLoading, error } = useGetTechTreeDefinitionsQuery({
+    type: planetId && filterNodeType ? filterNodeType : undefined, // Only filter by type when coming from planet detail
+    planet_id: planetId,
   })
   
+  const { selectedNodeId, highlightedPath, activeFilters } = useAppSelector((state) => state.techTree)
+  const { selectedNode, openDetails, closeDetails } = useTechNodeDetails()
+  
+  // Apply node type filter ONLY when coming from planet detail (has planetId)
+  // When no planetId, show ALL categories unfiltered
+  useEffect(() => {
+    if (planetId && filterNodeType && ['facility', 'research', 'ship', 'defence'].includes(filterNodeType)) {
+      // Coming from planet detail - apply filter based on tab selection
+      dispatch(setFilters({ nodeTypes: [filterNodeType] }))
+    } else if (!planetId) {
+      // Full tech tree view (no planet context) - show ALL categories
+      dispatch(setFilters({ nodeTypes: [] }))
+    }
+    // If planetId exists but no filterNodeType, don't change filters (user can use filter bar)
+  }, [filterNodeType, planetId, dispatch])
+  
   // Build graph from API data
+  // New definitions API format doesn't have completed_research, queued_items, in_progress_items
+  // Instead, it has completed, can_build fields per item
   const graphData = useMemo<TechTreeGraphData | null>(() => {
     if (!apiData) return null
     
+    // For new API format, buildGraph handles completed status from item.completed field
+    // But we still need empty arrays for queued/in-progress as those come from elsewhere
     const completedNodes: string[] = []
     const queuedNodes: string[] = []
     const inProgressNodes: string[] = []
     
-    // Extract completed/queued/in-progress nodes from API response
-    if (apiData.completed_research) {
-      apiData.completed_research.forEach((slug) => {
-        completedNodes.push(`research-${slug}`)
-      })
-    }
-    
-    if (apiData.queued_items) {
-      apiData.queued_items.forEach((item) => {
-        queuedNodes.push(`${item.type}-${item.slug}`)
-      })
-    }
-    
-    if (apiData.in_progress_items) {
-      apiData.in_progress_items.forEach((item) => {
-        inProgressNodes.push(`${item.type}-${item.slug}`)
-      })
-    }
-    
     return buildGraph(apiData, completedNodes, queuedNodes, inProgressNodes)
   }, [apiData])
   
-  // Calculate layout positions - use hierarchical layout for better visibility
+  // Calculate layout positions - use backend positions if available, otherwise hierarchical layout
   const layoutPositions = useMemo(() => {
     if (!graphData) return new Map()
     
-    // Use hierarchical layout instead of radial for now
+    // Use hierarchical layout which can integrate backend positions
     return calculateHierarchicalLayout(
       graphData.nodes,
       graphData.edges,
@@ -120,15 +107,17 @@ export function TechTreeScreen() {
       nodes = filterBySpecialization(nodes, activeFilters.specializations)
     }
     
-    // Filter by era
+    // Filter by era - only if explicitly filtered, not by default
+    // The full tech tree should show ALL eras regardless of current empire era
     if (activeFilters.eras.length > 0) {
       const maxEra = Math.max(...activeFilters.eras)
       nodes = filterByEra(nodes, maxEra)
-    } else if (graphData.empireState.active_era) {
-      nodes = filterByEra(nodes, graphData.empireState.active_era)
     }
+    // Remove automatic era filtering - show all eras in full tech tree
     
-    // Filter by type
+    // Filter by type - only apply if filters are explicitly set
+    // When no planet context, don't filter by type by default (show all)
+    // When coming from planet detail, type filter is already applied via useEffect
     if (activeFilters.nodeTypes.length > 0) {
       nodes = filterByType(nodes, activeFilters.nodeTypes)
     }
@@ -154,6 +143,40 @@ export function TechTreeScreen() {
     
     return nodes
   }, [graphData, layoutPositions, activeFilters])
+
+  // Calculate node bounds for zoom/pan (must be after filteredNodes)
+  const nodeBounds = useMemo(() => {
+    if (filteredNodes.length === 0) {
+      return { minX: 0, minY: 0, maxX: window.innerWidth, maxY: window.innerHeight, width: window.innerWidth, height: window.innerHeight }
+    }
+    
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    
+    filteredNodes.forEach((node) => {
+      if (node.position) {
+        minX = Math.min(minX, node.position.x)
+        minY = Math.min(minY, node.position.y)
+        maxX = Math.max(maxX, node.position.x)
+        maxY = Math.max(maxY, node.position.y)
+      }
+    })
+    
+    const padding = 200
+    const width = Math.max(window.innerWidth, maxX - minX + padding * 2)
+    const height = Math.max(window.innerHeight, maxY - minY + padding * 2)
+    
+    return {
+      minX: minX - padding,
+      minY: minY - padding,
+      maxX: maxX + padding,
+      maxY: maxY + padding,
+      width,
+      height,
+    }
+  }, [filteredNodes])
   
   // Handle node click
   const handleNodeClick = useCallback(
@@ -186,16 +209,53 @@ export function TechTreeScreen() {
     [graphData, dispatch]
   )
   
-  // Viewport bounds for culling - make it very permissive to ensure nodes render
-  const viewport = useMemo(() => {
-    const padding = 5000 // Large padding to ensure all nodes are visible
+  // Initialize zoom/pan hook - MUST be before early returns to maintain hook order
+  const zoomPan = useZoomPan({
+    minScale: 0.1,
+    maxScale: 2.0,
+    initialScale: 0.8,
+    gridWidth: nodeBounds.width,
+    gridHeight: nodeBounds.height,
+    enableWheelZoom: true,
+    resetDeps: [nodeBounds.width, nodeBounds.height],
+  })
+
+  // Viewport bounds for culling - account for panning and zoom
+  const actualViewport = useMemo(() => {
+    const padding = 500 // Padding around visible area for pre-rendering
+    const panX = zoomPan.panX
+    const panY = zoomPan.panY
+    const scale = zoomPan.scale
+    
     return {
-      minX: -panX / scale - padding,
-      maxX: (-panX + window.innerWidth) / scale + padding,
-      minY: -panY / scale - padding,
-      maxY: (-panY + window.innerHeight) / scale + padding,
+      minX: (-panX - padding) / scale,
+      maxX: (-panX + window.innerWidth + padding) / scale,
+      minY: (-panY - padding) / scale,
+      maxY: (-panY + window.innerHeight + padding) / scale,
     }
-  }, [panX, panY, scale])
+  }, [zoomPan.panX, zoomPan.panY, zoomPan.scale])
+
+  // Focus on a specific node (for jump to prerequisite) - MUST be before early returns
+  const focusOnNode = useCallback((nodeId: string) => {
+    const node = graphData?.nodes.find((n) => n.id === nodeId)
+    if (!node || !node.position) return
+
+    // Center view on the node
+    const centerX = window.innerWidth / 2
+    const centerY = window.innerHeight / 2
+    
+    // Calculate pan to center the node
+    const targetPanX = centerX - node.position.x * zoomPan.scale
+    const targetPanY = centerY - node.position.y * zoomPan.scale
+    
+    // Set zoom and pan to focus on node
+    zoomPan.setZoomAndPan(zoomPan.scale, targetPanX, targetPanY)
+    
+    // Optionally zoom in slightly for better visibility
+    setTimeout(() => {
+      zoomPan.zoomIn(centerX, centerY)
+    }, 100)
+  }, [graphData, zoomPan])
   
   // Debug: Log filtered nodes count
   useEffect(() => {
@@ -230,7 +290,9 @@ export function TechTreeScreen() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <p className="text-destructive mb-4">Failed to load tech tree</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
+          <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded">
+            Retry
+          </button>
         </div>
       </div>
     )
@@ -239,47 +301,42 @@ export function TechTreeScreen() {
   if (!graphData) {
     return null
   }
-  
+
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ zIndex: 1 }}>
-      {/* Main Canvas */}
+    <div 
+      ref={zoomPan.containerRef}
+      className="fixed inset-0 overflow-hidden pb-20" 
+      style={{ zIndex: 1 }}
+      onMouseDown={zoomPan.onMouseDown}
+      onMouseMove={zoomPan.onMouseMove}
+      onMouseUp={zoomPan.onMouseUp}
+      onWheel={zoomPan.onWheel}
+    >
+      {/* Background gradient - Fixed, doesn't move with panning */}
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
+      
+      {/* Main Canvas - This moves with panning */}
       <div
-        ref={canvasRef}
-        className="absolute inset-0 cursor-grab active:cursor-grabbing w-full h-full"
-        onWheel={onWheel}
-        onMouseDown={(e) => {
-          if (e.button === 0 && canvasRef.current) {
-            // Left mouse button - pan
-            const startX = e.clientX - panX
-            const startY = e.clientY - panY
-            
-            const handleMouseMove = (moveEvent: MouseEvent) => {
-              setPan(moveEvent.clientX - startX, moveEvent.clientY - startY)
-            }
-            
-            const handleMouseUp = () => {
-              document.removeEventListener('mousemove', handleMouseMove)
-              document.removeEventListener('mouseup', handleMouseUp)
-            }
-            
-            document.addEventListener('mousemove', handleMouseMove)
-            document.addEventListener('mouseup', handleMouseUp)
-          }
+        className="relative"
+        style={{
+          width: nodeBounds.width,
+          height: nodeBounds.height,
+          minWidth: '100%',
+          minHeight: '100%',
+          transform: `translate(${zoomPan.panX}px, ${zoomPan.panY}px) scale(${zoomPan.scale})`,
+          transformOrigin: '0 0',
         }}
       >
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
-        
         {/* Connections Layer */}
         {graphData && (
           <ConnectionsCanvas
             nodes={filteredNodes}
             edges={graphData.edges}
             highlightedPath={highlightedPath}
-            viewport={viewport}
-            panX={panX}
-            panY={panY}
-            zoom={scale}
+            viewport={actualViewport}
+            panX={zoomPan.panX}
+            panY={zoomPan.panY}
+            zoom={zoomPan.scale}
           />
         )}
         
@@ -289,25 +346,20 @@ export function TechTreeScreen() {
             nodes={filteredNodes}
             onNodeClick={handleNodeClick}
             onNodeHover={handleNodeHover}
-            viewport={viewport}
-            panX={panX}
-            panY={panY}
-            zoom={scale}
+            viewport={actualViewport}
+            panX={zoomPan.panX}
+            panY={zoomPan.panY}
+            zoom={zoomPan.scale}
             highlightedNodes={highlightedPath}
           />
         )}
       </div>
       
-      {/* Controls */}
-      <div className="absolute top-4 right-4 z-40 flex gap-2">
-        <Button onClick={reset} variant="outline" size="sm">
-          Reset View
-        </Button>
-      </div>
-      
       {/* Details Panel */}
       <NodeDetailsPanel
         node={selectedNode}
+        planetId={planetId}
+        graphData={graphData}
         onClose={() => {
           dispatch(selectNode(null))
           closeDetails()
@@ -323,10 +375,13 @@ export function TechTreeScreen() {
           }
         }}
         onJumpToNode={(nodeId) => {
-          // TODO: Focus camera on node
+          focusOnNode(nodeId)
           handleNodeClick(nodeId)
         }}
       />
+      
+      {/* Filter Bar */}
+      <TechTreeFilterBar />
     </div>
   )
 }

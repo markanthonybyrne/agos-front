@@ -120,3 +120,5 @@ export function ResearchEffectsSummary({ effectsSummary, className }: ResearchEf
   )
 }
 
+
+

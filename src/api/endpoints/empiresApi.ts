@@ -13,6 +13,7 @@ import {
   SelectSpecializationRequest,
   SelectSpecializationResponse,
   TechTreeApiResponse,
+  TechTreeDefinitionsResponse,
   TechPathRequest,
   TechPathResponse,
 } from '@/types/api.types'
@@ -80,6 +81,16 @@ export const empiresApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Empire'],
     }),
+    getTechTreeDefinitions: builder.query<
+      TechTreeDefinitionsResponse,
+      { type?: string; era?: number; specialization?: string; planet_id?: number }
+    >({
+      query: (params) => ({
+        url: '/tech-tree/definitions',
+        params,
+      }),
+      providesTags: ['Empire', 'Planet'],
+    }),
   }),
 })
 
@@ -93,5 +104,6 @@ export const {
   useGetDarkMatterInfoQuery,
   useGetTechTreeQuery,
   useGetTechPathQuery,
+  useGetTechTreeDefinitionsQuery,
 } = empiresApi
 
