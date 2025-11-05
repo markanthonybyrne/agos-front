@@ -12,10 +12,11 @@ import { PanelSize, PanelType, PanelState, Panel } from '@/app/slices/panelSlice
 import { SlidingPanel } from './SlidingPanel'
 import { useCallback } from 'react'
 import { X } from 'lucide-react'
-import { FacilityTechTree } from '@/components/tech-tree/FacilityTechTree'
-import { ShipTechTree } from '@/components/tech-tree/ShipTechTree'
-import { DefenseTechTree } from '@/components/tech-tree/DefenseTechTree'
-import { ResearchTechTree } from '@/components/tech-tree/ResearchTechTree'
+// Old tech tree components replaced with new full-screen route
+// import { FacilityTechTree } from '@/components/tech-tree/FacilityTechTree'
+// import { ShipTechTree } from '@/components/tech-tree/ShipTechTree'
+// import { DefenseTechTree } from '@/components/tech-tree/DefenseTechTree'
+// import { ResearchTechTree } from '@/components/tech-tree/ResearchTechTree'
 import { BuildDetailPanel } from '@/components/build/BuildDetailPanel'
 import { ResearchDetailPanel } from '@/components/research/ResearchDetailPanel'
 import { FleetCommandPanel } from '@/components/fleet/FleetCommandPanel'
@@ -40,10 +41,11 @@ import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
 import { ComposeMailPanel } from '@/components/messaging/ComposeMailPanel'
 import { ChatPanel } from '@/features/chat/ChatPanel'
 import { MarketPanel } from '@/features/market/MarketPanel'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useState, useEffect } from 'react'
+import * as React from 'react'
 import { AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -209,10 +211,32 @@ function PlanetViewWithAnimation({
 function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
   // Get planet ID from route params if available, otherwise use first planet or fallback
   const params = useParams()
+  const navigate = useNavigate()
   const { data: meData } = useGetMeQuery()
   const planets = (meData?.planets || []) as any[]
   const firstPlanetId = planets?.length > 0 ? planets[0]?.id : 1
   const planetId = panel.data?.planetId || (params?.id && Number(params.id)) || firstPlanetId
+  
+  // Handle tech tree navigation - redirect to new full-screen tech tree route with filter
+  React.useEffect(() => {
+    let nodeType: string | null = null
+    
+    if (panel.type === PanelType.TECH_TREE_FACILITIES) {
+      nodeType = 'facility'
+    } else if (panel.type === PanelType.TECH_TREE_SHIPS) {
+      nodeType = 'ship'
+    } else if (panel.type === PanelType.TECH_TREE_DEFENSES) {
+      nodeType = 'defence'
+    } else if (panel.type === PanelType.TECH_TREE_RESEARCH) {
+      nodeType = 'research'
+    }
+    
+    if (nodeType) {
+      // Close the panel and navigate to the new tech tree route with filter
+      onClose()
+      navigate('/tech-tree', { state: { nodeType } })
+    }
+  }, [panel.type, navigate, onClose])
   
   switch (panel.type) {
     case PanelType.PLANET_VIEW:
@@ -223,16 +247,17 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
       return <PlanetConsolePanel planetId={panel.data?.planetId || planetId} />
     
     case PanelType.TECH_TREE_FACILITIES:
-      return <FacilityTechTree planetId={planetId} />
-    
     case PanelType.TECH_TREE_SHIPS:
-      return <ShipTechTree planetId={planetId} />
-    
     case PanelType.TECH_TREE_DEFENSES:
-      return <DefenseTechTree planetId={planetId} />
-    
     case PanelType.TECH_TREE_RESEARCH:
-      return <ResearchTechTree planetId={planetId} />
+      // These now redirect to /tech-tree route - show loading message
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">Redirecting to Tech Tree...</p>
+          </div>
+        </div>
+      )
     
     case PanelType.BUILD_DETAIL:
       return (

@@ -1,0 +1,105 @@
+/* Holopad Grid Layout Styles */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: rgba(0, 123, 255, 0.2);
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+}
+
+.react-grid-item.dropping {
+  visibility: hidden;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: rgba(59, 130, 246, 0.3);
+  border: 2px dashed rgba(59, 130, 246, 0.5);
+  border-radius: 0.5rem;
+}
+
+/* Prevent GridLayout from blocking interactions */
+.react-grid-item {
+  pointer-events: none;
+}
+
+.react-grid-item > * {
+  pointer-events: auto;
+}
+
+/* Drag handle styling - only the header should be draggable */
+.react-grid-item .widget-drag-handle {
+  cursor: move !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.react-grid-item .widget-drag-handle:active {
+  cursor: grabbing !important;
+}
+
+/* Allow all interactions inside widget content */
+.react-grid-item > div {
+  pointer-events: auto;
+}
+
+.react-grid-item > div > * {
+  pointer-events: auto;
+}
+
+/* Buttons and interactive elements should work normally */
+.react-grid-item button,
+.react-grid-item a,
+.react-grid-item input,
+.react-grid-item select,
+.react-grid-item textarea,
+.react-grid-item [role="button"],
+.react-grid-item [tabindex] {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+/* Prevent dragging when interacting with buttons */
+.react-grid-item button:active,
+.react-grid-item a:active {
+  cursor: pointer !important;
+}
+
+/* Ensure widgets don't interfere with each other when dragging */
+.react-grid-item.react-draggable-dragging {
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.react-grid-item.react-draggable-dragging > * {
+  pointer-events: none;
+}
+
+.react-grid-item.react-draggable-dragging .widget-drag-handle {
+  pointer-events: auto;
+  cursor: grabbing !important;
+}
+

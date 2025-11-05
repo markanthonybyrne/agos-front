@@ -447,7 +447,7 @@ export function GeodesicGrid({ planetId, planetSize }: GeodesicGridProps) {
                     }
                   }}
                 >
-                  <title>{cell.facility?.definition.name || cell.defence?.definition.name || 'Empty'}</title>
+                  <title>{cell.facility?.definition?.name || cell.defence?.definition?.name || 'Empty'}</title>
                 </path>
               )}
               
@@ -507,7 +507,7 @@ export function GeodesicGrid({ planetId, planetSize }: GeodesicGridProps) {
             >
               <div className="text-sm">
                 <div className="font-semibold text-foreground mb-1">
-                  {cell.facility?.definition.name || cell.defence?.definition.name}
+                  {cell.facility?.definition?.name || cell.defence?.definition?.name || 'Unknown'}
                 </div>
                 {cell.facility && (
                   <div className="text-xs text-muted-foreground">

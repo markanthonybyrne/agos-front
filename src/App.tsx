@@ -29,6 +29,7 @@ import { AlliancesPage } from '@/features/alliances/AlliancesPage'
 import { PoliticsPage } from '@/features/politics/PoliticsPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { TechTreeScreen } from '@/features/tech-tree/TechTreeScreen'
 import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
 import { AdminPage } from '@/features/admin/AdminPage'
 import { UsersPage } from '@/features/admin/routes/UsersPage'
@@ -95,6 +96,7 @@ function AppContent() {
                   <Route path="/combat" element={<CombatLogsPage />} />
                   <Route path="/rankings" element={<RankingsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/tech-tree" element={<TechTreeScreen />} />
                   {/* Admin Routes */}
                   <Route
                     path="/admin/*"

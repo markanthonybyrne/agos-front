@@ -2303,3 +2303,112 @@ export interface SelectSpecializationResponse {
   errors?: string[]
 }
 
+// Tech Tree API Response
+export interface TechTreeApiResponse {
+  facilities?: Array<{
+    slug: string
+    name: string
+    description?: string
+    era?: number
+    specialization?: string
+    unlocked: boolean
+    can_build: boolean
+    completed: boolean
+    prerequisites?: string[]
+    base_tellerium_cost?: number
+    base_krypton_cost?: number
+    per_tick?: {
+      tellerium?: number
+      krypton?: number
+    }
+    upkeep?: {
+      tellerium?: number
+      krypton?: number
+      energy?: number
+    }
+    build_time_ticks?: number
+    effects?: Record<string, any>
+    quantity?: number
+  }>
+  research?: Array<{
+    slug: string
+    name: string
+    description?: string
+    era?: number
+    specialization?: string
+    unlocked: boolean
+    can_research: boolean
+    completed?: boolean
+    prerequisite_facilities?: string[]
+    prerequisite_research?: string[]
+    cost_tellerium?: number
+    cost_krypton?: number
+    cost_research_points?: number
+    build_time_ticks?: number
+    effects?: Record<string, any>
+  }>
+  ships?: Array<{
+    slug: string
+    name: string
+    description?: string
+    era?: number
+    specialization?: string
+    unlocked: boolean
+    can_build: boolean
+    prerequisites?: string[]
+    tellerium_cost?: number
+    krypton_cost?: number
+    build_time_ticks?: number
+  }>
+  defences?: Array<{
+    slug: string
+    name: string
+    description?: string
+    era?: number
+    specialization?: string
+    unlocked: boolean
+    can_build: boolean
+    prerequisites?: string[]
+    tellerium_cost?: number
+    krypton_cost?: number
+    build_time_ticks?: number
+  }>
+  empire?: {
+    active_era?: number
+    specializations_unlocked?: string[]
+  }
+  completed_research?: string[]
+  queued_items?: Array<{
+    id: string
+    type: 'facility' | 'research' | 'ship' | 'defence'
+    slug: string
+    started_at?: string
+    completes_at?: string
+  }>
+  in_progress_items?: Array<{
+    id: string
+    type: 'facility' | 'research' | 'ship' | 'defence'
+    slug: string
+    progress_percentage?: number
+  }>
+}
+
+// Tech Path API Request/Response
+export interface TechPathRequest {
+  target_node_id: string
+  specialization_filter?: string
+}
+
+export interface TechPathResponse {
+  path: string[] // Node IDs in order
+  total_cost: {
+    tellerium?: number
+    krypton?: number
+    dark_matter?: number
+    research_points?: number
+  }
+  total_time: number // in ticks
+  is_valid: boolean
+  errors?: string[]
+}
+

@@ -29,10 +29,10 @@ export function WidgetWindow({
       data-tutorial={dataTutorial}
     >
       {/* Window-style header with controls */}
-      <CardHeader className="flex-shrink-0 p-2 border-b border-border/50 bg-muted/20">
+      <CardHeader className="flex-shrink-0 p-2 border-b border-border/50 bg-muted/20 widget-drag-handle cursor-move">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold truncate pr-2">{title}</CardTitle>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {onMinimize && (
               <Button
                 variant="ghost"
@@ -40,6 +40,7 @@ export function WidgetWindow({
                 className="h-5 w-5 hover:bg-muted"
                 onClick={(e) => {
                   e.stopPropagation()
+                  e.preventDefault()
                   onMinimize()
                 }}
               >
@@ -53,6 +54,7 @@ export function WidgetWindow({
                 className="h-5 w-5 hover:bg-red-500/20 hover:text-red-400"
                 onClick={(e) => {
                   e.stopPropagation()
+                  e.preventDefault()
                   onClose()
                 }}
               >

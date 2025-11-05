@@ -29,7 +29,7 @@ export function FleetsTab({ planet }: FleetsTabProps) {
   const [cancelFleet] = useCancelFleetMutation()
   
   // Debug logging
-  console.log('FleetsTab mounted for planet:', planet.id, planet.name)
+  console.log('FleetsTab mounted for planet:', planet.id, planet?.name || 'Unknown')
   console.log('Planet ID type:', typeof planet.id, 'Value:', planet.id)
   console.log('Fleets query state:', { isLoading, error, hasData: !!fleetsData })
   console.log('Fleets data:', fleetsData)
@@ -380,7 +380,7 @@ export function FleetsTab({ planet }: FleetsTabProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Ship className="w-5 h-5 text-cyan-400" />
-            Fleets at {planet.name}
+            Fleets at {planet?.name || 'Unknown Planet'}
           </CardTitle>
           <CardDescription>
             All fleets currently stationed at or traveling to this planet
@@ -531,7 +531,7 @@ export function FleetsTab({ planet }: FleetsTabProps) {
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Build Fleet from {planet.name}</DialogTitle>
+                <DialogTitle>Build Fleet from {planet?.name || 'Unknown Planet'}</DialogTitle>
                 <DialogDescription>
                   Select ships from this planet to create a new fleet
                 </DialogDescription>

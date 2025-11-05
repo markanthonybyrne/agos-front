@@ -12,6 +12,8 @@ import { FlaskConical, CheckCircle, Lock, Loader2, AlertCircle, Building2, Zap }
 import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { TechTreeEmbedded } from '@/components/tech-tree/TechTreeEmbedded'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface ResearchTabProps {
   planet: Planet
@@ -95,7 +97,14 @@ export function ResearchTab({ planet }: ResearchTabProps) {
   const availableResearch = planetResearchData?.research || []
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="list" className="space-y-6">
+      <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="list">Research List</TabsTrigger>
+        <TabsTrigger value="tree">Tech Tree</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="list" className="space-y-6 mt-6">
+      <div className="space-y-6">
       {/* Planet Resources */}
       <Card className="panel-glass border-cyan/20">
         <CardContent className="pt-6">
@@ -604,6 +613,12 @@ export function ResearchTab({ planet }: ResearchTabProps) {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+      </TabsContent>
+      
+      <TabsContent value="tree" className="mt-6">
+        <TechTreeEmbedded nodeType="research" planetId={Number(planet.id)} height="600px" />
+      </TabsContent>
+    </Tabs>
   )
 }

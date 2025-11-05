@@ -155,17 +155,17 @@ export function PlanetDetail() {
             }}
           />
         <div>
-          <h1 className="text-xl font-heading glow-cyan">{planet.name}</h1>
+          <h1 className="text-xl font-heading glow-cyan">{planet?.name || 'Unknown Planet'}</h1>
           <p className="text-muted-foreground">
-            {formatCoordinate(planet.coordinate)} • {planet.state}
+            {formatCoordinate(planet?.coordinate || '')} • {planet?.state || ''}
               {planet?.type?.name && (
                 <>
-                  {' '}• <span className="capitalize">{planet.type.name}</span>
+                  {' '}• <span className="capitalize">{planet?.type?.name}</span>
                 </>
               )}
           </p>
           {planet?.type?.description && (
-            <p className="mt-2 text-sm text-muted-foreground italic">{planet.type.description}</p>
+            <p className="mt-2 text-sm text-muted-foreground italic">{planet?.type?.description}</p>
           )}
           </div>
         </div>

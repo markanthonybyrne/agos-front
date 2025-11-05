@@ -136,10 +136,10 @@ export function PlanetImageDisplay({
             {planet?.type?.name && (
               <div>
                 <Badge variant="secondary" className="capitalize">
-                  {planet.type.name}
+                  {planet?.type?.name}
                 </Badge>
                 {planet?.type?.description && (
-                  <p className="mt-1 text-xs text-muted-foreground italic">{planet.type.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground italic">{planet?.type?.description}</p>
                 )}
               </div>
             )}

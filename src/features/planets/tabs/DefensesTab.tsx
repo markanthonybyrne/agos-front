@@ -20,6 +20,8 @@ import { toast } from 'sonner'
 import { Shield, Zap, AlertTriangle, Target, Bomb, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getDefenseImage } from '@/lib/defenseImages'
+import { TechTreeEmbedded } from '@/components/tech-tree/TechTreeEmbedded'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
 
@@ -274,7 +276,14 @@ export function DefensesTab({ planet }: DefensesTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="list" className="space-y-6">
+      <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="list">Defenses List</TabsTrigger>
+        <TabsTrigger value="tree">Tech Tree</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="list" className="space-y-6 mt-6">
+      <div className="space-y-6">
       {/* Defense Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="panel-glass border-red/20">
@@ -385,7 +394,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                     {getDefenseImage(selectedDefenceDef.slug) ? (
                       <img
                         src={getDefenseImage(selectedDefenceDef.slug)}
-                        alt={selectedDefenceDef.name}
+                        alt={selectedDefenceDef?.name || 'Defence'}
                         className="w-32 h-32 object-contain flex-shrink-0"
                         style={{ imageRendering: 'auto' }}
                       />
@@ -393,7 +402,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                       <Shield className="w-32 h-32 text-red-400 opacity-50 flex-shrink-0" />
                     )}
                     <div className="flex-1">
-                      <h4 className="font-semibold mb-2 text-lg">{selectedDefenceDef.name}</h4>
+                      <h4 className="font-semibold mb-2 text-lg">{selectedDefenceDef?.name || 'Unknown Defence'}</h4>
                       <p className="text-sm text-muted-foreground mb-3">
                         {selectedDefenceDef.description}
                       </p>
@@ -787,6 +796,12 @@ export function DefensesTab({ planet }: DefensesTabProps) {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+      </TabsContent>
+      
+      <TabsContent value="tree" className="mt-6">
+        <TechTreeEmbedded nodeType="defence" planetId={Number(planet.id)} height="600px" />
+      </TabsContent>
+    </Tabs>
   )
 }

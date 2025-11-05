@@ -109,9 +109,9 @@ export function OverviewTab({ planet }: OverviewTabProps) {
           {planet.type && (
             <div className="pt-4 border-t border-border">
               <p className="text-sm text-muted-foreground mb-1">Planet Type</p>
-              <p className="font-semibold capitalize">{planet.type.name}</p>
-              {planet.type.description && (
-                <p className="mt-1 text-sm text-muted-foreground italic">{planet.type.description}</p>
+              <p className="font-semibold capitalize">{planet.type?.name || 'Unknown'}</p>
+              {planet.type?.description && (
+                <p className="mt-1 text-sm text-muted-foreground italic">{planet.type?.description}</p>
               )}
             </div>
           )}

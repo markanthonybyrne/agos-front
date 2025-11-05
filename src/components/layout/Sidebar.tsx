@@ -21,6 +21,7 @@ import {
   Sword,
   Shield,
   Award,
+  GitBranch,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +33,7 @@ const navItems = [
   { path: '/fleets', label: 'Fleets', icon: Rocket },
   { path: '/combat', label: 'Battle Reports', icon: Sword },
   { path: '/signals', label: 'Signals', icon: Scan },
+  { path: '/tech-tree', label: 'Tech Tree', icon: GitBranch },
   { path: '/alliances', label: 'Politics', icon: Users },
   { path: '/mail', label: 'Mail', icon: Mail },
   { path: '/rankings', label: 'Rankings', icon: Trophy },

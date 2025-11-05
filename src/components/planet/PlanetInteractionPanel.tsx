@@ -149,9 +149,9 @@ export function PlanetInteractionPanel({ planet, onClose }: PlanetInteractionPan
           {planet.type && (
             <div>
               <div className="text-sm text-muted-foreground">Planet Type</div>
-              <div className="font-semibold capitalize">{planet.type.name}</div>
-              {planet.type.description && (
-                <p className="mt-1 text-xs text-muted-foreground">{planet.type.description}</p>
+              <div className="font-semibold capitalize">{planet?.type?.name || 'Unknown'}</div>
+              {planet?.type?.description && (
+                <p className="mt-1 text-xs text-muted-foreground">{planet?.type?.description}</p>
               )}
             </div>
           )}

@@ -12,6 +12,9 @@ import {
   ResearchEffectsSummary,
   SelectSpecializationRequest,
   SelectSpecializationResponse,
+  TechTreeApiResponse,
+  TechPathRequest,
+  TechPathResponse,
 } from '@/types/api.types'
 
 export const empiresApi = apiSlice.injectEndpoints({
@@ -63,9 +66,19 @@ export const empiresApi = apiSlice.injectEndpoints({
       query: () => '/empire/dark-matter',
       providesTags: ['Empire'],
     }),
-    getTechTree: builder.query<any, void>({
+    getTechTree: builder.query<TechTreeApiResponse, void>({
       query: () => '/empire/tech-tree',
       providesTags: ['Empire', 'Facility', 'Research', 'Ship', 'Defence'],
+    }),
+    getTechPath: builder.query<TechPathResponse, TechPathRequest>({
+      query: (params) => ({
+        url: '/empire/tech-path',
+        params: {
+          target_node_id: params.target_node_id,
+          specialization_filter: params.specialization_filter,
+        },
+      }),
+      providesTags: ['Empire'],
     }),
   }),
 })
@@ -79,5 +92,6 @@ export const {
   useGetEraProgressionQuery,
   useGetDarkMatterInfoQuery,
   useGetTechTreeQuery,
+  useGetTechPathQuery,
 } = empiresApi
 

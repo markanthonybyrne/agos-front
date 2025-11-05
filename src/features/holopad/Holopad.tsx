@@ -29,6 +29,10 @@ import { DarkMatterWidget } from '@/components/holopad/DarkMatterWidget'
 import { ResearchEffectsWidget } from '@/components/holopad/ResearchEffectsWidget'
 import { SpecializationSelectionModal } from '@/components/specialization/SpecializationSelectionModal'
 import { useGetEmpireStateQuery } from '@/api/endpoints/empiresApi'
+import { Taskbar } from '@/components/holopad/Taskbar'
+import '@/styles/holopad.css'
+import 'react-grid-layout/css/styles.css'
+import 'react-resizable/css/styles.css'
 
 export function Holopad() {
   const dispatch = useAppDispatch()
@@ -193,8 +197,40 @@ export function Holopad() {
     ]
   })
 
-  // Widget minimize state
-  const [minimizedWidgets, setMinimizedWidgets] = useState<Set<string>>(new Set())
+  // Widget minimize state - load from localStorage
+  const [minimizedWidgets, setMinimizedWidgets] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('holopad-minimized')
+    return saved ? new Set(JSON.parse(saved)) : new Set()
+  })
+  const [closedWidgets, setClosedWidgets] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('holopad-closed')
+    return saved ? new Set(JSON.parse(saved)) : new Set()
+  })
+
+  // Save minimized/closed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('holopad-minimized', JSON.stringify(Array.from(minimizedWidgets)))
+  }, [minimizedWidgets])
+
+  useEffect(() => {
+    localStorage.setItem('holopad-closed', JSON.stringify(Array.from(closedWidgets)))
+  }, [closedWidgets])
+
+  // Widget titles for taskbar
+  const widgetTitles: Record<string, string> = {
+    operations: 'Fleet Operations',
+    resources: 'Resources',
+    planets: 'Planets',
+    era_progression: 'Era Progression',
+    dark_matter: 'Dark Matter',
+    research_effects: 'Research Effects',
+    status: 'Empire Status',
+    quantum_credits: 'Quantum Credits',
+    boosters: 'Boosters',
+    achievements: 'Achievements',
+    announcements: 'Announcements',
+    market_trends: 'Market Trends',
+  }
 
   const handleLayoutChange = (newLayout: any) => {
     setLayout(newLayout)
@@ -204,19 +240,69 @@ export function Holopad() {
   const handleMinimizeWidget = (widgetId: string) => {
     setMinimizedWidgets(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(widgetId)) {
-        newSet.delete(widgetId)
-      } else {
-        newSet.add(widgetId)
-      }
+      newSet.add(widgetId)
       return newSet
     })
+    // Remove from layout when minimized
+    setLayout((prev: any[]) => prev.filter((item: any) => item.i !== widgetId))
+  }
+
+  // Filter out minimized and closed widgets from layout
+  const visibleLayout = useMemo(() => {
+    return layout.filter((item: any) => 
+      !minimizedWidgets.has(item.i) && !closedWidgets.has(item.i)
+    )
+  }, [layout, minimizedWidgets, closedWidgets])
+
+  const handleRestoreWidget = (widgetId: string) => {
+    setMinimizedWidgets(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(widgetId)
+      return newSet
+    })
+    // Also remove from closed widgets if it was closed
+    setClosedWidgets(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(widgetId)
+      return newSet
+    })
+    // Add back to layout at a default position
+    const existingLayout = visibleLayout
+    const maxY = existingLayout.length > 0 
+      ? Math.max(...existingLayout.map((item: any) => item.y + item.h))
+      : 0
+    setLayout([...existingLayout, {
+      i: widgetId,
+      x: 0,
+      y: maxY,
+      w: 4,
+      h: 4,
+    }])
   }
 
   const handleCloseWidget = (widgetId: string) => {
-    // For now, just minimize - could implement actual removal later
-    setMinimizedWidgets(prev => new Set(prev).add(widgetId))
+    setClosedWidgets(prev => new Set(prev).add(widgetId))
+    setMinimizedWidgets(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(widgetId)
+      return newSet
+    })
+    // Remove from layout
+    setLayout((prev: any[]) => prev.filter((item: any) => item.i !== widgetId))
   }
+
+  const handleReorderWidgets = (newOrder: string[]) => {
+    // Save order to localStorage
+    localStorage.setItem('holopad-taskbar-order', JSON.stringify(newOrder))
+  }
+
+  // Get minimized widgets for taskbar
+  const minimizedWidgetsList = Array.from(minimizedWidgets)
+    .filter(id => !closedWidgets.has(id))
+    .map(id => ({
+      id,
+      title: widgetTitles[id] || id,
+    }))
 
   // Handle window resize
   useEffect(() => {
@@ -264,10 +350,10 @@ export function Holopad() {
   }
 
   return (
-    <div className="px-6 py-8 holopad-enter">
+    <div className="px-6 py-8 holopad-enter pb-24">
       <GridLayout
         className="layout"
-        layout={layout}
+        layout={visibleLayout}
         onLayoutChange={handleLayoutChange}
         cols={12}
         rowHeight={60}
@@ -277,6 +363,8 @@ export function Holopad() {
         margin={[16, 16]}
         compactType={null}
         preventCollision={false}
+        draggableHandle=".widget-drag-handle"
+        useCSSTransforms={true}
       >
         {/* Fleet Operations Widget */}
         <div key="operations">
@@ -415,6 +503,14 @@ export function Holopad() {
         open={showSpecializationModal}
         onClose={() => setShowSpecializationModal(false)}
         availableSpecializations={['industrial', 'military', 'relic']}
+      />
+
+      {/* Taskbar for minimized widgets */}
+      <Taskbar
+        minimizedWidgets={minimizedWidgetsList}
+        onRestoreWidget={handleRestoreWidget}
+        onCloseWidget={handleCloseWidget}
+        onReorder={handleReorderWidgets}
       />
     </div>
   )

@@ -8,6 +8,8 @@ import panelReducer from './slices/panelSlice'
 import tutorialReducer from './slices/tutorialSlice'
 import chatReducer from './slices/chatSlice'
 import planetsReducer from './slices/planetsSlice'
+import cameraReducer from './slices/cameraSlice'
+import techTreeReducer from './slices/techTreeSlice'
 
 export const store = configureStore({
   reducer: {
@@ -17,9 +19,11 @@ export const store = configureStore({
     ui: uiReducer,
     notifications: notificationReducer,
     panel: panelReducer,
+    techTree: techTreeReducer,
     tutorial: tutorialReducer,
     chat: chatReducer,
     planets: planetsReducer,
+    camera: cameraReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(apiSlice.middleware),

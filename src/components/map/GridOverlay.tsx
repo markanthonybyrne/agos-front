@@ -4,6 +4,7 @@ interface GridOverlayProps {
   width: number
   height: number
   scale?: number
+  normalizedZoom?: number  // Normalized zoom (0.0-1.0) for dynamic spacing
   viewportBounds?: {
     minX: number
     maxX: number
@@ -26,12 +27,22 @@ export function GridOverlay({
   width, 
   height, 
   scale = 1,
+  normalizedZoom,
   viewportBounds
 }: GridOverlayProps) {
-  // Grid spacing - main grid lines every 100 units
-  const MAIN_GRID_SPACING = 100
-  // Sub-grid spacing - dashed lines every 25 units
-  const SUB_GRID_SPACING = 25
+  // Dynamic grid spacing based on normalized zoom
+  // At universe view (0.0): large spacing (500 units)
+  // At system view (1.0): small spacing (10 units)
+  const baseSpacing = 500
+  const minSpacing = 10
+  const dynamicSpacing = normalizedZoom !== undefined
+    ? baseSpacing - (normalizedZoom * (baseSpacing - minSpacing))
+    : 100
+  
+  // Grid spacing - main grid lines
+  const MAIN_GRID_SPACING = dynamicSpacing
+  // Sub-grid spacing - dashed lines (1/4 of main spacing)
+  const SUB_GRID_SPACING = dynamicSpacing / 4
   
   // Calculate visible grid lines based on viewport (for performance)
   const visibleGridLines = useMemo(() => {

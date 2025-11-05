@@ -6,6 +6,8 @@ import { useGetFacilityDefinitionsQuery, useGetPlanetFacilitiesQuery, useBuildFa
 import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
 import { usePrerequisites } from '@/hooks/usePrerequisites'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { TechTreeEmbedded } from '@/components/tech-tree/TechTreeEmbedded'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -355,7 +357,14 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="list" className="space-y-6">
+      <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="list">Facility List</TabsTrigger>
+        <TabsTrigger value="tree">Tech Tree</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="list" className="space-y-6 mt-6">
+      <div className="space-y-6">
       {/* Production Bonus */}
       {productionBonus > 1 && (
         <Card className="panel-glass border-green/20">
@@ -422,7 +431,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                 {getFacilityImage(selectedFacilityDef.slug) ? (
                   <img
                     src={getFacilityImage(selectedFacilityDef.slug)}
-                    alt={selectedFacilityDef.name}
+                    alt={selectedFacilityDef?.name || 'Facility'}
                     className="w-32 h-32 object-contain flex-shrink-0"
                     style={{ imageRendering: 'auto' }}
                   />
@@ -430,7 +439,7 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
                   <Building className="w-32 h-32 text-purple-400 opacity-50 flex-shrink-0" />
                 )}
                 <div className="flex-1">
-                  <h4 className="font-semibold mb-2 text-lg">{selectedFacilityDef.name}</h4>
+                  <h4 className="font-semibold mb-2 text-lg">{selectedFacilityDef?.name || 'Unknown Facility'}</h4>
                   <p className="text-sm text-muted-foreground mb-3">
                     {selectedFacilityDef.description}
                   </p>
@@ -1146,6 +1155,12 @@ export function FacilitiesTab({ planet }: FacilitiesTabProps) {
         planetId={Number(planet.id)}
         facility={selectedFacilityDef}
       />
-    </div>
+      </div>
+      </TabsContent>
+      
+      <TabsContent value="tree" className="mt-6">
+        <TechTreeEmbedded nodeType="facility" planetId={Number(planet.id)} height="600px" />
+      </TabsContent>
+    </Tabs>
   )
 }

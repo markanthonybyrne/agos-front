@@ -5,10 +5,13 @@ import { getPlanetXY } from '@/lib/coordinates'
 import { getPlanetImage, getRandomSolImageForSystem, getRandomAsteroidImageForPlanet } from '@/lib/planetImages'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
+import { getOrbitLineOpacity, getOrbitLineWidth } from '@/lib/zoomLevels'
+import { normalizedToRenderScale } from '@/hooks/useZoomPan'
 
 interface SystemViewProps {
   system: SystemData
   scale: number
+  normalizedZoom?: number  // Optional normalized zoom (0.0-1.0)
   onPlanetClick?: (planet: Planet) => void
   onPlanetHover?: (planet: Planet | null) => void
   hoveredPlanet?: Planet | null
@@ -28,12 +31,19 @@ interface SystemViewProps {
 function SystemView({
   system,
   scale,
+  normalizedZoom,
   onPlanetClick,
   onPlanetHover,
   hoveredPlanet,
   className = '',
   systemName
 }: SystemViewProps) {
+  // Use normalized zoom if provided, otherwise calculate from scale
+  const effectiveNormalizedZoom = normalizedZoom ?? (() => {
+    const minScale = 0.01
+    const maxScale = 7.0
+    return Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
+  })()
   // Calculate orbit information for each planet
   const planetOrbits = useMemo(() => {
     return system.planets.map(planet => {
@@ -72,63 +82,62 @@ function SystemView({
     return Array.from(radii).sort((a, b) => a - b)
   }, [planetOrbits, scale])
   
-  // Determine star size based on zoom scale - use logarithmic scaling for smoother growth
-  // Like Google Earth: elements grow gradually, not linearly
-  // At 352% (scale 3.52), stars should be visible but not overwhelming
-  const logScale = Math.log10(Math.max(1, scale * 10)) // Logarithmic scaling
-  const starSize = scale < 0.5 
-    ? Math.max(6, Math.min(12, logScale * 8))
-    : scale >= 7.0 ? 80  // Much larger at 700% zoom
-    : scale >= 6.0 ? 65  // Large at 600% zoom
-    : scale >= 5.0 ? 50  // Larger at 500% zoom
-    : scale >= 4.0 ? 40  // Increased at 400% zoom
-    : Math.max(12, Math.min(35, logScale * 10)) // Standard scaling below 400%
+  // Calculate asset sizes based on normalized zoom (0.0-1.0)
+  // Smooth scaling: linear interpolation between min and max based on zoom
+  // Star (sol) size scaling
+  // At universe view (0.0): small (6px)
+  // At system view (1.0): large (80px)
+  const starSize = useMemo(() => {
+    const minSize = 6
+    const maxSize = 80
+    const size = minSize + (effectiveNormalizedZoom * (maxSize - minSize))
+    return Math.max(minSize, Math.min(maxSize, size))
+  }, [effectiveNormalizedZoom])
   
-  // Determine planet size based on zoom scale - logarithmic scaling
-  // At very high zoom (700%+), reduce planet size slightly to reduce visual clutter
-  const basePlanetSize = scale < 0.5
-    ? Math.max(6, Math.min(12, logScale * 6))
-    : scale >= 7.0 ? 35  // Slightly smaller at 700% to reduce clutter
-    : scale >= 6.0 ? 40  // Large at 600% zoom
-    : scale >= 5.0 ? 32  // Larger at 500% zoom
-    : scale >= 4.0 ? 28  // Increased at 400% zoom
-    : Math.max(12, Math.min(25, logScale * 8)) // Standard scaling below 400%
+  // Planet size scaling
+  // At universe view (0.0): tiny (4px)
+  // At system view (1.0): visible (35px)
+  const basePlanetSize = useMemo(() => {
+    const minSize = 4
+    const maxSize = 35
+    const size = minSize + (effectiveNormalizedZoom * (maxSize - minSize))
+    return Math.max(minSize, Math.min(maxSize, size))
+  }, [effectiveNormalizedZoom])
   
   return (
     <g className={cn('system-view', className)}>
       {/* Orbit lines - dashed circles around central star */}
-      {/* Show orbit lines at system level zoom (scale >= 1.57, which is 157%) */}
-      {/* At very high zoom (700%+), reduce orbit line opacity and thickness to reduce clutter */}
-      {scale >= 1.57 && uniqueOrbitRadii.map((radius, index) => {
-        // Reduce orbit line stroke width at very high zoom to prevent visual clutter
-        const orbitStrokeWidth = scale >= 7.0 ? 1.5  // Thinner at 700%+
-          : scale >= 6.0 ? 2
-          : scale >= 5.0 ? 2.5
-          : scale >= 4.0 ? 2.5
-          : 1.5
+      {/* Orbit lines fade in starting at zoom 0.7, fully visible at 0.75-1.00 */}
+      {(() => {
+        const orbitOpacity = getOrbitLineOpacity(effectiveNormalizedZoom)
+        const orbitWidth = getOrbitLineWidth(effectiveNormalizedZoom)
         
-        // Reduce opacity at very high zoom levels
-        const orbitOpacity = scale >= 7.0 ? 0.25  // Very transparent at 700%+
-          : scale >= 6.0 ? 0.35
-          : scale >= 5.0 ? 0.4
-          : scale >= 4.0 ? 0.45
-          : 0.6
+        if (orbitOpacity <= 0) return null
         
-        return (
-          <circle
-            key={`orbit-${system.key}-${radius}-${index}`}
-            cx={system.center.x}
-            cy={system.center.y}
-            r={radius}
-            fill="none"
-            stroke="rgba(100, 200, 255, 0.5)"
-            strokeWidth={orbitStrokeWidth}
-            strokeDasharray={scale >= 7.0 ? "8,8" : "4,4"}  // Longer dashes at high zoom
-            className="orbit-line"
-            style={{ opacity: orbitOpacity }}
-          />
-        )
-      })}
+        return uniqueOrbitRadii.map((radius, index) => {
+          // Scale orbit radius smoothly with zoom
+          const renderScale = normalizedToRenderScale(effectiveNormalizedZoom)
+          const scaledRadius = radius * renderScale
+          
+          return (
+            <circle
+              key={`orbit-${system.key}-${radius}-${index}`}
+              cx={system.center.x}
+              cy={system.center.y}
+              r={scaledRadius}
+              fill="none"
+              stroke="rgba(100, 200, 255, 0.5)"
+              strokeWidth={orbitWidth}
+              strokeDasharray="4,4"
+              className="orbit-line"
+              style={{ 
+                opacity: orbitOpacity,
+                transition: 'opacity 0.3s ease-in-out'
+              }}
+            />
+          )
+        })
+      })()}
       
       {/* Central star */}
       <g className="central-star">
@@ -158,7 +167,7 @@ function SystemView({
           style={{ filter: 'drop-shadow(0 0 10px rgba(255, 200, 0, 0.8))' }}
         />
         {/* System label - show from galaxy view (0.5) through system view, hide at planet level to reduce clutter */}
-        {scale >= 0.5 && scale < 3.0 && (
+        {effectiveNormalizedZoom >= 0.5 && effectiveNormalizedZoom < 0.85 && (
           <g>
             <text
               x={system.center.x}
@@ -166,7 +175,7 @@ function SystemView({
               textAnchor="middle"
               className="fill-cyan-300 font-mono font-semibold"
               style={{ 
-                fontSize: `${Math.max(7, Math.min(9, logScale * 2.5))}px`, // Much smaller text for system level
+                fontSize: `${Math.max(7, Math.min(9, 7 + effectiveNormalizedZoom * 2))}px`,
                 textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
               }}
             >
@@ -179,7 +188,7 @@ function SystemView({
                 textAnchor="middle"
                 className="fill-blue-400 font-mono"
                 style={{ 
-                  fontSize: `${Math.max(6, Math.min(8, logScale * 2))}px`, // Much smaller text for system level
+                  fontSize: `${Math.max(6, Math.min(8, 6 + effectiveNormalizedZoom * 2))}px`,
                   textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                 }}
               >
@@ -250,9 +259,9 @@ function SystemView({
                 />
               </>
             )}
-            {/* Planet label - only show at planet level zoom (scale >= 3.0) */}
-            {/* At 300-400% zoom, show labels normally */}
-            {(scale >= 3.0 && scale < 4.0) && (
+            {/* Planet label - show based on normalized zoom */}
+            {/* At 0.75-0.85 normalized zoom, show labels normally */}
+            {(effectiveNormalizedZoom >= 0.75 && effectiveNormalizedZoom < 0.85) && (
               <g>
                 <text
                   x={planetXY.x}
@@ -260,7 +269,7 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-white font-mono font-semibold"
                   style={{ 
-                    fontSize: `${Math.max(6, Math.min(8, logScale * 2))}px`,
+                    fontSize: `${Math.max(6, Math.min(8, 6 + effectiveNormalizedZoom * 2))}px`,
                     textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
@@ -272,7 +281,7 @@ function SystemView({
                   textAnchor="middle"
                   className="fill-gray-300 font-mono"
                   style={{ 
-                    fontSize: `${Math.max(5, Math.min(7, logScale * 1.5))}px`,
+                    fontSize: `${Math.max(5, Math.min(7, 5 + effectiveNormalizedZoom * 1.5))}px`,
                     textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                   }}
                 >
@@ -280,37 +289,8 @@ function SystemView({
                 </text>
               </g>
             )}
-            {/* At 400%+ zoom, only show labels on hover to reduce clutter */}
-            {(scale >= 4.0 && scale < 7.0) && isHovered && (
-              <g>
-                <text
-                  x={planetXY.x}
-                  y={planetXY.y + planetSize / 2 + 14}
-                  textAnchor="middle"
-                  className="fill-white font-mono font-semibold"
-                  style={{ 
-                    fontSize: '7px',
-                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
-                  }}
-                >
-                  Planet {formatCoordinate(planet.coordinate)}
-                </text>
-                <text
-                  x={planetXY.x}
-                  y={planetXY.y + planetSize / 2 + 24}
-                  textAnchor="middle"
-                  className="fill-gray-300 font-mono"
-                  style={{ 
-                    fontSize: '6px',
-                    textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
-                  }}
-                >
-                  {formatCoordinate(planet.coordinate)}
-                </text>
-              </g>
-            )}
-            {/* At 700%+ zoom, only show labels on hover to prevent clutter */}
-            {scale >= 7.0 && isHovered && (
+            {/* At 0.85+ normalized zoom, only show labels on hover to reduce clutter */}
+            {effectiveNormalizedZoom >= 0.85 && isHovered && (
               <g>
                 <text
                   x={planetXY.x}
@@ -358,9 +338,15 @@ function SystemView({
 export const SystemViewMemo = memo(SystemView, (prevProps, nextProps) => {
   // Only re-render if scale changes significantly or system data changes
   // More aggressive memoization to reduce re-renders during panning
+  const scaleChanged = Math.abs(prevProps.scale - nextProps.scale) >= 0.2
+  const normalizedZoomChanged = prevProps.normalizedZoom !== undefined && 
+    nextProps.normalizedZoom !== undefined &&
+    Math.abs(prevProps.normalizedZoom - nextProps.normalizedZoom) >= 0.05
+  
   return (
     prevProps.system.key === nextProps.system.key &&
-    Math.abs(prevProps.scale - nextProps.scale) < 0.2 && // Only re-render if scale changes by >20%
+    !scaleChanged &&
+    !normalizedZoomChanged &&
     prevProps.hoveredPlanet?.id === nextProps.hoveredPlanet?.id &&
     prevProps.system.planets.length === nextProps.system.planets.length && // Check if planets changed
     prevProps.systemName === nextProps.systemName // Check if system name changed

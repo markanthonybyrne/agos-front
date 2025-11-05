@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
 import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { useAuth } from '@/hooks/useAuth'
-import { useZoomPan } from '@/hooks/useZoomPan'
+import { useZoomPan, normalizedToRenderScale, renderScaleToNormalized } from '@/hooks/useZoomPan'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { useAppSelector } from '@/app/hooks'
@@ -16,15 +16,18 @@ import {
 import { getPlanetImage } from '@/lib/planetImages'
 import { getGalaxyImage, getRandomGalaxyTypeForSystem } from '@/lib/galaxyImages'
 import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange, getSystemXyRange } from '@/lib/coordinateUtils'
+import { getLayerOpacity } from '@/lib/zoomLevels'
 import { SystemViewMemo } from './SystemView'
 import { GridOverlay } from './GridOverlay'
 import { QuadrantOverlay } from './QuadrantOverlay'
 import { SectorOverlay } from './SectorOverlay'
+import { LayerWrapper } from './LayerWrapper'
 import { Planet } from '@/types/api.types'
 import { Loader } from '@/components/ui/loader'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
 import { CoordinateJumpPanel } from './CoordinateJumpPanel'
+import { CoordinateSearchBar } from './CoordinateSearchBar'
 
 // Default grid dimensions (will be overridden by config)
 // Universe is now rectangular: 2000 x 1000
@@ -47,6 +50,7 @@ export function UnifiedUniverseMapV2() {
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<SystemData | null>(null)
   const [showJumpPanel, setShowJumpPanel] = useState(false)
+  const debugLoggedRef = useRef(false)
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
   // Support both old format (single grid_size) and new format (grid_width/grid_height)
@@ -174,7 +178,7 @@ export function UnifiedUniverseMapV2() {
   const zoomPan = useZoomPan({
     minScale: 0.01,  // Sector view - shows all galaxies
     maxScale: 7.0,   // Very high zoom for detailed system/planet viewing (allows 700%)
-    initialScale: 0.05, // Start at sector level (5% zoom) - shows all galaxies
+    initialScale: 0.05, // Start at sector level (5% zoom, normalized ~0.006) - shows all galaxies
     gridWidth: gridWidth,
     gridHeight: gridHeight
   })
@@ -245,7 +249,10 @@ export function UnifiedUniverseMapV2() {
     return names
   }, [enrichedPlanets, mapData])
 
-  // Determine current zoom level
+  // Get normalized zoom (0.0 = Universe, 1.0 = System)
+  const normalizedZoom = zoomPan.normalizedZoom
+
+  // Determine current zoom level (backward compatibility)
   // Start at sector level (no quadrant view) - shows all galaxies across all quadrants
   // Extended sector view to show galaxies at more zoom levels with better spacing
   const zoomLevel = useMemo(() => {
@@ -262,6 +269,67 @@ export function UnifiedUniverseMapV2() {
   const visibleSystems = useMemo(() => {
     const bounds = zoomPan.viewportBounds
     const scale = zoomPan.scale
+    
+    // Debug: Log viewport and system distribution (once per mount)
+    if (systemsByKey.size > 0 && !debugLoggedRef.current && allPlanets.length > 0) {
+      debugLoggedRef.current = true
+      
+      // Check how many planets have actual X/Y coordinates
+      const planetsWithXY = allPlanets.filter(p => {
+        if (typeof p.x === 'number' && typeof p.y === 'number') return true
+        if (p.coordinate && typeof p.coordinate === 'object' && p.coordinate !== null) {
+          const coord = p.coordinate as { x?: number; y?: number }
+          return typeof coord.x === 'number' && typeof coord.y === 'number'
+        }
+        return false
+      }).length
+      const planetsNeedingConversion = allPlanets.length - planetsWithXY
+      
+      const allSystems = Array.from(systemsByKey.values())
+      const minX = Math.min(...allSystems.map(s => s.center.x))
+      const maxX = Math.max(...allSystems.map(s => s.center.x))
+      const minY = Math.min(...allSystems.map(s => s.center.y))
+      const maxY = Math.max(...allSystems.map(s => s.center.y))
+      const avgX = allSystems.reduce((sum, s) => sum + s.center.x, 0) / allSystems.length
+      const avgY = allSystems.reduce((sum, s) => sum + s.center.y, 0) / allSystems.length
+      
+      // Count systems in each quadrant
+      const quadrantCounts = { q1: 0, q2: 0, q3: 0, q4: 0 }
+      allSystems.forEach(s => {
+        if (s.center.x < gridWidth / 2 && s.center.y < gridHeight / 2) quadrantCounts.q1++
+        else if (s.center.x >= gridWidth / 2 && s.center.y < gridHeight / 2) quadrantCounts.q2++
+        else if (s.center.x < gridWidth / 2 && s.center.y >= gridHeight / 2) quadrantCounts.q3++
+        else quadrantCounts.q4++
+      })
+      
+      console.log('[Map Debug] System distribution:', {
+        totalSystems: allSystems.length,
+        xRange: { min: minX, max: maxX, span: maxX - minX, avg: avgX, expectedSpan: gridWidth },
+        yRange: { min: minY, max: maxY, span: maxY - minY, avg: avgY, expectedSpan: gridHeight },
+        quadrantDistribution: quadrantCounts,
+        viewportBounds: bounds,
+        pan: { x: zoomPan.panX, y: zoomPan.panY },
+        scale,
+        gridSize: { width: gridWidth, height: gridHeight }
+      })
+      
+      console.log('[Map Debug] Planet coordinate source:', {
+        total: allPlanets.length,
+        withDirectXY: planetsWithXY,
+        needingConversion: planetsNeedingConversion,
+        conversionPercentage: ((planetsNeedingConversion / allPlanets.length) * 100).toFixed(1) + '%'
+      })
+      
+      // Warn if systems are clustered (span < 50% of grid)
+      if ((maxX - minX) < gridWidth * 0.5 || (maxY - minY) < gridHeight * 0.5) {
+        console.warn('[Map Debug] ⚠️ Systems appear clustered! Span is less than 50% of grid size.')
+        console.warn('[Map Debug] X span:', (maxX - minX), 'of', gridWidth, '(' + (((maxX - minX) / gridWidth) * 100).toFixed(1) + '%)')
+        console.warn('[Map Debug] Y span:', (maxY - minY), 'of', gridHeight, '(' + (((maxY - minY) / gridHeight) * 100).toFixed(1) + '%)')
+        console.warn('[Map Debug] This suggests planets may not have proper X/Y coordinates and are using fallback conversion.')
+        console.warn('[Map Debug] Check backend to ensure planets have x/y fields populated in database.')
+      }
+    }
+    
     const allInViewport: SystemData[] = []
     
     // Padding based on zoom level - more padding at lower zoom for smoother panning
@@ -463,7 +531,8 @@ export function UnifiedUniverseMapV2() {
         })
       }
     }
-  }, [allPlanets.length, enrichedPlanets, mapData, galaxyNames.size, systemsByKey.size, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingPlanets])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPlanets.length, enrichedPlanets, mapData, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingPlanets])
 
   // Handle system click
   const handleSystemClick = (system: SystemData) => {
@@ -678,44 +747,50 @@ export function UnifiedUniverseMapV2() {
             width={gridWidth}
             height={gridHeight}
             scale={zoomPan.scale}
+            normalizedZoom={normalizedZoom}
             viewportBounds={zoomPan.viewportBounds}
           />
 
-          {/* Navigation overlays */}
-          {/* Quadrant overlay still available for navigation, but zooms to sector level */}
-          <QuadrantOverlay
-            gridWidth={gridWidth}
-            gridHeight={gridHeight}
-            scale={zoomPan.scale}
-            viewportBounds={zoomPan.viewportBounds}
-            onQuadrantClick={(quadrant) => {
-              const range = getQuadrantXyRange(quadrant)
-              const centerX = (range.x_min + range.x_max) / 2
-              const centerY = (range.y_min + range.y_max) / 2
-              const screen = zoomPan.gridToScreen(centerX, centerY)
-              // Zoom to sector level (0.05) to show all galaxies in quadrant
-              zoomPan.setZoom(0.05, screen.x, screen.y)
-            }}
-          />
-          <SectorOverlay
-            gridWidth={gridWidth}
-            gridHeight={gridHeight}
-            scale={zoomPan.scale}
-            viewportBounds={zoomPan.viewportBounds}
-            onSectorClick={(quadrant, sector) => {
-              const range = getSectorXyRange(quadrant, sector)
-              const centerX = (range.x_min + range.x_max) / 2
-              const centerY = (range.y_min + range.y_max) / 2
-              const screen = zoomPan.gridToScreen(centerX, centerY)
-              zoomPan.setZoom(0.1, screen.x, screen.y)
-            }}
-          />
+          {/* Navigation overlays with layer fading */}
+          <LayerWrapper layerName="quadrant" normalizedZoom={normalizedZoom}>
+            <QuadrantOverlay
+              gridWidth={gridWidth}
+              gridHeight={gridHeight}
+              scale={zoomPan.scale}
+              viewportBounds={zoomPan.viewportBounds}
+              onQuadrantClick={(quadrant) => {
+                const range = getQuadrantXyRange(quadrant)
+                const centerX = (range.x_min + range.x_max) / 2
+                const centerY = (range.y_min + range.y_max) / 2
+                const screen = zoomPan.gridToScreen(centerX, centerY)
+                // Zoom to sector level using normalized zoom
+                zoomPan.setNormalizedZoom(0.05, screen.x, screen.y)
+              }}
+            />
+          </LayerWrapper>
+          <LayerWrapper layerName="sector" normalizedZoom={normalizedZoom}>
+            <SectorOverlay
+              gridWidth={gridWidth}
+              gridHeight={gridHeight}
+              scale={zoomPan.scale}
+              viewportBounds={zoomPan.viewportBounds}
+              onSectorClick={(quadrant, sector) => {
+                const range = getSectorXyRange(quadrant, sector)
+                const centerX = (range.x_min + range.x_max) / 2
+                const centerY = (range.y_min + range.y_max) / 2
+                const screen = zoomPan.gridToScreen(centerX, centerY)
+                zoomPan.setNormalizedZoom(0.15, screen.x, screen.y)
+              }}
+            />
+          </LayerWrapper>
 
-          {/* Render based on zoom level */}
+          {/* Render based on zoom level with layer fading */}
           {/* Sector level - show systems as galaxy images (extended range) */}
-          {zoomLevel === 'sector' && (
-            <g className="systems-layer" style={{ pointerEvents: 'all' }}>
-              {visibleSystems.map(system => {
+          {/* Render when sector layer has any opacity (will be handled by LayerWrapper, but we check here for performance) */}
+          <LayerWrapper layerName="sector" normalizedZoom={normalizedZoom}>
+            {(zoomLevel === 'sector' || getLayerOpacity('sector', normalizedZoom) > 0.01) && (
+              <g className="systems-layer" style={{ pointerEvents: 'all' }}>
+                {visibleSystems.map(system => {
                 // Get a deterministic random galaxy type based on system coordinates
                 const galaxyType = getRandomGalaxyTypeForSystem(system.key)
                 const galaxyImage = getGalaxyImage(galaxyType)
@@ -735,7 +810,7 @@ export function UnifiedUniverseMapV2() {
                       y={system.center.y - imageSize / 2}
                       width={imageSize}
                       height={imageSize}
-                      className="cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
+                      className="cursor-pointer hover:brightness-110 transition-all"
                       onClick={() => handleSystemClick(system)}
                       style={{ pointerEvents: 'all' }}
                     />
@@ -773,47 +848,56 @@ export function UnifiedUniverseMapV2() {
                   </g>
                 )
               })}
-            </g>
-          )}
+              </g>
+            )}
+          </LayerWrapper>
 
           {/* Galaxy level - show systems with SystemView component */}
-          {zoomLevel === 'galaxy' && visibleSystems.length > 0 && (
-            <g className="systems-layer">
-              {visibleSystems.map(system => (
-                <SystemViewMemo
-                  key={system.key}
-                  system={system}
-                  scale={zoomPan.scale}
-                  onPlanetClick={handlePlanetClick}
-                  onPlanetHover={setHoveredPlanet}
-                  hoveredPlanet={hoveredPlanet}
-                  systemName={(system.system_name && system.system_name.trim()) || null}
-                />
-              ))}
-            </g>
-          )}
+          {/* Render when galaxy layer has any opacity (will be handled by LayerWrapper, but we check here for performance) */}
+          <LayerWrapper layerName="galaxy" normalizedZoom={normalizedZoom}>
+            {(zoomLevel === 'galaxy' || getLayerOpacity('galaxy', normalizedZoom) > 0.01) && visibleSystems.length > 0 && (
+              <g className="systems-layer">
+                {visibleSystems.map(system => (
+                  <SystemViewMemo
+                    key={system.key}
+                    system={system}
+                    scale={zoomPan.scale}
+                    normalizedZoom={normalizedZoom}
+                    onPlanetClick={handlePlanetClick}
+                    onPlanetHover={setHoveredPlanet}
+                    hoveredPlanet={hoveredPlanet}
+                    systemName={(system.system_name && system.system_name.trim()) || null}
+                  />
+                ))}
+              </g>
+            )}
+          </LayerWrapper>
 
           {/* System view - show at scale >= 0.5 */}
-          {(zoomLevel === 'system' || zoomLevel === 'planet') && (
-            <g className="systems-layer">
-              {visibleSystems.map(system => (
-                <SystemViewMemo
-                  key={system.key}
-                  system={system}
-                  scale={zoomPan.scale}
-                  onPlanetClick={handlePlanetClick}
-                  onPlanetHover={setHoveredPlanet}
-                  hoveredPlanet={hoveredPlanet}
-                  systemName={(system.system_name && system.system_name.trim()) || null}
-                />
-              ))}
-            </g>
-          )}
+          {/* Render when system layer has any opacity (will be handled by LayerWrapper, but we check here for performance) */}
+          <LayerWrapper layerName="system" normalizedZoom={normalizedZoom}>
+            {(zoomLevel === 'system' || zoomLevel === 'planet' || getLayerOpacity('system', normalizedZoom) > 0.01) && (
+              <g className="systems-layer">
+                {visibleSystems.map(system => (
+                  <SystemViewMemo
+                    key={system.key}
+                    system={system}
+                    scale={zoomPan.scale}
+                    normalizedZoom={normalizedZoom}
+                    onPlanetClick={handlePlanetClick}
+                    onPlanetHover={setHoveredPlanet}
+                    hoveredPlanet={hoveredPlanet}
+                    systemName={(system.system_name && system.system_name.trim()) || null}
+                  />
+                ))}
+              </g>
+            )}
+          </LayerWrapper>
 
           {/* Fallback: show galaxies if no systems visible at galaxy level */}
           {zoomLevel === 'galaxy' && visibleSystems.length === 0 && (
             <g className="galaxies-layer">
-              {Array.from(systemsByGalaxy.entries()).map(([galaxyKey, systems]) => {
+              {Array.from(systemsByGalaxy.entries()).map(([galaxyKey]) => {
                 const [q, s, g] = galaxyKey.split(':').map(Number)
                 const galaxyRange = getGalaxyXyRange(q, s, g)
                 const centerX = (galaxyRange.x_min + galaxyRange.x_max) / 2
@@ -837,7 +921,7 @@ export function UnifiedUniverseMapV2() {
                       y={centerY - 20}
                       width={40}
                       height={40}
-                      className="cursor-pointer opacity-80 hover:opacity-100"
+                      className="cursor-pointer hover:brightness-110 transition-all"
                     />
                     {zoomPan.scale > 0.2 && (() => {
                       const galaxyName = galaxyNames.get(galaxyKey)
@@ -916,6 +1000,20 @@ export function UnifiedUniverseMapV2() {
           </g>
         </svg>
 
+        {/* Coordinate Search Bar */}
+        <CoordinateSearchBar
+          onSearch={(centerX, centerY, normalizedZoom) => {
+            // Convert normalized zoom to render scale
+            const targetScale = normalizedToRenderScale(normalizedZoom)
+            // Calculate target pan to center on coordinate
+            const targetPanX = (gridWidth / 2 - centerX) * targetScale
+            const targetPanY = (gridHeight / 2 - centerY) * targetScale
+            
+            // Use setZoomAndPan to set both together atomically
+            zoomPan.setZoomAndPan(targetScale, targetPanX, targetPanY)
+          }}
+        />
+
         {/* Zoom controls */}
         <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 bg-black/80 backdrop-blur-sm px-4 py-3 angled-corners border border-gray-700">
           <button
@@ -967,23 +1065,15 @@ export function UnifiedUniverseMapV2() {
         {showJumpPanel && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100]">
             <CoordinateJumpPanel
-              onJump={(centerX, centerY, zoom) => {
-                // Use the same approach as homeworld centering
-                // Formula: panX = (gridWidth / 2 - targetX) * scale
-                // This centers the viewport on the target coordinate
-                const targetPanX = (gridWidth / 2 - centerX) * zoom
-                const targetPanY = (gridHeight / 2 - centerY) * zoom
+              onJump={(centerX, centerY, normalizedZoom) => {
+                // Convert normalized zoom to render scale
+                const targetScale = normalizedToRenderScale(normalizedZoom)
+                // Calculate target pan to center on coordinate
+                const targetPanX = (gridWidth / 2 - centerX) * targetScale
+                const targetPanY = (gridHeight / 2 - centerY) * targetScale
                 
                 // Use setZoomAndPan to set both together atomically
-                if (zoomPan.setZoomAndPan) {
-                  zoomPan.setZoomAndPan(zoom, targetPanX, targetPanY)
-                } else {
-                  // Fallback: set zoom first, then pan
-                  zoomPan.setZoom(zoom)
-                  requestAnimationFrame(() => {
-                    zoomPan.setPan(targetPanX, targetPanY)
-                  })
-                }
+                zoomPan.setZoomAndPan(targetScale, targetPanX, targetPanY)
                 
                 setShowJumpPanel(false)
               }}

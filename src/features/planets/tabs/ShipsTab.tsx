@@ -19,6 +19,8 @@ import { Ship, Zap, Shield, Target, Plus, AlertCircle, Loader2 } from 'lucide-re
 import { Skeleton } from '@/components/ui/skeleton'
 import { getShipImage } from '@/lib/shipImages'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
+import { TechTreeEmbedded } from '@/components/tech-tree/TechTreeEmbedded'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCheckPrerequisitesMutation } from '@/api/endpoints/prerequisitesApi'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 
@@ -347,7 +349,14 @@ export function ShipsTab({ planet }: ShipsTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="list" className="space-y-6">
+      <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="list">Ships List</TabsTrigger>
+        <TabsTrigger value="tree">Tech Tree</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="list" className="space-y-6 mt-6">
+      <div className="space-y-6">
       {/* Ship Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="panel-glass border-blue/20">
@@ -876,6 +885,12 @@ export function ShipsTab({ planet }: ShipsTabProps) {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+      </TabsContent>
+      
+      <TabsContent value="tree" className="mt-6">
+        <TechTreeEmbedded nodeType="ship" planetId={Number(planet.id)} height="600px" />
+      </TabsContent>
+    </Tabs>
   )
 }

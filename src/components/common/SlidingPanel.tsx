@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Minimize2, Maximize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,6 +50,12 @@ export function SlidingPanel({
   const backdropRef = useRef<HTMLDivElement>(null)
   const [isAnimating, setIsAnimating] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure portal only renders on client side
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Handle ESC key to close
   useEffect(() => {
@@ -94,17 +101,21 @@ export function SlidingPanel({
   // Don't render minimized panels here - they're handled by PanelManager as tabs
   if (panelState === PanelState.MINIMIZED) return null
 
-  return (
+  // Only render portal after mounting (client-side only)
+  if (!mounted) return null
+
+  const panelContent = (
     <>
       {/* Backdrop */}
       {!hideBackdrop && (
         <div 
           ref={backdropRef}
           className={cn(
-            "sliding-panel-backdrop fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-all duration-300 ease-out",
+            "sliding-panel-backdrop fixed inset-0 bg-black/50 backdrop-blur-sm transition-all duration-300 ease-out",
             isAnimating ? "opacity-100" : "opacity-0"
           )}
           style={{ 
+            zIndex: zIndex - 1, // Backdrop should be just below the panel
             pointerEvents: isAnimating ? 'auto' : 'none'
           }}
           onClick={(e) => {
@@ -194,5 +205,8 @@ export function SlidingPanel({
       </div>
     </>
   )
+
+  // Render to document.body via portal to escape stacking context
+  return createPortal(panelContent, document.body)
 }
 

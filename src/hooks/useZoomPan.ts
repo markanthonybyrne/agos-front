@@ -6,6 +6,26 @@ export interface ZoomPanState {
   panY: number
 }
 
+/**
+ * Normalized zoom (0.0-1.0) → Render scale (0.01-7.0)
+ * Universe view: scale 0.01 (1% zoom) = normalized 0.0
+ * System view: scale 7.0 (700% zoom) = normalized 1.0
+ */
+export function normalizedToRenderScale(normalized: number): number {
+  const minScale = 0.01
+  const maxScale = 7.0
+  return minScale + (normalized * (maxScale - minScale))
+}
+
+/**
+ * Render scale (0.01-7.0) → Normalized zoom (0.0-1.0)
+ */
+export function renderScaleToNormalized(scale: number): number {
+  const minScale = 0.01
+  const maxScale = 7.0
+  return Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
+}
+
 export interface ViewportBounds {
   minX: number
   maxX: number
@@ -408,6 +428,21 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     return 4 // Planet view
   }, [state.scale])
 
+  // Calculate normalized zoom (0.0 = Universe, 1.0 = System)
+  const normalizedZoom = useMemo(() => {
+    return renderScaleToNormalized(state.scale)
+  }, [state.scale])
+
+  // Set normalized zoom with optional center point
+  const setNormalizedZoom = useCallback((
+    normalized: number, 
+    centerX?: number, 
+    centerY?: number
+  ) => {
+    const targetScale = normalizedToRenderScale(Math.max(0, Math.min(1, normalized)))
+    setZoom(targetScale, centerX, centerY)
+  }, [setZoom])
+
   // Convert screen coordinates to grid coordinates
   const screenToGrid = useCallback((screenX: number, screenY: number) => {
     const container = getContainerDimensions()
@@ -434,6 +469,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     scale: state.scale,
     panX: state.panX,
     panY: state.panY,
+    normalizedZoom,
     zoomLevel,
     viewportBounds,
     isDragging: isDraggingRef.current,
@@ -443,6 +479,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     
     // Actions
     setZoom,
+    setNormalizedZoom,
     setZoomAndPan,
     zoomIn,
     zoomOut,
