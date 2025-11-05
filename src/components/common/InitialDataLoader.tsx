@@ -155,21 +155,50 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
         dispatch(setLoadingPhase('initializing'))
 
         try {
-          // Phase 1: Initialize and fetch first page to get total count
-          dispatch(setLoadingProgress(2))
-          dispatch(setLoadingPhase('fetching'))
-          
           const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1').replace(
             /\/$/,
             ''
           )
 
-          // Use larger page size to reduce API calls - 300 items per page
-          const limit = 300
-          const maxPlanetsToLoad = 15000
-          const maxParallelRequests = 10 // Fetch up to 10 pages in parallel (10 * 300 = 3000 planets)
+          // OPTIMIZATION: Use API max limit (100) instead of 300
+          const limit = 100 // API maximum per docs
+          const initialPlanetsToLoad = 2000 // Load 2000 planets initially (fast)
+          const maxPlanetsToLoad = 15000 // Load remaining in background
+          const maxParallelRequests = 20 // Increased parallelism for faster initial load
           
+          // PHASE 1: Load player's planets first (fastest, most important)
+          dispatch(setLoadingProgress(5))
+          dispatch(setLoadingPhase('fetching'))
+          
+          let allPlanets: Planet[] = []
+          
+          try {
+            // Load player's planets via /planets endpoint (fast, no pagination)
+            const playerPlanetsResponse = await fetch(`${baseUrl}/planets`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            
+            if (playerPlanetsResponse.ok) {
+              const playerData = await playerPlanetsResponse.json()
+              const playerPlanets = playerData?.planets || []
+              if (playerPlanets.length > 0) {
+                allPlanets.push(...playerPlanets)
+                dispatch(addPlanets(playerPlanets))
+                console.log(`[InitialDataLoader] ✅ Loaded ${playerPlanets.length} player planets (Phase 1)`)
+              }
+            }
+          } catch (error) {
+            console.warn('[InitialDataLoader] Failed to load player planets, continuing...', error)
+          }
+          
+          dispatch(setLoadingProgress(10))
+          
+          // PHASE 2: Load initial batch for immediate use (2000 planets)
           // Fetch first page to get total count
+          
           const firstPageResponse = await fetch(`${baseUrl}/planets/search?limit=${limit}&offset=0`, {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -185,57 +214,41 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           const total = firstPageData.total || 0
           const firstPagePlanets = firstPageData.planets || []
           
-          // Detect actual limit - API might return fewer than requested
-          const actualLimit = firstPagePlanets.length
-          const effectiveLimit = actualLimit > 0 ? actualLimit : limit
+          // Filter out player planets we already loaded
+          const existingIds = new Set(allPlanets.map(p => p.id))
+          const newFirstPagePlanets = firstPagePlanets.filter(p => !existingIds.has(p.id))
           
-          // If API returned less than requested, it likely has a max limit
-          if (actualLimit < limit && actualLimit > 0) {
-            console.warn(`[InitialDataLoader] API returned ${actualLimit} planets per page (requested ${limit}). API likely has a max limit of ${actualLimit}.`)
+          if (newFirstPagePlanets.length > 0) {
+            allPlanets.push(...newFirstPagePlanets)
+            dispatch(addPlanets(newFirstPagePlanets))
           }
           
+          const effectiveLimit = limit // Use API max limit (100)
+          const initialPagesNeeded = Math.ceil(initialPlanetsToLoad / effectiveLimit)
           const totalToLoad = Math.min(total, maxPlanetsToLoad)
           const totalPages = Math.ceil(totalToLoad / effectiveLimit)
 
-          console.log('[InitialDataLoader] Starting optimized planet load:', { 
+          console.log('[InitialDataLoader] Optimized loading strategy:', { 
             apiTotal: total,
+            playerPlanetsLoaded: allPlanets.length - newFirstPagePlanets.length,
+            initialTarget: initialPlanetsToLoad,
             maxPlanetsToLoad,
-            totalToLoad, 
-            requestedLimit: limit,
-            actualLimit: effectiveLimit,
-            totalPages, 
-            maxParallel: maxParallelRequests,
-            firstPagePlanets: firstPagePlanets.length,
-            expectedTotalPages: Math.ceil(totalToLoad / effectiveLimit)
+            effectiveLimit,
+            initialPagesNeeded,
+            totalPages,
+            maxParallel: maxParallelRequests
           })
-
-          // Warn if API total is less than expected
-          if (total < maxPlanetsToLoad) {
-            console.warn(`[InitialDataLoader] API reports only ${total} planets, but we want to load ${maxPlanetsToLoad}. Will load ${totalToLoad}.`)
-          }
-
-          // Start with first page
-          const allPlanets: Planet[] = firstPagePlanets
-          dispatch(setLoadingProgress(5))
-          dispatch(addPlanets(allPlanets))
-
-          // Phase 2: Fetch all remaining pages in parallel chunks
-          // Calculate how many parallel requests we need
-          const remainingPages = totalPages - 1
           
-          if (remainingPages > 0) {
-            // Create all fetch promises upfront
-            const allFetchPromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
+          // PHASE 2: Load initial batch quickly (for immediate use)
+          dispatch(setLoadingProgress(15))
+          
+          if (initialPagesNeeded > 1) {
+            // Create promises for initial batch only
+            const initialPromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
             
-            // Create fetch promises for all remaining pages
-            // Use effectiveLimit (actual API limit) not requested limit for offset calculation
-            for (let page = 1; page < totalPages; page++) {
+            for (let page = 1; page < initialPagesNeeded && page < totalPages; page++) {
               const offset = page * effectiveLimit
-              
-              // Don't break early - create all promises even if offset seems high
-              // The API might have pagination quirks, so fetch all pages
-              // Use effectiveLimit in the request URL to match what API actually returns
-              allFetchPromises.push(
+              initialPromises.push(
                 fetch(`${baseUrl}/planets/search?limit=${effectiveLimit}&offset=${offset}`, {
                   headers: {
                     Authorization: `Bearer ${token}`,
@@ -246,252 +259,69 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
                     throw new Error(`Failed to fetch planets at offset ${offset}: ${response.status}`)
                   }
                   const data = await response.json()
-                  const planets = data.planets || []
-                  console.log(`[InitialDataLoader] Fetched page ${page} (offset ${offset}): ${planets.length} planets returned`)
-                  return { planets, offset, page }
+                  return { planets: data.planets || [], offset, page }
                 }).catch(error => {
-                  console.error(`[InitialDataLoader] Error fetching page ${page} (offset ${offset}):`, error)
+                  console.error(`[InitialDataLoader] Error fetching page ${page}:`, error)
                   return { planets: [], offset, page }
                 })
               )
             }
-
-            console.log('[InitialDataLoader] Created fetch promises:', {
-              remainingPages,
-              totalPages,
-              promisesCreated: allFetchPromises.length,
-              expectedPromises: totalPages - 1,
-              actualLimit: effectiveLimit,
-              requestedLimit: limit,
-              lastOffset: (totalPages - 1) * effectiveLimit,
-              totalToLoad,
-              firstOffset: effectiveLimit,
-              lastOffsetCalculated: (totalPages - 1) * effectiveLimit,
-              willFetchUpTo: (totalPages - 1) * effectiveLimit + effectiveLimit,
-              estimatedPlanets: (totalPages - 1) * effectiveLimit + firstPagePlanets.length
-            })
             
-            // Verify we created enough promises
-            if (allFetchPromises.length < totalPages - 1) {
-              console.error(`[InitialDataLoader] ⚠️ WARNING: Only created ${allFetchPromises.length} promises but need ${totalPages - 1} for ${totalToLoad} planets!`)
-            }
+            // Fetch initial batch in parallel (all at once for speed)
+            const initialResults = await Promise.all(initialPromises)
+            const existingIdsAfter = new Set(allPlanets.map(p => p.id))
             
-            // Warn if effective limit is different from requested
-            if (effectiveLimit !== limit) {
-              console.warn(`[InitialDataLoader] ⚠️ Using effective limit of ${effectiveLimit} instead of requested ${limit}. This means we need ${totalPages} pages instead of ${Math.ceil(totalToLoad / limit)}.`)
-            }
-
-            // Process in parallel chunks to avoid overwhelming the server
-            // but maximize parallelism
-            const chunkSize = maxParallelRequests
-            const totalChunks = Math.ceil(allFetchPromises.length / chunkSize)
-            
-            console.log('[InitialDataLoader] Starting to process chunks:', {
-              totalPromises: allFetchPromises.length,
-              chunkSize,
-              totalChunks,
-              willProcessAll: true
-            })
-            
-            for (let i = 0; i < allFetchPromises.length; i += chunkSize) {
-              const chunk = allFetchPromises.slice(i, i + chunkSize)
-              const chunkIndex = Math.floor(i / chunkSize) + 1
-              const chunksRemaining = Math.ceil((allFetchPromises.length - (i + chunkSize)) / chunkSize)
-              
-              console.log(`[InitialDataLoader] Processing chunk ${chunkIndex}/${totalChunks} (${chunk.length} promises, ${chunksRemaining} remaining)`)
-              
-              try {
-                // Fetch chunk in parallel
-                const chunkResults = await Promise.all(chunk)
-                
-                // Process all results from this chunk
-                let chunkPlanetCount = 0
-                for (const result of chunkResults) {
-                  if (result.planets && result.planets.length > 0) {
-                    allPlanets.push(...result.planets)
-                    dispatch(addPlanets(result.planets))
-                    chunkPlanetCount += result.planets.length
-                  } else {
-                    console.warn(`[InitialDataLoader] Empty result from page ${result.page || 'unknown'} (offset ${result.offset || 'unknown'})`)
-                  }
-                }
-
-                // Update progress based on actual planets loaded
-                const progress = 5 + ((allPlanets.length / totalToLoad) * 90)
-                dispatch(setLoadingProgress(Math.min(95, progress)))
-
-                console.log('[InitialDataLoader] Loaded parallel chunk:', {
-                  chunkIndex,
-                  totalChunks,
-                  chunksRemaining,
-                  chunkSize: chunk.length,
-                  chunkPlanets: chunkPlanetCount,
-                  totalLoaded: allPlanets.length,
-                  target: totalToLoad,
-                  progress: Math.round(progress),
-                  remaining: totalToLoad - allPlanets.length,
-                  percentageComplete: Math.round((allPlanets.length / totalToLoad) * 100) + '%',
-                  willContinue: i + chunkSize < allFetchPromises.length,
-                  nextChunkStart: i + chunkSize,
-                  totalPromises: allFetchPromises.length
-                })
-                
-                // NEVER break early - always process ALL chunks
-                // Even if we've loaded enough planets, continue to ensure we get all data
-                if (i + chunkSize >= allFetchPromises.length) {
-                  console.log(`[InitialDataLoader] ✅ Processed all ${totalChunks} chunks. Total loaded: ${allPlanets.length}`)
-                } else {
-                  console.log(`[InitialDataLoader] Continuing to next chunk...`)
-                }
-              } catch (error) {
-                console.error(`[InitialDataLoader] Error fetching chunk ${chunkIndex}:`, error)
-                // Continue with next chunk even if one fails - don't break the loop
+            for (const result of initialResults) {
+              const newPlanets = result.planets.filter(p => !existingIdsAfter.has(p.id))
+              if (newPlanets.length > 0) {
+                allPlanets.push(...newPlanets)
+                dispatch(addPlanets(newPlanets))
+                existingIdsAfter.add(...newPlanets.map(p => p.id))
               }
             }
             
-            console.log(`[InitialDataLoader] ✅ Finished processing all ${totalChunks} chunks. Final count: ${allPlanets.length} planets`)
+            console.log(`[InitialDataLoader] ✅ Loaded initial batch: ${allPlanets.length} planets total`)
           }
-
-          // Verify we actually loaded all planets
-          const actualLoaded = allPlanets.length
-          console.log('[InitialDataLoader] Finished loading planets:', { 
-            loaded: actualLoaded, 
-            target: totalToLoad, 
-            total,
-            success: actualLoaded >= totalToLoad,
-            missing: totalToLoad - actualLoaded
-          })
-
-          // If we didn't load all planets, try to fetch remaining ones
-          // Use effectiveLimit for calculations
-          if (actualLoaded < totalToLoad && actualLoaded < total) {
-            const missing = totalToLoad - actualLoaded
-            const additionalPagesNeeded = Math.ceil(missing / effectiveLimit)
-            const currentPage = Math.floor(actualLoaded / effectiveLimit)
-            
-            console.warn(`[InitialDataLoader] Only loaded ${actualLoaded} of ${totalToLoad} planets. Missing ${missing}.`)
-            console.warn(`[InitialDataLoader] Using effective limit ${effectiveLimit}, need ${additionalPagesNeeded} more pages starting from page ${currentPage + 1}`)
-            
-            // Try fetching additional pages that might have been missed
-            const additionalPromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
-            
-              // Fetch all remaining pages systematically using effectiveLimit
-              // Calculate how many pages we've actually loaded
-              const pagesActuallyLoaded = Math.ceil(actualLoaded / effectiveLimit)
-              const pagesNeeded = Math.ceil(totalToLoad / effectiveLimit)
-              
-              console.log(`[InitialDataLoader] Recovery: Loaded ${pagesActuallyLoaded} pages, need ${pagesNeeded} total. Fetching pages ${pagesActuallyLoaded + 1} to ${pagesNeeded}`)
-              
-              for (let page = pagesActuallyLoaded; page < pagesNeeded && page * effectiveLimit < total; page++) {
-                const offset = page * effectiveLimit
-                
-                additionalPromises.push(
-                  fetch(`${baseUrl}/planets/search?limit=${effectiveLimit}&offset=${offset}`, {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                    },
-                  }).then(async response => {
-                    if (!response.ok) {
-                      console.warn(`[InitialDataLoader] Additional fetch failed for page ${page} (offset ${offset}): ${response.status}`)
-                      return { planets: [], offset, page }
-                    }
-                    const data = await response.json()
-                    const planets = data.planets || []
-                    console.log(`[InitialDataLoader] Additional fetch page ${page} (offset ${offset}): ${planets.length} planets returned`)
-                    return { planets, offset, page }
-                  }).catch(error => {
-                    console.error(`[InitialDataLoader] Error in additional fetch page ${page} (offset ${offset}):`, error)
-                    return { planets: [], offset, page }
-                  })
-                )
-              }
-            
-            // Fetch additional pages in smaller batches
-            if (additionalPromises.length > 0) {
-              const batchSize = 5
-              for (let i = 0; i < additionalPromises.length; i += batchSize) {
-                const batch = additionalPromises.slice(i, i + batchSize)
-                try {
-                  const batchResults = await Promise.all(batch)
-                  for (const result of batchResults) {
-                    if (result.planets && result.planets.length > 0) {
-                      // Only add planets we don't already have
-                      const newPlanets = result.planets.filter(p => !allPlanets.some(existing => existing.id === p.id))
-                      if (newPlanets.length > 0) {
-                        allPlanets.push(...newPlanets)
-                        dispatch(addPlanets(newPlanets))
-                        console.log(`[InitialDataLoader] Added ${newPlanets.length} new planets from page ${result.page}`)
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.error('[InitialDataLoader] Error fetching additional batch:', error)
-                }
-              }
-              
-              const finalLoaded = allPlanets.length
-              console.log('[InitialDataLoader] After additional fetch:', {
-                loaded: finalLoaded,
-                target: totalToLoad,
-                stillMissing: totalToLoad - finalLoaded
-              })
-            }
-          }
-
-          // Phase 3: Start prefetching map data in background (optional, doesn't block completion)
-          // This is a large response that takes time, so we prefetch it but don't wait
-          dispatch(setLoadingPhase('processing'))
-          dispatch(setLoadingProgress(90))
           
-          // Prefetch map data using RTK Query (fire and forget)
-          // This will cache the result so useGetMapQuery can use it immediately
-          store.dispatch(
-            universeApi.endpoints.getMap.initiate({}, { forceRefetch: false })
-          ).catch(() => {
-            // Silently handle errors - map data is optional
-            console.warn('[InitialDataLoader] Map data prefetch failed (non-blocking)')
-          })
-          
-          console.log('[InitialDataLoader] Started map data prefetch in background')
-
-          // Phase 4: Complete - ensure we have all planets before completing
+          // Complete initial load quickly
           dispatch(setAllPlanets(allPlanets))
-          dispatch(setLoadingProgress(95))
+          dispatch(setLoadingProgress(90))
           dispatch(setLoadingPhase('complete'))
-
-          // Small delay before completing
-          // Ensure minimum display time AND that we actually loaded the data
+          
+          // Complete immediately so user can interact
           const elapsed = loaderStartTimeRef.current ? Date.now() - loaderStartTimeRef.current : 0
           const remainingTime = Math.max(0, MIN_LOADER_DISPLAY_TIME - elapsed)
           
           setTimeout(() => {
-            // Double-check that we have planets before completing
-            if (allPlanets.length >= totalToLoad || allPlanets.length >= 15000) {
-              console.log('[InitialDataLoader] ✅ Sufficient planets loaded, completing loader')
-              setHasCompleted(true)
-              hasLoadedOnceRef.current = true
-              hasLoadedThisSession.current = true
-              sessionStorage.setItem(SESSION_LOADED_KEY, 'true')
-              setTimeout(() => {
-                onComplete()
-              }, 300)
-            } else {
-              console.warn('[InitialDataLoader] ⚠️ Not enough planets loaded, but completing anyway to prevent blocking')
-              setHasCompleted(true)
-              hasLoadedOnceRef.current = true
-              hasLoadedThisSession.current = true
-              sessionStorage.setItem(SESSION_LOADED_KEY, 'true')
-              setTimeout(() => {
-                onComplete()
-              }, 300)
+            console.log('[InitialDataLoader] ✅ Initial load complete, allowing user to continue')
+            setHasCompleted(true)
+            hasLoadedOnceRef.current = true
+            hasLoadedThisSession.current = true
+            sessionStorage.setItem(SESSION_LOADED_KEY, 'true')
+            
+            // Start background loading of remaining planets (non-blocking)
+            if (allPlanets.length < totalToLoad && totalPages > initialPagesNeeded) {
+              console.log('[InitialDataLoader] Starting background load of remaining planets...')
+              loadRemainingPlanetsInBackground(
+                baseUrl,
+                token!,
+                allPlanets,
+                initialPagesNeeded,
+                totalPages,
+                effectiveLimit,
+                totalToLoad
+              )
             }
+            
+            setTimeout(() => {
+              onComplete()
+            }, 300)
           }, remainingTime + 200)
+          
+          return // Exit early, background loading continues
         } catch (error) {
           console.error('Error loading planets:', error)
           dispatch(setLoading(false))
-          // Still complete to allow user to continue
-          // Ensure minimum display time
           const elapsed = loaderStartTimeRef.current ? Date.now() - loaderStartTimeRef.current : 0
           const remainingTime = Math.max(0, MIN_LOADER_DISPLAY_TIME - elapsed)
           
@@ -504,6 +334,82 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
               onComplete()
             }, 300)
           }, remainingTime + 200)
+        }
+      }
+      
+      // Background loading function (non-blocking)
+      const loadRemainingPlanetsInBackground = async (
+        baseUrl: string,
+        token: string,
+        existingPlanets: Planet[],
+        startPage: number,
+        totalPages: number,
+        effectiveLimit: number,
+        totalToLoad: number
+      ) => {
+        try {
+          const existingIds = new Set(existingPlanets.map(p => p.id))
+          const remainingPages = totalPages - startPage
+          
+          if (remainingPages <= 0) return
+          
+          console.log(`[InitialDataLoader] Background: Loading ${remainingPages} remaining pages...`)
+          
+          // Create all promises for remaining pages
+          const backgroundPromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
+          
+          for (let page = startPage; page < totalPages; page++) {
+            const offset = page * effectiveLimit
+            backgroundPromises.push(
+              fetch(`${baseUrl}/planets/search?limit=${effectiveLimit}&offset=${offset}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              }).then(async response => {
+                if (!response.ok) {
+                  return { planets: [], offset, page }
+                }
+                const data = await response.json()
+                return { planets: data.planets || [], offset, page }
+              }).catch(error => {
+                console.error(`[InitialDataLoader] Background fetch error page ${page}:`, error)
+                return { planets: [], offset, page }
+              })
+            )
+          }
+          
+          // Process in smaller chunks to avoid overwhelming
+          const chunkSize = 10
+          for (let i = 0; i < backgroundPromises.length; i += chunkSize) {
+            const chunk = backgroundPromises.slice(i, i + chunkSize)
+            const results = await Promise.all(chunk)
+            
+            const newPlanets: Planet[] = []
+            for (const result of results) {
+              const filtered = result.planets.filter(p => !existingIds.has(p.id))
+              newPlanets.push(...filtered)
+              filtered.forEach(p => existingIds.add(p.id))
+            }
+            
+            if (newPlanets.length > 0) {
+              dispatch(addPlanets(newPlanets))
+              existingPlanets.push(...newPlanets)
+              console.log(`[InitialDataLoader] Background: Loaded ${newPlanets.length} planets (${existingPlanets.length}/${totalToLoad} total)`)
+            }
+            
+            // Update final state periodically
+            if (i + chunkSize >= backgroundPromises.length || newPlanets.length > 0) {
+              dispatch(setAllPlanets([...existingPlanets]))
+            }
+            
+            // Small delay to avoid blocking UI
+            await new Promise(resolve => setTimeout(resolve, 50))
+          }
+          
+          console.log(`[InitialDataLoader] ✅ Background load complete: ${existingPlanets.length} planets total`)
+        } catch (error) {
+          console.error('[InitialDataLoader] Background load error:', error)
         }
       }
 
@@ -612,4 +518,3 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
     </div>
   )
 }
-

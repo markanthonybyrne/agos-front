@@ -1,10 +1,17 @@
+import { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setFilters } from '@/app/slices/techTreeSlice'
 import { TechNodeType, SpecializationType } from '@/types/tech-tree.types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, X, Filter } from 'lucide-react'
+import { Search, X, Filter, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 const NODE_TYPES: { value: TechNodeType; label: string }[] = [
   { value: 'facility', label: 'Facilities' },
@@ -27,6 +34,7 @@ interface TechTreeFilterBarProps {
 }
 
 export function TechTreeFilterBar({ className }: TechTreeFilterBarProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const dispatch = useAppDispatch()
   const { activeFilters } = useAppSelector((state) => state.techTree)
 
@@ -89,17 +97,78 @@ export function TechTreeFilterBar({ className }: TechTreeFilterBarProps) {
     !activeFilters.showLocked ||
     !activeFilters.showCompleted
 
+  const activeFilterCount = 
+    activeFilters.nodeTypes.length +
+    activeFilters.eras.length +
+    activeFilters.specializations.length +
+    (activeFilters.searchQuery !== '' ? 1 : 0) +
+    (!activeFilters.showLocked ? 1 : 0) +
+    (!activeFilters.showCompleted ? 1 : 0)
+
   return (
-    <div
-      className={cn(
-        'fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border/50 shadow-lg',
-        className
-      )}
-    >
-      <div className="container mx-auto px-4 py-3 max-w-7xl">
-        <div className="flex flex-col gap-3">
-          {/* Main filter row */}
-          <div className="flex items-center gap-2 flex-wrap">
+    <TooltipProvider>
+      <div
+        className={cn(
+          'fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border/50 shadow-lg transition-all duration-300 ease-in-out',
+          isExpanded ? 'max-h-[300px]' : 'max-h-[60px]',
+          className
+        )}
+      >
+        <div className="container mx-auto px-4 py-3 max-w-7xl">
+          {/* Minimized Header - Always visible */}
+          <div className="flex items-center justify-between">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="flex items-center gap-2 h-9 px-3"
+                >
+                  <Filter className="w-4 h-4" />
+                  <span className="text-sm font-medium">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary text-primary-foreground">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4 ml-1" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4 ml-1" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              {!isExpanded && (
+                <TooltipContent side="top" className="mb-2">
+                  <p className="text-sm">Click to open filter options</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+            
+            {isExpanded && hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                className="h-7 px-2 text-xs"
+              >
+                <X className="w-3 h-3 mr-1" />
+                Clear All
+              </Button>
+            )}
+          </div>
+
+          {/* Expandable Filter Content */}
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-300 ease-in-out',
+              isExpanded ? 'max-h-[250px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+            )}
+          >
+            <div className="flex flex-col gap-3">
+              {/* Main filter row */}
+              <div className="flex items-center gap-2 flex-wrap">
             {/* Search */}
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -187,22 +256,12 @@ export function TechTreeFilterBar({ className }: TechTreeFilterBarProps) {
               </Button>
             </div>
 
-            {/* Clear filters */}
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAllFilters}
-                className="h-7 px-2 text-xs"
-              >
-                <X className="w-3 h-3 mr-1" />
-                Clear
-              </Button>
-            )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
 

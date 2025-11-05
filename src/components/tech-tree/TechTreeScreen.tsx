@@ -217,7 +217,7 @@ export function TechTreeScreen() {
     gridWidth: nodeBounds.width,
     gridHeight: nodeBounds.height,
     enableWheelZoom: true,
-    resetDeps: [nodeBounds.width, nodeBounds.height],
+    // Don't auto-reset - we handle centering manually
   })
 
   // Viewport bounds for culling - account for panning and zoom
@@ -234,6 +234,40 @@ export function TechTreeScreen() {
       maxY: (-panY + window.innerHeight + padding) / scale,
     }
   }, [zoomPan.panX, zoomPan.panY, zoomPan.scale])
+
+  // Center the tree on initial load and after bounds change
+  const lastBoundsRef = useRef({ width: 0, height: 0 })
+  useEffect(() => {
+    // Center when nodeBounds are first calculated or when they change significantly
+    if (
+      filteredNodes.length > 0 && 
+      nodeBounds.width > 0 && 
+      nodeBounds.height > 0 &&
+      (lastBoundsRef.current.width !== nodeBounds.width || lastBoundsRef.current.height !== nodeBounds.height)
+    ) {
+      const centerX = (nodeBounds.minX + nodeBounds.maxX) / 2
+      const centerY = (nodeBounds.minY + nodeBounds.maxY) / 2
+      
+      // Calculate pan to center the content in the viewport
+      const viewportCenterX = window.innerWidth / 2
+      const viewportCenterY = window.innerHeight / 2
+      
+      // Account for the filter bar at the bottom (pb-20 = 80px padding)
+      const filterBarHeight = 80
+      const adjustedViewportCenterY = (window.innerHeight - filterBarHeight) / 2
+      
+      const targetPanX = viewportCenterX - centerX * zoomPan.scale
+      const targetPanY = adjustedViewportCenterY - centerY * zoomPan.scale
+      
+      // Set zoom and pan to center the tree
+      // Use a small delay to ensure this runs after any reset from useZoomPan
+      setTimeout(() => {
+        zoomPan.setZoomAndPan(zoomPan.scale, targetPanX, targetPanY)
+      }, 0)
+      
+      lastBoundsRef.current = { width: nodeBounds.width, height: nodeBounds.height }
+    }
+  }, [filteredNodes, nodeBounds, zoomPan])
 
   // Focus on a specific node (for jump to prerequisite) - MUST be before early returns
   const focusOnNode = useCallback((nodeId: string) => {

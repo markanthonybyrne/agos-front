@@ -6,7 +6,6 @@ import { getPlanetImage, getRandomSolImageForSystem, getRandomAsteroidImageForPl
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
 import { getOrbitLineOpacity, getOrbitLineWidth } from '@/lib/zoomLevels'
-import { normalizedToRenderScale } from '@/hooks/useZoomPan'
 
 interface SystemViewProps {
   system: SystemData
@@ -62,15 +61,20 @@ function SystemView({
     }).filter((orbit): orbit is NonNullable<typeof orbit> => orbit !== null)
   }, [system.planets, system.center])
   
-  // Get unique orbit radii for drawing orbit lines
-  // At high zoom levels, reduce orbit line density to prevent visual clutter
+  // Get orbit radii for drawing orbit lines
+  // At high zoom, show individual orbit lines for each planet to ensure accuracy
   const uniqueOrbitRadii = useMemo(() => {
+    // At higher zoom levels (scale >= 1.0), show exact orbits for each planet
+    // This ensures planets align perfectly with their orbit lines
+    if (scale >= 1.0) {
+      // High zoom: show exact orbit for each planet (no grouping)
+      return planetOrbits.map(orbit => orbit.radius).sort((a, b) => a - b)
+    }
+    
+    // At lower zoom levels, group similar orbits to reduce visual clutter
     const radii = new Set<number>()
-    // Adjust grouping threshold based on zoom level - larger threshold at high zoom
-    const groupingThreshold = scale >= 7.0 ? 20  // Very high zoom: group every 20 units
-      : scale >= 5.0 ? 15                         // High zoom: group every 15 units
-      : scale >= 3.0 ? 10                         // Medium-high: group every 10 units
-      : 5                                          // Normal: group every 5 units
+    const groupingThreshold = scale >= 0.5 ? 10  // Medium zoom: group every 10 units
+      : 5                                          // Low zoom: group every 5 units
     
     planetOrbits.forEach(orbit => {
       // Round to nearest threshold to group similar orbits
@@ -115,16 +119,15 @@ function SystemView({
         if (orbitOpacity <= 0) return null
         
         return uniqueOrbitRadii.map((radius, index) => {
-          // Scale orbit radius smoothly with zoom
-          const renderScale = normalizedToRenderScale(effectiveNormalizedZoom)
-          const scaledRadius = radius * renderScale
+          // Use actual radius - the SVG transform will handle scaling
+          // Don't scale the radius here as it's already in the coordinate space
           
           return (
             <circle
               key={`orbit-${system.key}-${radius}-${index}`}
               cx={system.center.x}
               cy={system.center.y}
-              r={scaledRadius}
+              r={radius}
               fill="none"
               stroke="rgba(100, 200, 255, 0.5)"
               strokeWidth={orbitWidth}

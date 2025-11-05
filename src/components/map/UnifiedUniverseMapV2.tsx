@@ -52,7 +52,7 @@ export function UnifiedUniverseMapV2() {
   const [showJumpPanel, setShowJumpPanel] = useState(false)
   const debugLoggedRef = useRef(false)
   // Load universe config
-  const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
+  const { data: configData, isLoading: isLoadingConfig, error: configError } = useGetUniverseConfigQuery()
   // Support both old format (single grid_size) and new format (grid_width/grid_height)
   // If API returns single number, assume square; otherwise use separate width/height
   const gridWidth = configData?.grid_width 
@@ -654,23 +654,26 @@ export function UnifiedUniverseMapV2() {
     }
   }, [roundedScale, roundedPanX, roundedPanY, containerSize.width, containerSize.height, gridWidth, gridHeight])
 
-  // Show loading state only if actively loading config or planets
-  // Note: mapData loading is optional - we can show the map without it, names will appear when it loads
-  if (isLoadingConfig || isLoadingPlanets || allPlanets.length === 0) {
+  // Show loading state only if actively loading config (and not errored)
+  // If config errors, use defaults and show the map anyway
+  // Allow map to show even if planets haven't loaded yet (they'll appear when loaded)
+  // mapData loading is optional - we can show the map without it, names will appear when it loads
+  if (isLoadingConfig && !configError) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full">
         <Loader />
         <div className="mt-4">
           <p className="text-sm text-muted-foreground">
-            {isLoadingPlanets ? 'Loading universe data...' : 'Initializing map...'}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {allPlanets.length > 0 ? `${allPlanets.length.toLocaleString()} planets loaded` : 'Waiting for planet data...'}
+            Initializing map...
           </p>
         </div>
       </div>
     )
   }
+  
+  // If planets are actively loading, show a loading indicator but don't block the map
+  // This allows the map to render while planets load in the background
+  const isPlanetsLoading = isLoadingPlanets && allPlanets.length === 0
 
   // Convert grid coordinates to viewport position
   const gridToViewport = (gridX: number, gridY: number) => {
@@ -1081,6 +1084,18 @@ export function UnifiedUniverseMapV2() {
               gridWidth={gridWidth}
               gridHeight={gridHeight}
             />
+          </div>
+        )}
+        
+        {/* Loading indicator overlay for planets (non-blocking) */}
+        {isPlanetsLoading && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-background/90 backdrop-blur-sm border border-border rounded-lg px-4 py-2 shadow-lg">
+            <div className="flex items-center gap-2">
+              <Loader className="w-4 h-4" />
+              <p className="text-sm text-muted-foreground">
+                Loading planets...
+              </p>
+            </div>
           </div>
         )}
       </div>
