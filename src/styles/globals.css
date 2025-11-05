@@ -1187,6 +1187,16 @@
     animation: planet-orbit 120s linear infinite;
     transform-origin: center center;
   }
+
+  /* Slow animated orbit lines - dash offset creates moving effect */
+  @keyframes orbit-dash-offset {
+    from {
+      stroke-dashoffset: 0;
+    }
+    to {
+      stroke-dashoffset: -8; /* Move dash pattern (4 dash + 4 gap = 8) */
+    }
+  }
   
   /* Cosmic overlay effects for immersive space feel */
   .cosmic-stars::before {

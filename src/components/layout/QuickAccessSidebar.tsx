@@ -1,4 +1,5 @@
-import { LayoutDashboard, ListChecks, MessageSquare, Mail, Trophy, Award, Settings, LogOut } from 'lucide-react'
+import { useState } from 'react'
+import { LayoutDashboard, ListChecks, MessageSquare, Mail, Trophy, Award, Settings, LogOut, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
@@ -17,6 +18,7 @@ interface QuickAccessSidebarProps {
 }
 
 export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(true) // Start collapsed by default
   const navigate = useNavigate()
   const { openPanel } = usePanel()
   const { unreadCount } = useUnreadMailCount()
@@ -31,9 +33,17 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
   }
 
   return (
-    <div className="fixed left-0 top-0 bottom-0 w-16 z-20 pointer-events-none">
+    <>
+      {/* Collapsible Sidebar */}
+      <div 
+        className={cn(
+          'fixed left-0 top-0 bottom-0 z-20 pointer-events-none transition-transform duration-300 ease-in-out',
+          isCollapsed ? '-translate-x-full' : 'translate-x-0'
+        )}
+        style={{ width: '64px' }}
+      >
       {/* EVE-style vertical icon bar with glass effect */}
-      <div className="w-full h-full flex flex-col items-center pt-4 pb-4 gap-2 panel-glass surface-gradient card-glow vignette border-r border-border/50">
+      <div className="w-full h-full flex flex-col items-center pt-4 pb-4 gap-2 panel-glass surface-gradient card-glow vignette border-r border-border/50 pointer-events-auto">
         
         {/* Avatar at top */}
         <div className="relative group pointer-events-auto z-10">
@@ -248,7 +258,60 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Pull-out Tab - appears when sidebar is collapsed */}
+      {isCollapsed && (
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className={cn(
+            'fixed left-0 z-30',
+            'w-14 h-40',
+            'panel-glass border-r border-primary/30 backdrop-blur-md',
+            'flex items-center justify-center',
+            'transition-all duration-300',
+            'hover:bg-primary/10 hover:border-primary/50 hover:scale-105',
+            'shadow-lg shadow-primary/30',
+            'pointer-events-auto',
+            'group'
+          )}
+          style={{
+            top: '50vh',
+            transform: 'translateY(-50%)',
+            clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%)',
+          }}
+          aria-label="Open sidebar"
+        >
+          <ChevronRight className="w-6 h-6 text-primary group-hover:text-primary transition-colors" />
+        </button>
+      )}
+
+      {/* Collapse button - appears when sidebar is open, positioned on the right edge */}
+      {!isCollapsed && (
+        <button
+          onClick={() => setIsCollapsed(true)}
+          className={cn(
+            'fixed left-[64px] z-30',
+            'w-8 h-20',
+            'panel-glass border-l border-border/50 backdrop-blur-sm',
+            'flex items-center justify-center',
+            'transition-all duration-300',
+            'hover:bg-muted/20 hover:border-border',
+            'shadow-lg',
+            'pointer-events-auto',
+            'group'
+          )}
+          style={{
+            top: '50vh',
+            transform: 'translateY(-50%)',
+            clipPath: 'polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%)',
+          }}
+          aria-label="Collapse sidebar"
+        >
+          <ChevronRight className="w-4 h-4 text-muted-foreground rotate-180 group-hover:text-foreground transition-colors" />
+        </button>
+      )}
+    </>
   )
 }
 

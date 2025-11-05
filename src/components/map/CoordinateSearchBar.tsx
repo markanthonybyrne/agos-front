@@ -3,10 +3,12 @@ import { Input } from '@/components/ui/input'
 import { Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolveCoordinate } from '@/lib/coordinateResolver'
+import { Planet } from '@/types/api.types'
 
 interface CoordinateSearchBarProps {
   onSearch: (centerX: number, centerY: number, normalizedZoom: number) => void
   className?: string
+  planets?: Planet[]
 }
 
 /**
@@ -17,7 +19,7 @@ interface CoordinateSearchBarProps {
  * - Autocomplete suggestions (optional, for future enhancement)
  * - Smooth transitions on coordinate search
  */
-export function CoordinateSearchBar({ onSearch, className }: CoordinateSearchBarProps) {
+export function CoordinateSearchBar({ onSearch, className, planets }: CoordinateSearchBarProps) {
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isFocused, setIsFocused] = useState(false)
@@ -40,7 +42,7 @@ export function CoordinateSearchBar({ onSearch, className }: CoordinateSearchBar
     if (!query.trim()) return
 
     try {
-      const resolution = resolveCoordinate(query.trim())
+      const resolution = resolveCoordinate(query.trim(), planets)
       onSearch(resolution.centerX, resolution.centerY, resolution.normalizedZoom)
       setQuery('')
       setSuggestions([])
@@ -63,10 +65,10 @@ export function CoordinateSearchBar({ onSearch, className }: CoordinateSearchBar
   }
 
   return (
-    <div className={cn('absolute top-4 left-1/2 transform -translate-x-1/2 z-50', className)}>
-      <form onSubmit={handleSubmit} className="relative">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+    <div className={cn('relative w-full', className)}>
+      <form onSubmit={handleSubmit} className="relative w-full">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
           <Input
             ref={inputRef}
             type="text"
@@ -80,7 +82,7 @@ export function CoordinateSearchBar({ onSearch, className }: CoordinateSearchBar
               setTimeout(() => setIsFocused(false), 200)
             }}
             className={cn(
-              'pl-10 pr-10 w-80 bg-black/80 backdrop-blur-sm border-gray-700 text-white',
+              'pl-10 pr-10 w-full bg-black/80 backdrop-blur-sm border-gray-700 text-white',
               'font-mono text-sm',
               'focus:border-cyan-400 focus:ring-cyan-400/20',
               'transition-all duration-200'

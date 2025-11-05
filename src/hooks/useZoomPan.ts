@@ -84,8 +84,8 @@ export interface UseZoomPanOptions {
  */
 export function useZoomPan(options: UseZoomPanOptions = {}) {
   const {
-    minScale = 0.1,
-    maxScale = 2.0,
+    minScale = 0.01,
+    maxScale = 7.0,
     initialScale = 0.5,
     initialPanX = 0,
     initialPanY = 0,
@@ -110,7 +110,6 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
   const lastPanRef = useRef({ x: 0, y: 0 })
   const wheelTimeoutRef = useRef<number | null>(null)
   const pendingZoomRef = useRef<{ delta: number; centerX: number; centerY: number } | null>(null)
-  const panUpdateTimeoutRef = useRef<number | null>(null)
 
   // Get container dimensions
   const getContainerDimensions = useCallback(() => {
@@ -130,18 +129,50 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     const scaledGridWidth = gridWidth * scale
     const scaledGridHeight = gridHeight * scale
 
-    // Pan boundaries ensure the grid stays within viewport
-    // Allow panning if grid is larger than container
-    const maxPanX = Math.max(0, (scaledGridWidth - container.width) / 2)
-    const maxPanY = Math.max(0, (scaledGridHeight - container.height) / 2)
-    const minPanX = -maxPanX
-    const minPanY = -maxPanY
+    // At low zoom levels (sector view and below), allow panning off-canvas to reach corners
+    // At higher zoom levels, keep grid centered
+    const isLowZoom = scale < 0.5 // Sector view and below
+    
+    if (isLowZoom) {
+      // Allow panning beyond grid boundaries to reach corners
+      // Calculate how much we can pan to see the full grid
+      let maxPanX = (scaledGridWidth - container.width) / 2
+      let maxPanY = (scaledGridHeight - container.height) / 2
+      
+      // If grid is smaller than container, allow panning to see empty space
+      // This ensures we can reach corners even when zoomed very far out
+      if (maxPanX < 0) {
+        maxPanX = Math.abs(maxPanX) + container.width * 0.2
+      }
+      if (maxPanY < 0) {
+        maxPanY = Math.abs(maxPanY) + container.height * 0.2
+      }
+      
+      // Add generous padding to allow panning to see the very edges and corners
+      // More padding at lower zoom levels to ensure full universe access
+      const paddingFactor = scale < 0.1 ? 0.3 : scale < 0.3 ? 0.2 : 0.15
+      const paddingX = Math.max(container.width * paddingFactor, gridWidth * 0.05)
+      const paddingY = Math.max(container.height * paddingFactor, gridHeight * 0.05)
+      
+      return {
+        minX: -maxPanX - paddingX,
+        maxX: maxPanX + paddingX,
+        minY: -maxPanY - paddingY,
+        maxY: maxPanY + paddingY
+      }
+    } else {
+      // At higher zoom levels, keep grid centered (original behavior)
+      const maxPanX = Math.max(0, (scaledGridWidth - container.width) / 2)
+      const maxPanY = Math.max(0, (scaledGridHeight - container.height) / 2)
+      const minPanX = -maxPanX
+      const minPanY = -maxPanY
 
-    return {
-      minX: minPanX,
-      maxX: maxPanX,
-      minY: minPanY,
-      maxY: maxPanY
+      return {
+        minX: minPanX,
+        maxX: maxPanX,
+        minY: minPanY,
+        maxY: maxPanY
+      }
     }
   }, [gridWidth, gridHeight, getContainerDimensions])
 
@@ -214,39 +245,107 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     })
   }, [minScale, maxScale, clampPan])
 
-  // Zoom in
-  const zoomIn = useCallback((centerX?: number, centerY?: number) => {
-    setState(prev => {
-      const newScale = Math.min(maxScale, prev.scale * 1.2)
-      if (centerX !== undefined && centerY !== undefined) {
-        zoomToPoint(0.2, centerX, centerY)
-        return prev // zoomToPoint updates state
-      }
-      const clamped = clampPan(prev.panX, prev.panY, newScale)
-      return {
+  // Smooth transition to zoom and pan (animated)
+  const smoothSetZoomAndPan = useCallback((
+    targetScale: number,
+    targetPanX: number,
+    targetPanY: number,
+    duration: number = 1000
+  ) => {
+    // Capture current state at animation start
+    setState(prevState => {
+      const newScale = Math.max(minScale, Math.min(maxScale, targetScale))
+      const clamped = clampPan(targetPanX, targetPanY, newScale)
+      
+      const startState = { ...prevState }
+      const endState = {
         scale: newScale,
         panX: clamped.x,
         panY: clamped.y
       }
+      
+      const startTime = performance.now()
+      const animate = () => {
+        const elapsed = performance.now() - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        
+        // Easing function (ease-in-out cubic)
+        const eased = progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2
+        
+        const currentScale = startState.scale + (endState.scale - startState.scale) * eased
+        const currentPanX = startState.panX + (endState.panX - startState.panX) * eased
+        const currentPanY = startState.panY + (endState.panY - startState.panY) * eased
+        
+        setState(prev => {
+          const currentClamped = clampPan(currentPanX, currentPanY, currentScale)
+          return {
+            scale: currentScale,
+            panX: currentClamped.x,
+            panY: currentClamped.y
+          }
+        })
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate)
+        }
+      }
+      
+      requestAnimationFrame(animate)
+      
+      // Return current state (animation will update it)
+      return prevState
     })
-  }, [maxScale, clampPan, zoomToPoint])
+  }, [minScale, maxScale, clampPan])
 
-  // Zoom out
-  const zoomOut = useCallback((centerX?: number, centerY?: number) => {
+  // Zoom in - smooth animation towards viewport center
+  const zoomIn = useCallback(() => {
     setState(prev => {
-      const newScale = Math.max(minScale, prev.scale * 0.8)
-      if (centerX !== undefined && centerY !== undefined) {
-        zoomToPoint(-0.2, centerX, centerY)
-        return prev // zoomToPoint updates state
-      }
-      const clamped = clampPan(prev.panX, prev.panY, newScale)
+      // Use consistent zoom step (1.15x = 15% increase) for smooth, predictable zoom
+      const zoomFactor = 1.15
+      const newScale = Math.min(maxScale, prev.scale * zoomFactor)
+      
+      // Adjust pan to keep viewport center fixed in grid coordinates
+      // Viewport center in grid: centerX = -panX/scale + gridWidth/2
+      // To keep same center point: panX_new = panX_old * (scale_new / scale_old)
+      const scaleRatio = newScale / prev.scale
+      const newPanX = prev.panX * scaleRatio
+      const newPanY = prev.panY * scaleRatio
+      
+      const clamped = clampPan(newPanX, newPanY, newScale)
+      
       return {
         scale: newScale,
         panX: clamped.x,
         panY: clamped.y
       }
     })
-  }, [minScale, clampPan, zoomToPoint])
+  }, [maxScale, clampPan])
+
+  // Zoom out - smooth animation towards viewport center
+  const zoomOut = useCallback(() => {
+    setState(prev => {
+      // Use consistent zoom step (1/1.15 ≈ 0.87 = 13% decrease) for smooth, predictable zoom
+      const zoomFactor = 1 / 1.15
+      const newScale = Math.max(minScale, prev.scale * zoomFactor)
+      
+      // Adjust pan to keep viewport center fixed in grid coordinates
+      // Viewport center in grid: centerX = -panX/scale + gridWidth/2
+      // To keep same center point: panX_new = panX_old * (scale_new / scale_old)
+      const scaleRatio = newScale / prev.scale
+      const newPanX = prev.panX * scaleRatio
+      const newPanY = prev.panY * scaleRatio
+      
+      const clamped = clampPan(newPanX, newPanY, newScale)
+      
+      return {
+        scale: newScale,
+        panX: clamped.x,
+        panY: clamped.y
+      }
+    })
+  }, [minScale, clampPan])
 
   // Reset zoom and pan
   const reset = useCallback(() => {
@@ -277,27 +376,13 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
 
     const clamped = clampPan(newPanX, newPanY, state.scale)
 
-    // Use requestAnimationFrame to throttle updates to 60fps for smooth panning
-    // This prevents lag by batching updates at the optimal frame rate
-    if (panUpdateTimeoutRef.current !== null) {
-      cancelAnimationFrame(panUpdateTimeoutRef.current)
-    }
-
-    // Store the clamped values for the next frame
-    const targetPan = { x: clamped.x, y: clamped.y }
-    
-    panUpdateTimeoutRef.current = requestAnimationFrame(() => {
-      setState(prev => {
-        // Always update pan values for smooth, consistent panning at all zoom levels
-        // RAF throttling provides sufficient performance optimization
-        return {
-          ...prev,
-          panX: targetPan.x,
-          panY: targetPan.y
-        }
-      })
-      panUpdateTimeoutRef.current = null
-    })
+    // Update immediately for perfectly smooth panning at every zoom level
+    // No throttling - direct state updates ensure zero latency
+    setState(prev => ({
+      ...prev,
+      panX: clamped.x,
+      panY: clamped.y
+    }))
   }, [state.scale, clampPan])
 
   const handleEnd = useCallback(() => {
@@ -392,9 +477,6 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
       if (wheelTimeoutRef.current !== null) {
         cancelAnimationFrame(wheelTimeoutRef.current)
       }
-      if (panUpdateTimeoutRef.current !== null) {
-        cancelAnimationFrame(panUpdateTimeoutRef.current)
-      }
     }
   }, [])
 
@@ -481,6 +563,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     setZoom,
     setNormalizedZoom,
     setZoomAndPan,
+    smoothSetZoomAndPan,
     zoomIn,
     zoomOut,
     reset,

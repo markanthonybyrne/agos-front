@@ -287,7 +287,7 @@ export function TechTreeScreen() {
     
     // Optionally zoom in slightly for better visibility
     setTimeout(() => {
-      zoomPan.zoomIn(centerX, centerY)
+      zoomPan.zoomIn()
     }, 100)
   }, [graphData, zoomPan])
   

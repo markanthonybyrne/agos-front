@@ -4,6 +4,8 @@ import {
   getGalaxyXyRange,
   getSystemXyRange,
 } from './coordinateUtils'
+import { parseCoordinate, getPlanetXY } from './coordinates'
+import { Planet } from '@/types/api.types'
 
 export interface CoordinateResolution {
   centerX: number
@@ -16,9 +18,10 @@ export interface CoordinateResolution {
  * Frontend service that mirrors backend CoordinateService logic
  * 
  * @param coordinate - Coordinate string in format Q, Q:S, Q:S:G, Q:S:G:SY, or Q:S:G:SY:P
+ * @param planets - Optional list of planets to look up actual planet coordinates
  * @returns Center position and normalized zoom level
  */
-export function resolveCoordinate(coordinate: string): CoordinateResolution {
+export function resolveCoordinate(coordinate: string, planets?: Planet[]): CoordinateResolution {
   // Parse coordinate string (Q:S:G:SY:P)
   const parts = coordinate
     .trim()
@@ -86,7 +89,58 @@ export function resolveCoordinate(coordinate: string): CoordinateResolution {
     if (q < 1 || q > 4 || s < 1 || s > 4 || g < 1 || g > 10 || sy < 1 || sy > 10 || p < 1 || p > 15) {
       throw new Error('Quadrant: 1-4, Sector: 1-4, Galaxy: 1-10, System: 1-10, Planet: 1-15')
     }
-    // For planet level, first get the system range, then approximate planet position within it
+    
+    // Try to find the actual planet if planets list is provided
+    if (planets && planets.length > 0) {
+      const targetCoord = parseCoordinate(`${q}:${s}:${g}:${sy}:${p}`)
+      if (targetCoord) {
+        const actualPlanet = planets.find(planet => {
+          const planetCoord = parseCoordinate(planet.coordinate)
+          if (!planetCoord) return false
+          
+          // Match coordinate parts exactly
+          const matches = (
+            planetCoord.quadrant === targetCoord.quadrant &&
+            planetCoord.sector === targetCoord.sector &&
+            planetCoord.galaxy === targetCoord.galaxy &&
+            (planetCoord.system ?? 0) === (targetCoord.system ?? 0) &&
+            planetCoord.planet === targetCoord.planet
+          )
+          
+          if (matches) {
+            console.log('[CoordinateResolver] Found planet:', {
+              target: `${q}:${s}:${g}:${sy}:${p}`,
+              planetCoord: planet.coordinate,
+              planetId: planet.id
+            })
+          }
+          
+          return matches
+        })
+        
+        if (actualPlanet) {
+          const planetXY = getPlanetXY(actualPlanet)
+          if (planetXY) {
+            console.log('[CoordinateResolver] Using actual planet coordinates:', {
+              coordinate: `${q}:${s}:${g}:${sy}:${p}`,
+              planetXY,
+              planetId: actualPlanet.id
+            })
+            centerX = planetXY.x
+            centerY = planetXY.y
+            normalizedZoom = 0.95  // High zoom for planet detail
+            return { centerX, centerY, normalizedZoom }
+          }
+        } else {
+          console.log('[CoordinateResolver] Planet not found, using approximation:', {
+            target: `${q}:${s}:${g}:${sy}:${p}`,
+            totalPlanets: planets.length
+          })
+        }
+      }
+    }
+    
+    // Fallback: approximate planet position within system
     const systemRange = getSystemXyRange(q, s, g, sy)
     // Approximate planet position within system (planets are distributed within system bounds)
     const planetOffsetX = ((p - 1) % 5) * ((systemRange.x_max - systemRange.x_min) / 5)

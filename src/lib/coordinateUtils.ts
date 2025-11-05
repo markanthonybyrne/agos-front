@@ -243,25 +243,28 @@ export function getSystemXyRange(
   // Get galaxy range first
   const galaxyRange = getGalaxyXyRange(q, s, g)
 
-  // System width within galaxy (divide galaxy width by 10 systems)
+  // System width within galaxy (5x2 grid: 5 columns, 2 rows)
+  const SYSTEMS_PER_ROW = 5
   const galaxyWidth = galaxyRange.x_max - galaxyRange.x_min
-  const systemWidth = galaxyWidth / 10
-  const systemHeight = (galaxyRange.y_max - galaxyRange.y_min) / 10
+  const galaxyHeight = galaxyRange.y_max - galaxyRange.y_min
+  const systemWidth = galaxyWidth / SYSTEMS_PER_ROW  // 5 columns
+  const systemHeight = galaxyHeight / 2  // 2 rows
 
-  // System position within galaxy (horizontal distribution)
-  const systemXComponent = (sy - 1) % 10
-  const systemYComponent = Math.floor((sy - 1) / 10)
+  // System position within galaxy (5x2 grid: systems 1-5 in row 0, systems 6-10 in row 1)
+  const systemXComponent = (sy - 1) % SYSTEMS_PER_ROW  // 0-4 for systems 1-5, 0-4 for systems 6-10
+  const systemYComponent = Math.floor((sy - 1) / SYSTEMS_PER_ROW)  // 0 for systems 1-5, 1 for systems 6-10
 
   const x_min = galaxyRange.x_min + (systemXComponent * systemWidth)
   const x_max = x_min + systemWidth
   const y_min = galaxyRange.y_min + (systemYComponent * systemHeight)
   const y_max = y_min + systemHeight
 
+  // Keep precise values (no rounding) to ensure accurate centering
   return {
-    x_min: Math.max(0, Math.floor(x_min)),
-    x_max: Math.min(GRID_WIDTH - 1, Math.ceil(x_max)),
-    y_min: Math.max(0, Math.floor(y_min)),
-    y_max: Math.min(GRID_HEIGHT - 1, Math.ceil(y_max))
+    x_min: Math.max(0, x_min),
+    x_max: Math.min(GRID_WIDTH, x_max),
+    y_min: Math.max(0, y_min),
+    y_max: Math.min(GRID_HEIGHT, y_max)
   }
 }
 

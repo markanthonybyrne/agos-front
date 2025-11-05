@@ -66,6 +66,7 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
         <PanelManager />
         
         {/* Main content in center - planets, map, etc */}
+        {/* Padding adjusts based on sidebar state (sidebar component handles its own state) */}
         <main className="relative z-0 pt-16 pl-16">
           {children}
         </main>

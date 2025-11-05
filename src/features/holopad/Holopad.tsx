@@ -181,26 +181,32 @@ export function Holopad() {
         // Fall through to default layout
       }
     }
+    // Default layout: Only Announcements and Planets visible, each at 1/3 width (4 columns)
     return [
-      { i: 'operations', x: 0, y: 0, w: 6, h: 4 },
-      { i: 'resources', x: 6, y: 0, w: 6, h: 4 },
-      { i: 'era_progression', x: 0, y: 4, w: 4, h: 4 },
-      { i: 'dark_matter', x: 4, y: 4, w: 4, h: 4 },
-      { i: 'research_effects', x: 8, y: 4, w: 4, h: 4 },
-      { i: 'market_trends', x: 0, y: 8, w: 6, h: 4 },
-      { i: 'quantum_credits', x: 6, y: 8, w: 3, h: 4 },
-      { i: 'boosters', x: 9, y: 8, w: 3, h: 4 },
-      { i: 'achievements', x: 0, y: 12, w: 4, h: 4 },
-      { i: 'planets', x: 4, y: 12, w: 6, h: 5 },
-      { i: 'status', x: 10, y: 12, w: 2, h: 5 },
-      { i: 'announcements', x: 0, y: 17, w: 6, h: 6 },
+      { i: 'announcements', x: 0, y: 0, w: 4, h: 6 },
+      { i: 'planets', x: 4, y: 0, w: 4, h: 5 },
     ]
   })
 
-  // Widget minimize state - load from localStorage
+  // Widget minimize state - load from localStorage or default to all widgets minimized except announcements and planets
   const [minimizedWidgets, setMinimizedWidgets] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('holopad-minimized')
-    return saved ? new Set(JSON.parse(saved)) : new Set()
+    if (saved) {
+      return new Set(JSON.parse(saved))
+    }
+    // Default: All widgets minimized except announcements and planets
+    return new Set([
+      'operations',
+      'resources',
+      'era_progression',
+      'dark_matter',
+      'research_effects',
+      'status',
+      'quantum_credits',
+      'boosters',
+      'achievements',
+      'market_trends',
+    ])
   })
   const [closedWidgets, setClosedWidgets] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('holopad-closed')

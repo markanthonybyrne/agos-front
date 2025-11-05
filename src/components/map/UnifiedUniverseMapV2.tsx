@@ -26,8 +26,7 @@ import { Planet } from '@/types/api.types'
 import { Loader } from '@/components/ui/loader'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
-import { CoordinateJumpPanel } from './CoordinateJumpPanel'
-import { CoordinateSearchBar } from './CoordinateSearchBar'
+import { MapControlsPanel } from './MapControlsPanel'
 
 // Default grid dimensions (will be overridden by config)
 // Universe is now rectangular: 2000 x 1000
@@ -49,7 +48,6 @@ export function UnifiedUniverseMapV2() {
   const { openPanel } = usePanel()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<SystemData | null>(null)
-  const [showJumpPanel, setShowJumpPanel] = useState(false)
   const debugLoggedRef = useRef(false)
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig, error: configError } = useGetUniverseConfigQuery()
@@ -263,14 +261,8 @@ export function UnifiedUniverseMapV2() {
     return 'planet'  // Very high zoom for individual planet detail (300%+)
   }, [zoomPan.scale])
 
-  // Filter entities visible in viewport with smart limiting for performance
-  // Balance between showing everything and maintaining smooth performance
-  // Uses distance-based filtering to prevent systems from overlapping
-  const visibleSystems = useMemo(() => {
-    const bounds = zoomPan.viewportBounds
-    const scale = zoomPan.scale
-    
-    // Debug: Log viewport and system distribution (once per mount)
+  // Debug: Log viewport and system distribution (once per mount)
+  useEffect(() => {
     if (systemsByKey.size > 0 && !debugLoggedRef.current && allPlanets.length > 0) {
       debugLoggedRef.current = true
       
@@ -307,9 +299,9 @@ export function UnifiedUniverseMapV2() {
         xRange: { min: minX, max: maxX, span: maxX - minX, avg: avgX, expectedSpan: gridWidth },
         yRange: { min: minY, max: maxY, span: maxY - minY, avg: avgY, expectedSpan: gridHeight },
         quadrantDistribution: quadrantCounts,
-        viewportBounds: bounds,
+        viewportBounds: zoomPan.viewportBounds,
         pan: { x: zoomPan.panX, y: zoomPan.panY },
-        scale,
+        scale: zoomPan.scale,
         gridSize: { width: gridWidth, height: gridHeight }
       })
       
@@ -329,20 +321,193 @@ export function UnifiedUniverseMapV2() {
         console.warn('[Map Debug] Check backend to ensure planets have x/y fields populated in database.')
       }
     }
+  }, [systemsByKey, allPlanets, gridWidth, gridHeight, zoomPan.viewportBounds, zoomPan.panX, zoomPan.panY, zoomPan.scale])
+
+  // Track container dimensions for resize handling (needed by dynamicViewBox)
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  
+  // Update container size when it changes
+  useEffect(() => {
+    const container = zoomPan.containerRef.current
+    if (!container) return
     
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect()
+      setContainerSize({ width: rect.width, height: rect.height })
+    }
+    
+    // Initial size
+    updateSize()
+    
+    // Listen for resize
+    const resizeObserver = new ResizeObserver(updateSize)
+    resizeObserver.observe(container)
+    
+    return () => resizeObserver.disconnect()
+  }, [zoomPan.containerRef])
+
+  // Calculate dynamic viewBox FIRST (needed by visibleSystems)
+  // Calculate dynamic viewBox based on actual container dimensions to ensure content always fills viewport
+  // No rounding for perfectly smooth panning at every zoom level
+  // Keep all values precise to prevent any snapping or jumping
+  const roundedPanX = zoomPan.panX  // No rounding - completely smooth
+  const roundedPanY = zoomPan.panY  // No rounding - completely smooth
+  const roundedScale = zoomPan.scale  // No rounding - completely smooth
+  
+  const dynamicViewBox = useMemo(() => {
+    if (containerSize.width === 0 || containerSize.height === 0) {
+      return { viewBox: `0 0 ${gridWidth} ${gridHeight}`, bounds: { minX: 0, minY: 0, maxX: gridWidth, maxY: gridHeight } }
+    }
+    
+    const containerWidth = containerSize.width
+    const containerHeight = containerSize.height
+    const containerAspectRatio = containerWidth / containerHeight
+    
+    // Calculate what grid coordinates are visible based on current scale and pan
+    const scale = roundedScale
+    const panX = roundedPanX
+    const panY = roundedPanY
+    
+    // Calculate center point in grid coordinates
+    // This matches the formula in useZoomPan: centerX = -panX/scale + gridWidth/2
+    const centerX = -panX / scale + gridWidth / 2
+    const centerY = -panY / scale + gridHeight / 2
+    
+    // Calculate visible width/height in grid coordinates
+    const visibleGridWidth = containerWidth / scale
+    const visibleGridHeight = containerHeight / scale
+    
+    // Calculate bounds - allow extending beyond grid at low zoom levels
+    const isLowZoom = scale < 0.5 // Sector view and below
+    const allowOffCanvas = isLowZoom
+    
+    let minX = centerX - visibleGridWidth / 2
+    let maxX = centerX + visibleGridWidth / 2
+    let minY = centerY - visibleGridHeight / 2
+    let maxY = centerY + visibleGridHeight / 2
+    
+    // Only clamp to grid boundaries if not allowing off-canvas panning
+    if (!allowOffCanvas) {
+      minX = Math.max(0, minX)
+      maxX = Math.min(gridWidth, maxX)
+      minY = Math.max(0, minY)
+      maxY = Math.min(gridHeight, maxY)
+    }
+    
+    let width = maxX - minX
+    let height = maxY - minY
+    
+    // Adjust to match container aspect ratio so viewBox fills viewport
+    const currentAspectRatio = width / height
+    if (containerAspectRatio > currentAspectRatio) {
+      // Container is wider - increase width
+      const newWidth = height * containerAspectRatio
+      const widthDiff = newWidth - width
+      width = newWidth
+      if (!allowOffCanvas) {
+        minX = Math.max(0, minX - widthDiff / 2)
+        maxX = Math.min(gridWidth, maxX + widthDiff / 2)
+      } else {
+        minX = minX - widthDiff / 2
+        maxX = maxX + widthDiff / 2
+      }
+    } else if (containerAspectRatio < currentAspectRatio) {
+      // Container is taller - increase height
+      const newHeight = width / containerAspectRatio
+      const heightDiff = newHeight - height
+      height = newHeight
+      if (!allowOffCanvas) {
+        minY = Math.max(0, minY - heightDiff / 2)
+        maxY = Math.min(gridHeight, maxY + heightDiff / 2)
+      } else {
+        minY = minY - heightDiff / 2
+        maxY = maxY + heightDiff / 2
+      }
+    }
+    
+    // Add generous padding to prevent items from popping in/out during pan
+    // More padding at lower zoom levels for smoother panning
+    const paddingFactor = isLowZoom ? (scale < 0.1 ? 0.2 : scale < 0.3 ? 0.15 : 0.1) : 0.1
+    const padding = Math.max(width, height) * paddingFactor
+    
+    let viewBoxX = minX - padding
+    let viewBoxY = minY - padding
+    let viewBoxWidth = width + padding * 2
+    let viewBoxHeight = height + padding * 2
+    
+    // Only clamp to grid boundaries if not allowing off-canvas panning
+    if (!allowOffCanvas) {
+      viewBoxX = Math.max(0, viewBoxX)
+      viewBoxY = Math.max(0, viewBoxY)
+      viewBoxWidth = Math.min(gridWidth, viewBoxWidth)
+      viewBoxHeight = Math.min(gridHeight, viewBoxHeight)
+    }
+    
+    // No rounding - keep values completely precise for smooth panning at every zoom level
+    return {
+      viewBox: `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`,
+      bounds: {
+        minX: viewBoxX,
+        minY: viewBoxY,
+        maxX: viewBoxX + viewBoxWidth,
+        maxY: viewBoxY + viewBoxHeight
+      }
+    }
+  }, [roundedPanX, roundedPanY, roundedScale, containerSize.width, containerSize.height, gridWidth, gridHeight])
+
+  // Filter entities visible in viewport
+  // At all zoom levels except individual system zoom, show ALL entities in viewport
+  // Only apply filtering when zoomed into individual systems (scale >= 3.0)
+  const visibleSystems = useMemo(() => {
+    // Use dynamicViewBox bounds instead of viewportBounds for more accurate visibility
+    // This ensures we use the same bounds that the SVG viewBox uses
+    const bounds = dynamicViewBox.bounds
+    const scale = zoomPan.scale
+    
+    // When NOT zoomed into individual systems (scale < 3.0), show ALL entities in viewport
+    // This includes universe, quadrant, sector, galaxy, and system overview levels
+    if (scale < 3.0) {
+      const allInViewport: SystemData[] = []
+      
+      // At low zoom levels, use the extended bounds from dynamicViewBox
+      // No additional padding needed since viewBox already has generous padding
+      const padding = scale >= 2.5 ? 40      // Medium-high: moderate padding
+        : scale >= 1.5 ? 60                  // Medium-high: generous padding
+        : scale >= 0.8 ? 100                  // Medium: very generous padding
+        : scale >= 0.5 ? 150                  // Medium: very generous padding
+        : scale >= 0.1 ? 200                 // Low: maximum padding
+        : 300                                 // Very low: extra maximum padding
+      
+      // Collect ALL systems in viewport (with padding for smooth panning)
+      systemsByKey.forEach(system => {
+        const centerX = system.center.x
+        const centerY = system.center.y
+        
+        if (
+          centerX >= bounds.minX - padding &&
+          centerX <= bounds.maxX + padding &&
+          centerY >= bounds.minY - padding &&
+          centerY <= bounds.maxY + padding
+        ) {
+          allInViewport.push(system)
+        }
+      })
+      
+      // Return all systems in viewport - no filtering, no limits
+      return allInViewport
+    }
+    
+    // When zoomed into individual systems (scale >= 3.0), apply filtering to prevent overlap
     const allInViewport: SystemData[] = []
     
     // Padding based on zoom level - more padding at lower zoom for smoother panning
     const padding = scale >= 7.0 ? 5   // Very high zoom: minimal padding, single system
       : scale > 5.0 ? 15                // Very high zoom: small padding
       : scale > 4.0 ? 25                // High zoom: moderate padding
-      : scale > 2.5 ? 40                // Medium-high: moderate padding
-      : scale > 1.5 ? 60                // Medium-high: generous padding
-      : scale > 0.5 ? 100               // Medium: very generous padding
-      : scale > 0.1 ? 150              // Low: very generous padding
-      : 200                              // Very low: maximum padding
+      : scale > 3.0 ? 40                // System zoom: moderate padding
+      : 50                               // Fallback
     
-    // First, collect all systems in viewport
+    // Collect systems in viewport
     systemsByKey.forEach(system => {
       const centerX = system.center.x
       const centerY = system.center.y
@@ -358,76 +523,22 @@ export function UnifiedUniverseMapV2() {
     })
     
     // Calculate minimum distance between systems based on zoom level
-    // At higher zoom, systems need more space to avoid visual overlap
-    // Increased spacing in sector view to reduce clustering
     const minSystemDistance = scale >= 7.0 ? 200  // Very high zoom: large spacing (single system)
       : scale > 5.6 ? 150                         // 560% zoom: large spacing for 2-3 systems
       : scale > 4.48 ? 100                        // 448% zoom: medium-large spacing
       : scale > 4.0 ? 80                          // 400% zoom: medium spacing
       : scale > 3.0 ? 60                          // 300% zoom: medium spacing
-      : scale > 2.5 ? 50                          // 250% zoom: smaller spacing
-      : scale > 1.5 ? 40                          // 150% zoom: smaller spacing
-      : scale > 0.8 ? 35                          // 80% zoom: medium spacing
-      : scale > 0.5 ? 40                          // 50% zoom: increased spacing for sector view
-      : scale > 0.3 ? 35                          // 30% zoom: good spacing
-      : scale > 0.15 ? 30                         // 15% zoom: moderate spacing
-      : scale > 0.1 ? 25                          // 10% zoom: better spacing
-      : 20                                         // Very low zoom: increased spacing to reduce clustering
+      : 50                                         // Fallback
     
-    // Maximum number of systems to show at each zoom level
-    // Reduced counts in sector view to reduce clustering and improve spacing
+    // Maximum number of systems to show at individual system zoom levels
     const maxSystems = scale >= 7.0 ? 1     // 700%+: 1 system (detailed planet view)
       : scale > 5.6 ? 2                      // 560%: 2 systems (still very detailed)
       : scale > 4.48 ? 4                     // 448%: 4 systems (detailed but more visible)
       : scale > 4.0 ? 6                      // 400%: 6 systems
       : scale > 3.0 ? 10                     // 300%: 10 systems
-      : scale > 2.5 ? 15                     // 250%: 15 systems
-      : scale > 1.5 ? 25                     // 150%: 25 systems
-      : scale > 0.8 ? 40                     // 80%: 40 systems
-      : scale > 0.5 ? 60                     // 50%: 60 systems (reduced from unlimited)
-      : scale > 0.3 ? 80                     // 30%: 80 systems
-      : scale > 0.15 ? 100                    // 15%: 100 systems
-      : scale > 0.1 ? 120                    // 10%: 120 systems (reduced from 150)
-      : 100                                  // Very low: 100 systems (reduced to reduce clustering)
+      : 15                                    // Fallback
     
-    // If we have fewer systems than max, return them all
-    if (allInViewport.length <= maxSystems) {
-      // But still filter by minimum distance to prevent overlap
-      const filtered: SystemData[] = []
-      const viewportCenterX = (bounds.minX + bounds.maxX) / 2
-      const viewportCenterY = (bounds.minY + bounds.maxY) / 2
-      
-      // Sort by distance from viewport center
-      const sorted = allInViewport
-        .map(system => {
-          const dx = system.center.x - viewportCenterX
-          const dy = system.center.y - viewportCenterY
-          const distance = Math.sqrt(dx * dx + dy * dy)
-          return { system, distance }
-        })
-        .sort((a, b) => a.distance - b.distance)
-      
-      // Add systems, ensuring minimum distance between them
-      for (const { system } of sorted) {
-        if (filtered.length >= maxSystems) break
-        
-        // Check if this system is far enough from already included systems
-        const tooClose = filtered.some(addedSystem => {
-          const dx = system.center.x - addedSystem.center.x
-          const dy = system.center.y - addedSystem.center.y
-          const distance = Math.sqrt(dx * dx + dy * dy)
-          return distance < minSystemDistance
-        })
-        
-        if (!tooClose) {
-          filtered.push(system)
-        }
-      }
-      
-      return filtered
-    }
-    
-    // If we have more systems than max, filter by distance and take closest ones
+    // Filter by distance and max systems
     const viewportCenterX = (bounds.minX + bounds.maxX) / 2
     const viewportCenterY = (bounds.minY + bounds.maxY) / 2
     
@@ -460,7 +571,7 @@ export function UnifiedUniverseMapV2() {
     }
     
     return filtered
-  }, [systemsByKey, zoomPan.viewportBounds, zoomPan.scale])
+  }, [systemsByKey, dynamicViewBox.bounds, zoomPan.scale])
 
   const visiblePlanets = useMemo(() => {
     if (zoomLevel !== 'planet') return []
@@ -553,107 +664,6 @@ export function UnifiedUniverseMapV2() {
     }
   }
 
-  // Track container dimensions for resize handling
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
-  
-  // Update container size when it changes
-  useEffect(() => {
-    const container = zoomPan.containerRef.current
-    if (!container) return
-    
-    const updateSize = () => {
-      const rect = container.getBoundingClientRect()
-      setContainerSize({ width: rect.width, height: rect.height })
-    }
-    
-    // Initial size
-    updateSize()
-    
-    // Listen for resize
-    const resizeObserver = new ResizeObserver(updateSize)
-    resizeObserver.observe(container)
-    
-    return () => resizeObserver.disconnect()
-  }, [zoomPan.containerRef])
-  
-  // Calculate dynamic viewBox based on actual container dimensions to ensure content always fills viewport
-  // MUST be before early return to maintain hook order
-  // Use minimal rounding for smooth panning at all zoom levels (like 140% zoom feels)
-  // Only round scale slightly to reduce micro-updates, keep pan values precise
-  const roundedPanX = zoomPan.panX  // No rounding for smooth panning
-  const roundedPanY = zoomPan.panY  // No rounding for smooth panning
-  const roundedScale = Math.round(zoomPan.scale * 1000) / 1000  // Fine-grained rounding for scale only
-  
-  const dynamicViewBox = useMemo(() => {
-    if (containerSize.width === 0 || containerSize.height === 0) {
-      return { viewBox: `0 0 ${gridWidth} ${gridHeight}`, bounds: { minX: 0, minY: 0, maxX: gridWidth, maxY: gridHeight } }
-    }
-    
-    const containerWidth = containerSize.width
-    const containerHeight = containerSize.height
-    const containerAspectRatio = containerWidth / containerHeight
-    
-    // Calculate what grid coordinates are visible based on current scale and pan
-    // Use rounded values to reduce calculation complexity and improve performance
-    const scale = roundedScale
-    const panX = roundedPanX
-    const panY = roundedPanY
-    
-    // Calculate center point in grid coordinates
-    const centerX = gridWidth / 2 - panX / scale
-    const centerY = gridHeight / 2 - panY / scale
-    
-    // Calculate visible width/height in grid coordinates
-    const visibleGridWidth = containerWidth / scale
-    const visibleGridHeight = containerHeight / scale
-    
-    // Calculate bounds
-    let minX = Math.max(0, centerX - visibleGridWidth / 2)
-    let maxX = Math.min(gridWidth, centerX + visibleGridWidth / 2)
-    let minY = Math.max(0, centerY - visibleGridHeight / 2)
-    let maxY = Math.min(gridHeight, centerY + visibleGridHeight / 2)
-    
-    let width = maxX - minX
-    let height = maxY - minY
-    
-    // Adjust to match container aspect ratio so viewBox fills viewport
-    const currentAspectRatio = width / height
-    if (containerAspectRatio > currentAspectRatio) {
-      // Container is wider - increase width
-      const newWidth = height * containerAspectRatio
-      const widthDiff = newWidth - width
-      width = newWidth
-      minX = Math.max(0, minX - widthDiff / 2)
-      maxX = Math.min(gridWidth, maxX + widthDiff / 2)
-    } else if (containerAspectRatio < currentAspectRatio) {
-      // Container is taller - increase height
-      const newHeight = width / containerAspectRatio
-      const heightDiff = newHeight - height
-      height = newHeight
-      minY = Math.max(0, minY - heightDiff / 2)
-      maxY = Math.min(gridHeight, maxY + heightDiff / 2)
-    }
-    
-    // Add generous padding to prevent items from popping in/out during pan
-    // Reduced slightly for better performance while maintaining smoothness
-    const padding = Math.max(width, height) * 0.10
-    const viewBoxX = Math.max(0, minX - padding)
-    const viewBoxY = Math.max(0, minY - padding)
-    const viewBoxWidth = Math.min(gridWidth, width + padding * 2)
-    const viewBoxHeight = Math.min(gridHeight, height + padding * 2)
-    
-    // Round values to prevent micro-updates that cause visual "clicking"
-    return {
-      viewBox: `${Math.round(viewBoxX * 10) / 10} ${Math.round(viewBoxY * 10) / 10} ${Math.round(viewBoxWidth * 10) / 10} ${Math.round(viewBoxHeight * 10) / 10}`,
-      bounds: {
-        minX: viewBoxX,
-        minY: viewBoxY,
-        maxX: viewBoxX + viewBoxWidth,
-        maxY: viewBoxY + viewBoxHeight
-      }
-    }
-  }, [roundedScale, roundedPanX, roundedPanY, containerSize.width, containerSize.height, gridWidth, gridHeight])
-
   // Show loading state only if actively loading config (and not errored)
   // If config errors, use defaults and show the map anyway
   // Allow map to show even if planets haven't loaded yet (they'll appear when loaded)
@@ -694,13 +704,9 @@ export function UnifiedUniverseMapV2() {
 
   return (
     <div 
-      className="fixed inset-0 overflow-hidden" 
+      className="fixed inset-0 overflow-hidden z-0" 
       style={{ 
         backgroundColor: 'transparent',
-        top: '64px', // Account for PersistentHUD height
-        left: '64px', // Account for QuickAccessSidebar width
-        width: 'calc(100vw - 64px)',
-        height: 'calc(100vh - 64px)'
       }}
     >
       {/* Map container with zoom/pan */}
@@ -724,6 +730,9 @@ export function UnifiedUniverseMapV2() {
           transform: 'translateZ(0)', // Force GPU acceleration
         }}
       >
+        {/* Background gradient fade - Fixed, doesn't move with panning */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none z-0" />
+        
         {/* SVG overlay for rendering entities */}
         {/* Dynamic viewBox ensures visible content always fills viewport at all zoom levels */}
         <svg
@@ -745,14 +754,16 @@ export function UnifiedUniverseMapV2() {
           {/* Transparent background */}
           <rect width={gridWidth} height={gridHeight} fill="transparent" />
           
-          {/* Grid overlay */}
-          <GridOverlay
-            width={gridWidth}
-            height={gridHeight}
-            scale={zoomPan.scale}
-            normalizedZoom={normalizedZoom}
-            viewportBounds={zoomPan.viewportBounds}
-          />
+          {/* Grid overlay - hide at 700% zoom (scale >= 7.0) */}
+          {zoomPan.scale < 7.0 && (
+            <GridOverlay
+              width={gridWidth}
+              height={gridHeight}
+              scale={zoomPan.scale}
+              normalizedZoom={normalizedZoom}
+              viewportBounds={zoomPan.viewportBounds}
+            />
+          )}
 
           {/* Navigation overlays with layer fading */}
           <LayerWrapper layerName="quadrant" normalizedZoom={normalizedZoom}>
@@ -789,9 +800,9 @@ export function UnifiedUniverseMapV2() {
 
           {/* Render based on zoom level with layer fading */}
           {/* Sector level - show systems as galaxy images (extended range) */}
-          {/* Render when sector layer has any opacity (will be handled by LayerWrapper, but we check here for performance) */}
+          {/* Always render at 0% zoom and above - opacity will handle visibility */}
           <LayerWrapper layerName="sector" normalizedZoom={normalizedZoom}>
-            {(zoomLevel === 'sector' || getLayerOpacity('sector', normalizedZoom) > 0.01) && (
+            {(getLayerOpacity('sector', normalizedZoom) > 0) && (
               <g className="systems-layer" style={{ pointerEvents: 'all' }}>
                 {visibleSystems.map(system => {
                 // Get a deterministic random galaxy type based on system coordinates
@@ -856,28 +867,38 @@ export function UnifiedUniverseMapV2() {
           </LayerWrapper>
 
           {/* Galaxy level - show systems with SystemView component */}
-          {/* Render when galaxy layer has any opacity (will be handled by LayerWrapper, but we check here for performance) */}
+          {/* Performance: Use detail level based on zoom */}
           <LayerWrapper layerName="galaxy" normalizedZoom={normalizedZoom}>
-            {(zoomLevel === 'galaxy' || getLayerOpacity('galaxy', normalizedZoom) > 0.01) && visibleSystems.length > 0 && (
+            {(getLayerOpacity('galaxy', normalizedZoom) > 0) && visibleSystems.length > 0 && (
               <g className="systems-layer">
-                {visibleSystems.map(system => (
-                  <SystemViewMemo
-                    key={system.key}
-                    system={system}
-                    scale={zoomPan.scale}
-                    normalizedZoom={normalizedZoom}
-                    onPlanetClick={handlePlanetClick}
-                    onPlanetHover={setHoveredPlanet}
-                    hoveredPlanet={hoveredPlanet}
-                    systemName={(system.system_name && system.system_name.trim()) || null}
-                  />
-                ))}
+                {visibleSystems.map(system => {
+                  // Determine detail level based on zoom for performance
+                  // Low zoom (< 0.3): minimal (dots), Medium (0.3-0.7): standard (images, no labels), High (0.7+): full (all details)
+                  const detailLevel: 'minimal' | 'standard' | 'full' = 
+                    normalizedZoom < 0.3 ? 'minimal'
+                    : normalizedZoom < 0.7 ? 'standard'
+                    : 'full'
+                  
+                  return (
+                    <SystemViewMemo
+                      key={system.key}
+                      system={system}
+                      scale={zoomPan.scale}
+                      normalizedZoom={normalizedZoom}
+                      detailLevel={detailLevel}
+                      onPlanetClick={handlePlanetClick}
+                      onPlanetHover={setHoveredPlanet}
+                      hoveredPlanet={hoveredPlanet}
+                      systemName={(system.system_name && system.system_name.trim()) || null}
+                    />
+                  )
+                })}
               </g>
             )}
           </LayerWrapper>
 
           {/* System view - show at scale >= 0.5 */}
-          {/* Render when system layer has any opacity (will be handled by LayerWrapper, but we check here for performance) */}
+          {/* Performance: Always use full detail at system level for best experience */}
           <LayerWrapper layerName="system" normalizedZoom={normalizedZoom}>
             {(zoomLevel === 'system' || zoomLevel === 'planet' || getLayerOpacity('system', normalizedZoom) > 0.01) && (
               <g className="systems-layer">
@@ -887,6 +908,7 @@ export function UnifiedUniverseMapV2() {
                     system={system}
                     scale={zoomPan.scale}
                     normalizedZoom={normalizedZoom}
+                    detailLevel="full"  // Always full detail at system level
                     onPlanetClick={handlePlanetClick}
                     onPlanetHover={setHoveredPlanet}
                     hoveredPlanet={hoveredPlanet}
@@ -1003,89 +1025,26 @@ export function UnifiedUniverseMapV2() {
           </g>
         </svg>
 
-        {/* Coordinate Search Bar */}
-        <CoordinateSearchBar
+        {/* Map Controls Panel - sliding from right */}
+        <MapControlsPanel
+          zoomPan={zoomPan}
+          zoomLevel={zoomLevel}
+          allPlanets={allPlanets}
           onSearch={(centerX, centerY, normalizedZoom) => {
             // Convert normalized zoom to render scale
             const targetScale = normalizedToRenderScale(normalizedZoom)
-            // Calculate target pan to center on coordinate
+            
+            // Calculate target pan to center the coordinate in the viewport
             const targetPanX = (gridWidth / 2 - centerX) * targetScale
             const targetPanY = (gridHeight / 2 - centerY) * targetScale
             
-            // Use setZoomAndPan to set both together atomically
-            zoomPan.setZoomAndPan(targetScale, targetPanX, targetPanY)
+            // Use smooth transition for better UX
+            zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 800)
           }}
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+          systemsCount={systemsByKey.size}
         />
-
-        {/* Zoom controls */}
-        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 bg-black/80 backdrop-blur-sm px-4 py-3 angled-corners border border-gray-700">
-          <button
-            onClick={() => zoomPan.zoomIn()}
-            className="p-2 bg-blue-600 hover:bg-blue-700 angled-corners text-white font-bold text-lg"
-            title="Zoom In"
-          >
-            +
-          </button>
-          <div className="text-center text-xs text-white px-2 font-mono">
-            {Math.round(zoomPan.scale * 100)}%
-          </div>
-          <button
-            onClick={() => zoomPan.zoomOut()}
-            className="p-2 bg-blue-600 hover:bg-blue-700 angled-corners text-white font-bold text-lg"
-            title="Zoom Out"
-          >
-            −
-          </button>
-          <button
-            onClick={() => zoomPan.reset()}
-            className="p-2 bg-gray-600 hover:bg-gray-700 angled-corners text-white text-xs"
-            title="Reset Zoom"
-          >
-            Reset
-          </button>
-        </div>
-
-        {/* Zoom level indicator */}
-        <div className="absolute top-4 left-4 z-50 bg-black/80 backdrop-blur-sm px-4 py-3 angled-corners text-white text-sm border border-gray-700">
-          <div className="font-mono">
-            Zoom: {zoomLevel} ({Math.round(zoomPan.scale * 100)}%)
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            Planets: {allPlanets.length} | Systems: {systemsByKey.size}
-          </div>
-        </div>
-
-        {/* Jump button */}
-        <button
-          onClick={() => setShowJumpPanel(true)}
-          className="absolute bottom-4 right-4 z-50 bg-cyan-600 hover:bg-cyan-700 angled-corners text-white px-4 py-2 text-sm font-semibold border border-cyan-400/30 hover:border-cyan-400/50 transition-all"
-          title="Jump to Coordinates"
-        >
-          Jump
-        </button>
-
-        {/* Coordinate Jump Panel */}
-        {showJumpPanel && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100]">
-            <CoordinateJumpPanel
-              onJump={(centerX, centerY, normalizedZoom) => {
-                // Convert normalized zoom to render scale
-                const targetScale = normalizedToRenderScale(normalizedZoom)
-                // Calculate target pan to center on coordinate
-                const targetPanX = (gridWidth / 2 - centerX) * targetScale
-                const targetPanY = (gridHeight / 2 - centerY) * targetScale
-                
-                // Use setZoomAndPan to set both together atomically
-                zoomPan.setZoomAndPan(targetScale, targetPanX, targetPanY)
-                
-                setShowJumpPanel(false)
-              }}
-              onClose={() => setShowJumpPanel(false)}
-              gridWidth={gridWidth}
-              gridHeight={gridHeight}
-            />
-          </div>
-        )}
         
         {/* Loading indicator overlay for planets (non-blocking) */}
         {isPlanetsLoading && (

@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { X, Navigation } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolveCoordinate } from '@/lib/coordinateResolver'
+import { Planet } from '@/types/api.types'
 
 interface CoordinateJumpPanelProps {
   onJump: (centerX: number, centerY: number, normalizedZoom: number) => void
   onClose: () => void
   gridWidth: number
   gridHeight: number
+  planets?: Planet[]
 }
 
 export function CoordinateJumpPanel({
@@ -18,6 +20,7 @@ export function CoordinateJumpPanel({
   onClose,
   gridWidth,
   gridHeight,
+  planets,
 }: CoordinateJumpPanelProps) {
   const [coordinate, setCoordinate] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +36,8 @@ export function CoordinateJumpPanel({
 
     try {
       // Use coordinate resolver for clean, maintainable code
-      const resolution = resolveCoordinate(coordinate)
+      // Pass planets to look up actual planet coordinates if available
+      const resolution = resolveCoordinate(coordinate, planets)
       
       // Trigger smooth transition with normalized zoom
       onJump(resolution.centerX, resolution.centerY, resolution.normalizedZoom)

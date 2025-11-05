@@ -160,8 +160,8 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
             ''
           )
 
-          // OPTIMIZATION: Use API max limit (100) instead of 300
-          const limit = 100 // API maximum per docs
+          // OPTIMIZATION: Use API max limit (500) for better performance
+          const limit = 500 // API maximum per docs (5x increase from 100)
           const initialPlanetsToLoad = 2000 // Load 2000 planets initially (fast)
           const maxPlanetsToLoad = 15000 // Load remaining in background
           const maxParallelRequests = 20 // Increased parallelism for faster initial load
@@ -197,9 +197,9 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           dispatch(setLoadingProgress(10))
           
           // PHASE 2: Load initial batch for immediate use (2000 planets)
-          // Fetch first page to get total count
+          // Fetch first page to get total count (include_total=true only on first page)
           
-          const firstPageResponse = await fetch(`${baseUrl}/planets/search?limit=${limit}&offset=0`, {
+          const firstPageResponse = await fetch(`${baseUrl}/planets/search?limit=${limit}&offset=0&include_total=true`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -216,7 +216,7 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           
           // Filter out player planets we already loaded
           const existingIds = new Set(allPlanets.map(p => p.id))
-          const newFirstPagePlanets = firstPagePlanets.filter(p => !existingIds.has(p.id))
+          const newFirstPagePlanets = firstPagePlanets.filter((p: Planet) => !existingIds.has(p.id))
           
           if (newFirstPagePlanets.length > 0) {
             allPlanets.push(...newFirstPagePlanets)
@@ -248,6 +248,7 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
             
             for (let page = 1; page < initialPagesNeeded && page < totalPages; page++) {
               const offset = page * effectiveLimit
+              // Skip total on subsequent pages (only returned on first page by default)
               initialPromises.push(
                 fetch(`${baseUrl}/planets/search?limit=${effectiveLimit}&offset=${offset}`, {
                   headers: {
@@ -276,7 +277,8 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
               if (newPlanets.length > 0) {
                 allPlanets.push(...newPlanets)
                 dispatch(addPlanets(newPlanets))
-                existingIdsAfter.add(...newPlanets.map(p => p.id))
+                // Add IDs to the set - can't spread array into Set.add()
+                newPlanets.forEach(p => existingIdsAfter.add(p.id))
               }
             }
             
@@ -360,6 +362,7 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           
           for (let page = startPage; page < totalPages; page++) {
             const offset = page * effectiveLimit
+            // Skip total on subsequent pages (only returned on first page by default)
             backgroundPromises.push(
               fetch(`${baseUrl}/planets/search?limit=${effectiveLimit}&offset=${offset}`, {
                 headers: {
