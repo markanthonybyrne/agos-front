@@ -1,9 +1,11 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
 import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useNavigate } from 'react-router-dom'
 import { buildGalaxyData, SystemData, RegionData } from '@/lib/galaxyUtils'
 import { useZoomPan } from '@/hooks/useZoomPan'
+import { useAuth } from '@/hooks/useAuth'
+import { useAppSelector } from '@/app/hooks'
 import { GalaxyRegionLayer } from './GalaxyRegionLayer'
 import { HyperspaceRoutesLayer } from './HyperspaceRoutesLayer'
 import { SystemMarkersLayer } from './SystemMarkersLayer'
@@ -39,6 +41,7 @@ const DEFAULT_GRID_HEIGHT = 2000
  */
 export function GalaxyMap() {
   const navigate = useNavigate()
+  const { empire } = useAuth()
   const [hoveredSystem, setHoveredSystem] = useState<SystemData | null>(null)
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null)
   const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
@@ -56,40 +59,94 @@ export function GalaxyMap() {
     (typeof configData?.grid_size === 'object' && configData.grid_size !== null ? configData.grid_size.height : null) || 
     (typeof configData?.grid_size === 'number' ? configData.grid_size : DEFAULT_GRID_HEIGHT)
   
-  // Fetch all planets for galaxy map
+  // Fetch all planets for galaxy map - use planets from Redux store (already loaded by InitialDataLoader)
+  // Only use map query to get region/system names and structure, not planets
   const { data: mapData, isLoading: isLoadingMap } = useGetMapQuery({ 
-    limit: 5000 
+    limit: 10000 // High limit to ensure we get all planets if needed (but prefer Redux store)
   })
+  
+  // Get planets from Redux store (loaded by InitialDataLoader) - this is the source of truth
+  const { allPlanets: reduxPlanets, isLoaded: planetsLoaded } = useAppSelector((state) => state.planets)
+  
+  // Use planets from Redux store if available, otherwise fall back to mapData
+  const planetsToUse = useMemo(() => {
+    if (reduxPlanets.length > 0 && planetsLoaded) {
+      return reduxPlanets
+    }
+    return mapData?.planets || []
+  }, [reduxPlanets, planetsLoaded, mapData?.planets])
   
   // Fetch incidents (filtered by visibility automatically by API)
   const { data: incidentsData } = useGetIncidentsQuery()
   
   // Build galaxy data structure from planets
+  // Use planets from Redux store (all 8,000+) instead of limited mapData
   const galaxyData = useMemo(() => {
-    if (!mapData?.planets || mapData.planets.length === 0) {
+    if (!planetsToUse || planetsToUse.length === 0) {
       return { regions: new Map(), systems: new Map(), systemMap: [] }
     }
     
     // Build galaxy data with region names from API response
-    const regionNames = mapData.region_names || {}
-    return buildGalaxyData(mapData.planets, regionNames)
-  }, [mapData])
+    const regionNames = mapData?.region_names || {}
+    return buildGalaxyData(planetsToUse, regionNames)
+  }, [planetsToUse, mapData?.region_names])
+  
+  // Find the user's home system
+  const homeSystem = useMemo(() => {
+    if (!empire?.homeworld_planet_id || !planetsToUse || planetsToUse.length === 0) {
+      return null
+    }
+    
+    // Find the homeworld planet from Redux store (all planets) or mapData
+    const homeworldPlanet = planetsToUse.find(p => p.id === empire.homeworld_planet_id)
+    if (!homeworldPlanet) {
+      return null
+    }
+    
+    // Find the system containing this homeworld
+    const homeSystem = galaxyData.systemMap.find(system => 
+      system.planets.some(p => p.id === empire.homeworld_planet_id)
+    )
+    
+    return homeSystem || null
+  }, [empire?.homeworld_planet_id, planetsToUse, galaxyData.systemMap])
   
   // Initialize zoom/pan - start with scale to fit entire galaxy
+  // Use actual window/viewport dimensions for responsive sizing
+  const [viewportSize, setViewportSize] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return { width: window.innerWidth, height: window.innerHeight }
+    }
+    return { width: 1920, height: 1080 }
+  })
+  
+  // Update viewport size on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      })
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
   const initialScale = useMemo(() => {
-    // Calculate scale to fit entire grid in viewport (assuming 1920x1080 viewport)
-    const viewportWidth = 1920
-    const viewportHeight = 1080
-    const scaleX = viewportWidth / gridWidth
-    const scaleY = viewportHeight / gridHeight
-    return Math.min(scaleX, scaleY) * 0.95 // 95% to add some padding
-  }, [gridWidth, gridHeight])
+    // Calculate scale based on actual viewport dimensions
+    const scaleX = viewportSize.width / gridWidth
+    const scaleY = viewportSize.height / gridHeight
+    // Use 0.70 (70%) to zoom out significantly and ensure entire galaxy is visible with comfortable padding
+    // This ensures both top and bottom of the galaxy are visible
+    return Math.min(scaleX, scaleY) * 0.70
+  }, [gridWidth, gridHeight, viewportSize.width, viewportSize.height])
   
   const zoomPan = useZoomPan({
     minScale: initialScale * 0.5,  // Can zoom out a bit more
     maxScale: initialScale * 8,    // Can zoom in 8x
     initialScale: initialScale,
-    initialPanX: 0,
+    initialPanX: 0,  // Start centered (0,0 centers on grid center)
     initialPanY: 0,
     gridWidth: gridWidth,
     gridHeight: gridHeight,
@@ -98,7 +155,7 @@ export function GalaxyMap() {
   })
   
   // Handle system click - navigate to system view when zoomed in enough
-  const handleSystemClick = (system: SystemData) => {
+  const handleSystemClick = useCallback((system: SystemData) => {
     // If zoomed in enough (5x initial scale), navigate to system view
     // Otherwise, zoom to the system progressively
     const systemViewThreshold = initialScale * 5
@@ -129,10 +186,10 @@ export function GalaxyMap() {
       
       zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 500)
     }
-  }
+  }, [navigate, initialScale, zoomPan, gridWidth, gridHeight])
   
   // Handle region click - zoom to region (spiral-aware positioning)
-  const handleRegionClick = (region: RegionData, event: React.MouseEvent) => {
+  const handleRegionClick = useCallback((region: RegionData, event: React.MouseEvent) => {
     event.stopPropagation()
     const targetScale = initialScale * 2.5 // Zoom to 2.5x to show region clearly
     
@@ -169,7 +226,7 @@ export function GalaxyMap() {
     
     setZoomedIntoRegion(true) // Mark that we've zoomed into a region
     zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 600)
-  }
+  }, [initialScale, zoomPan, gridWidth, gridHeight])
   
   // Reset zoomedIntoRegion when zooming out significantly
   useEffect(() => {
@@ -180,19 +237,19 @@ export function GalaxyMap() {
   }, [zoomPan.scale, initialScale, zoomedIntoRegion])
   
   // Reset when using reset button
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setZoomedIntoRegion(false)
     zoomPan.reset()
-  }
+  }, [zoomPan])
   
   // Navigate to galactic core
-  const handleNavigateToCore = () => {
+  const handleNavigateToCore = useCallback(() => {
     const targetScale = initialScale * 0.8 // Slightly zoomed out to show full galaxy
     const targetPanX = (gridWidth / 2 - GALACTIC_CORE.x) * targetScale
     const targetPanY = (gridHeight / 2 - GALACTIC_CORE.y) * targetScale
     
     zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 800)
-  }
+  }, [initialScale, zoomPan, gridWidth, gridHeight])
   
   // Calculate viewBox based on zoom/pan - maintain aspect ratio
   const viewBox = useMemo(() => {
@@ -257,7 +314,7 @@ export function GalaxyMap() {
     return `${minX - padding} ${minY - padding} ${finalWidth + padding * 2} ${finalHeight + padding * 2}`
   }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight])
 
-  // Calculate viewport bounds for FogOfWarLayer (from viewBox)
+  // Calculate viewport bounds for FogOfWarLayer (from viewBox) - with padding for better culling
   const viewportBounds = useMemo(() => {
     const container = zoomPan.containerRef.current
     if (!container) {
@@ -276,21 +333,26 @@ export function GalaxyMap() {
     const centerX = -zoomPan.panX / zoomPan.scale + gridWidth / 2
     const centerY = -zoomPan.panY / zoomPan.scale + gridHeight / 2
     
+    // Add padding for viewport culling (render slightly outside viewport for smooth panning)
+    const padding = Math.max(visibleWidth, visibleHeight) * 0.2
+    
     return {
-      minX: Math.max(0, centerX - visibleWidth / 2),
-      maxX: Math.min(gridWidth, centerX + visibleWidth / 2),
-      minY: Math.max(0, centerY - visibleHeight / 2),
-      maxY: Math.min(gridHeight, centerY + visibleHeight / 2),
+      minX: Math.max(-padding, centerX - visibleWidth / 2 - padding),
+      maxX: Math.min(gridWidth + padding, centerX + visibleWidth / 2 + padding),
+      minY: Math.max(-padding, centerY - visibleHeight / 2 - padding),
+      maxY: Math.min(gridHeight + padding, centerY + visibleHeight / 2 + padding),
     }
   }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight])
   
-  if (isLoadingConfig || isLoadingMap) {
+  // Wait for planets to be loaded from Redux store before rendering map
+  // This ensures we have all 8,000+ planets available
+  if (isLoadingConfig || isLoadingMap || !planetsLoaded || planetsToUse.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full">
         <Loader />
         <div className="mt-4">
           <p className="text-sm text-muted-foreground">
-            Loading galaxy map...
+            {!planetsLoaded ? `Loading ${planetsToUse.length.toLocaleString()} planets...` : 'Loading galaxy map...'}
           </p>
         </div>
       </div>
@@ -318,6 +380,7 @@ export function GalaxyMap() {
         style={{
           width: '100%',
           height: '100%',
+          willChange: 'transform', // GPU acceleration hint
         }}
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
@@ -369,6 +432,7 @@ export function GalaxyMap() {
           onRegionClick={handleRegionClick}
           onRegionHover={setHoveredRegion}
           hoveredRegion={hoveredRegion}
+          viewportBounds={viewportBounds}
         />
         
         {/* Layer 3: Hyperspace Routes (toggleable at any zoom level) */}
@@ -376,6 +440,7 @@ export function GalaxyMap() {
           systems={galaxyData.systemMap}
           maxConnectionDistance={zoomPan.scale > initialScale * 2 ? 100 : 75}
           showRoutes={showRoutes}
+          viewportBounds={viewportBounds}
         />
         
         {/* Layer 3.5: Planet Orbits (only at second zoom level, before system view) */}
@@ -396,6 +461,8 @@ export function GalaxyMap() {
           onSystemHover={setHoveredSystem}
           scale={zoomPan.scale}
           showNames={zoomedIntoRegion}
+          viewportBounds={viewportBounds}
+          homeSystem={homeSystem}
         />
         
         {/* Layer 5: Incidents */}

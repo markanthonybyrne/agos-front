@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { SystemData, calculateSystemDistance } from '@/lib/galaxyUtils'
 import { getRegionSystemColor } from '@/lib/regionColors'
 
@@ -15,16 +15,27 @@ interface HyperspaceRoutesLayerProps {
  * of each other, representing hyperspace routes or trade lanes.
  * Lines are colored to match the region color of the connected systems.
  */
-export function HyperspaceRoutesLayer({ 
+function HyperspaceRoutesLayerComponent({ 
   systems, 
   maxConnectionDistance = 75,
-  showRoutes = false
-}: HyperspaceRoutesLayerProps) {
+  showRoutes = false,
+  viewportBounds
+}: HyperspaceRoutesLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
   // Don't render routes if not zoomed into a region
   if (!showRoutes) {
     return null
   }
+  
   const routes = useMemo(() => {
+    // Optimize: Group systems by region first to reduce comparisons
+    const systemsByRegion = new Map<number, SystemData[]>()
+    systems.forEach(system => {
+      if (!systemsByRegion.has(system.region)) {
+        systemsByRegion.set(system.region, [])
+      }
+      systemsByRegion.get(system.region)!.push(system)
+    })
+    
     const connections: Array<{ 
       x1: number
       y1: number
@@ -34,37 +45,58 @@ export function HyperspaceRoutesLayer({
       color: string
     }> = []
     
-    // For each system, find nearby systems in the same region to connect
-    for (let i = 0; i < systems.length; i++) {
-      const system1 = systems[i]
+    // Only process systems in viewport (with padding)
+    const padding = maxConnectionDistance * 2
+    const visibleSystems = viewportBounds 
+      ? systems.filter(s => {
+          const { x, y } = s.center
+          return (
+            x >= viewportBounds.minX - padding &&
+            x <= viewportBounds.maxX + padding &&
+            y >= viewportBounds.minY - padding &&
+            y <= viewportBounds.maxY + padding
+          )
+        })
+      : systems
+    
+    // Process each region separately - reduces O(n²) to O(n²/k) where k is number of regions
+    systemsByRegion.forEach((regionSystems, region) => {
+      // Filter to visible systems in this region
+      const visibleInRegion = visibleSystems.filter(s => s.region === region)
       
-      for (let j = i + 1; j < systems.length; j++) {
-        const system2 = systems[j]
+      // For each system, find nearby systems in the same region to connect
+      for (let i = 0; i < visibleInRegion.length; i++) {
+        const system1 = visibleInRegion[i]
         
-        // Only connect systems in the same region
-        if (system1.region !== system2.region) continue
-        
-        // Calculate distance between systems
-        const distance = calculateSystemDistance(system1, system2)
-        
-        // Only connect if within threshold distance
-        if (distance <= maxConnectionDistance) {
-          // Use region color for the connection
-          const regionColor = getRegionSystemColor(system1.region)
-          connections.push({
-            x1: system1.center.x,
-            y1: system1.center.y,
-            x2: system2.center.x,
-            y2: system2.center.y,
-            region: system1.region,
-            color: regionColor
-          })
+        // Only check systems ahead to avoid duplicate connections
+        for (let j = i + 1; j < visibleInRegion.length; j++) {
+          const system2 = visibleInRegion[j]
+          
+          // Quick distance check using squared distance (avoid sqrt)
+          const dx = system1.center.x - system2.center.x
+          const dy = system1.center.y - system2.center.y
+          const distanceSquared = dx * dx + dy * dy
+          const maxDistanceSquared = maxConnectionDistance * maxConnectionDistance
+          
+          // Only connect if within threshold distance
+          if (distanceSquared <= maxDistanceSquared) {
+            // Use region color for the connection
+            const regionColor = getRegionSystemColor(region)
+            connections.push({
+              x1: system1.center.x,
+              y1: system1.center.y,
+              x2: system2.center.x,
+              y2: system2.center.y,
+              region: region,
+              color: regionColor
+            })
+          }
         }
       }
-    }
+    })
     
     return connections
-  }, [systems, maxConnectionDistance])
+  }, [systems, maxConnectionDistance, viewportBounds])
   
   return (
     <g className="hyperspace-routes-layer">
@@ -95,5 +127,8 @@ export function HyperspaceRoutesLayer({
     </g>
   )
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const HyperspaceRoutesLayer = memo(HyperspaceRoutesLayerComponent)
 
 

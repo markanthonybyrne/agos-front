@@ -287,19 +287,31 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
                 }
               }
               
-              // Update progress: 15% (first page) to 90% (all pages loaded)
-              const progress = 15 + Math.floor(((i + chunk.length) / allPagePromises.length) * 75)
-              dispatch(setLoadingProgress(Math.min(progress, 90)))
+              // Update progress: 15% (first page) to 95% (all pages loaded)
+              const progress = 15 + Math.floor(((i + chunk.length) / allPagePromises.length) * 80)
+              dispatch(setLoadingProgress(Math.min(progress, 95)))
               
-              console.log(`[InitialDataLoader] Loaded ${allPlanets.length}/${totalToLoad} planets (page ${i + chunk.length}/${allPagePromises.length})...`)
+              console.log(`[InitialDataLoader] Loaded ${allPlanets.length}/${totalToLoad} planets (${((allPlanets.length / totalToLoad) * 100).toFixed(1)}%) - page ${i + chunk.length}/${allPagePromises.length}...`)
             }
             
             console.log(`[InitialDataLoader] ✅ Loaded all pages: ${allPlanets.length} planets total`)
+          } else {
+            // No additional pages needed - we already have all planets from first page
+            console.log(`[InitialDataLoader] ✅ All planets loaded in first page: ${allPlanets.length} planets`)
           }
           
           // Warn if we didn't get all planets (shouldn't happen, but good to check)
-          if (allPlanets.length < totalToLoad) {
-            console.warn(`[InitialDataLoader] ⚠️ Only loaded ${allPlanets.length} out of ${totalToLoad} expected planets`)
+          if (allPlanets.length < totalToLoad * 0.95) { // Allow 5% margin for duplicates/edge cases
+            console.warn(`[InitialDataLoader] ⚠️ Only loaded ${allPlanets.length} out of ${totalToLoad} expected planets (${((allPlanets.length / totalToLoad) * 100).toFixed(1)}%)`)
+          }
+          
+          // Verify we have at least 8000 planets (or close to the total)
+          const minExpectedPlanets = Math.min(8000, totalToLoad * 0.95)
+          if (allPlanets.length < minExpectedPlanets) {
+            console.error(`[InitialDataLoader] ❌ Failed to load sufficient planets: ${allPlanets.length} < ${minExpectedPlanets}`)
+            // Continue anyway, but log the issue
+          } else {
+            console.log(`[InitialDataLoader] ✅ Successfully loaded ${allPlanets.length} planets (target: ${totalToLoad})`)
           }
           
           // Complete load with ALL planets
@@ -307,9 +319,9 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
           dispatch(setLoadingProgress(100))
           dispatch(setLoadingPhase('complete'))
           
-          console.log(`[InitialDataLoader] ✅ Loaded ALL ${allPlanets.length} planets`)
+          console.log(`[InitialDataLoader] ✅ Loaded ALL ${allPlanets.length} planets - ready to proceed`)
           
-          // Complete after minimum display time
+          // Complete after minimum display time - ensure user sees completion
           const elapsed = loaderStartTimeRef.current ? Date.now() - loaderStartTimeRef.current : 0
           const remainingTime = Math.max(0, MIN_LOADER_DISPLAY_TIME - elapsed)
           

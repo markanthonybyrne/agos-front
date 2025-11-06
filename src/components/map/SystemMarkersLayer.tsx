@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { SystemData } from '@/lib/galaxyUtils'
 import { getRegionSystemColor } from '@/lib/regionColors'
 
@@ -9,6 +9,7 @@ interface SystemMarkersLayerProps {
   onSystemHover?: (system: SystemData | null) => void
   scale?: number // Current zoom scale for adjusting marker size
   showNames?: boolean // Whether to show system names (only after zooming into region)
+  homeSystem?: SystemData | null // User's home system - always visible
 }
 
 /**
@@ -19,16 +20,43 @@ interface SystemMarkersLayerProps {
  * - Rectangular name boxes with region-colored backgrounds
  * - Enhanced visibility when zoomed in
  */
-export function SystemMarkersLayer({ 
+function SystemMarkersLayerComponent({ 
   systems, 
   onSystemClick,
   hoveredSystem,
   onSystemHover,
   scale = 1,
-  showNames = false
-}: SystemMarkersLayerProps) {
+  showNames = false,
+  viewportBounds,
+  homeSystem
+}: SystemMarkersLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
+  // Viewport culling - only render systems visible in viewport
+  // ALWAYS include home system even if outside viewport
+  const visibleSystems = useMemo(() => {
+    if (!viewportBounds) return systems
+    
+    const viewportSystems = systems.filter(system => {
+      // Always include home system
+      if (homeSystem && system.region === homeSystem.region && system.system === homeSystem.system) {
+        return true
+      }
+      
+      const { x, y } = system.center
+      // Add padding for smooth rendering during panning
+      const padding = 50
+      return (
+        x >= viewportBounds.minX - padding &&
+        x <= viewportBounds.maxX + padding &&
+        y >= viewportBounds.minY - padding &&
+        y <= viewportBounds.maxY + padding
+      )
+    })
+    
+    return viewportSystems
+  }, [systems, viewportBounds, homeSystem])
+  
   const markers = useMemo(() => {
-    return systems.map(system => {
+    return visibleSystems.map(system => {
       const isHovered = hoveredSystem?.region === system.region && 
                        hoveredSystem?.system === system.system
       
@@ -41,12 +69,18 @@ export function SystemMarkersLayer({
         ? `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, 0.6)`
         : 'rgba(255, 255, 255, 0.4)'
       
+      // Check if this is the user's home system
+      const isHomeSystem = homeSystem && 
+                          system.region === homeSystem.region && 
+                          system.system === homeSystem.system
+      
       // Check if this is a key system (has a name or contains a homeworld)
       const isKeySystem = system.name !== null || 
                          system.planets.some(p => p.state === 'homeworld')
       
       // Marker size scales with zoom and system importance
-      const baseSize = isKeySystem ? 4 : 3
+      // Home system is always larger and more prominent
+      const baseSize = isHomeSystem ? 6 : (isKeySystem ? 4 : 3)
       const markerSize = isHovered 
         ? baseSize * 1.5 
         : baseSize * Math.min(1.2, 1 + (scale - 1) * 0.1)
@@ -54,10 +88,12 @@ export function SystemMarkersLayer({
       // Glow radius
       const glowRadius = markerSize * 2.5
       
-      // System name - only show after user has clicked to zoom into a region
+      // System name - always show for home system, otherwise only after zooming into region
       // Always show on hover, but otherwise only if showNames is true
-      const showName = showNames || isHovered
-      const systemLabel = system.name || `System ${system.region}:${system.system}`
+      const showName = isHomeSystem || showNames || isHovered
+      const systemLabel = isHomeSystem 
+        ? 'Home System' 
+        : (system.name || `System ${system.region}:${system.system}`)
       
       return (
         <g
@@ -68,36 +104,57 @@ export function SystemMarkersLayer({
           onMouseLeave={() => onSystemHover?.(null)}
           style={{ cursor: 'pointer' }}
         >
-          {/* Outer glow */}
+          {/* Outer glow - enhanced for home system */}
           <circle
             cx={system.center.x}
             cy={system.center.y}
-            r={glowRadius}
-            fill={glowColor}
-            opacity={isHovered ? 0.8 : 0.5}
+            r={isHomeSystem ? glowRadius * 1.5 : glowRadius}
+            fill={isHomeSystem ? 'rgba(0, 255, 255, 0.8)' : glowColor}
+            opacity={isHomeSystem ? 1.0 : (isHovered ? 0.8 : 0.5)}
             className="system-glow"
             style={{
-              filter: 'blur(2px)',
-              transition: 'all 0.2s ease-in-out'
+              filter: isHomeSystem ? 'blur(3px)' : 'blur(2px)',
+              transition: 'all 0.2s ease-in-out',
+              animation: isHomeSystem ? 'pulse 2s ease-in-out infinite' : 'none'
             }}
           />
           
-          {/* System marker dot */}
+          {/* System marker dot - special styling for home system */}
           <circle
             cx={system.center.x}
             cy={system.center.y}
             r={markerSize}
-            fill={regionColor}
-            stroke={isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)'}
-            strokeWidth={isHovered ? 2 : 1.5}
+            fill={isHomeSystem ? '#00FFFF' : regionColor}
+            stroke={isHomeSystem ? '#FFFFFF' : (isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)')}
+            strokeWidth={isHomeSystem ? 3 : (isHovered ? 2 : 1.5)}
             className="system-dot"
             style={{
-              filter: isHovered 
-                ? `drop-shadow(0 0 6px ${regionColor}) drop-shadow(0 0 3px rgba(255, 255, 255, 0.8))`
-                : `drop-shadow(0 0 3px ${regionColor})`,
+              filter: isHomeSystem
+                ? `drop-shadow(0 0 10px #00FFFF) drop-shadow(0 0 5px rgba(0, 255, 255, 0.8))`
+                : (isHovered 
+                  ? `drop-shadow(0 0 6px ${regionColor}) drop-shadow(0 0 3px rgba(255, 255, 255, 0.8))`
+                  : `drop-shadow(0 0 3px ${regionColor})`),
               transition: 'all 0.2s ease-in-out'
             }}
           />
+          
+          {/* Home system indicator ring */}
+          {isHomeSystem && (
+            <circle
+              cx={system.center.x}
+              cy={system.center.y}
+              r={markerSize + 4}
+              fill="none"
+              stroke="#00FFFF"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              opacity={0.8}
+              style={{
+                animation: 'rotate 3s linear infinite',
+                transformOrigin: `${system.center.x}px ${system.center.y}px`
+              }}
+            />
+          )}
           
           {/* System name label in colored rectangular box */}
           {showName && (
@@ -108,14 +165,16 @@ export function SystemMarkersLayer({
                 y={system.center.y + markerSize + 4}
                 width={(systemLabel.length * 6.4) + 8}
                 height={14}
-                fill={regionColor}
-                opacity={0.95}
-                stroke={isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)'}
-                strokeWidth={isHovered ? 1.5 : 1}
+                fill={isHomeSystem ? '#00FFFF' : regionColor}
+                opacity={isHomeSystem ? 1.0 : 0.95}
+                stroke={isHomeSystem ? '#FFFFFF' : (isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)')}
+                strokeWidth={isHomeSystem ? 2 : (isHovered ? 1.5 : 1)}
                 rx={2}
                 className="system-label-bg"
                 style={{
-                  filter: isHovered ? `drop-shadow(0 0 4px ${regionColor})` : `drop-shadow(0 0 2px rgba(0, 0, 0, 0.5))`,
+                  filter: isHomeSystem 
+                    ? `drop-shadow(0 0 6px #00FFFF) drop-shadow(0 0 3px rgba(0, 255, 255, 0.8))`
+                    : (isHovered ? `drop-shadow(0 0 4px ${regionColor})` : `drop-shadow(0 0 2px rgba(0, 0, 0, 0.5))`),
                   transition: 'all 0.2s ease-in-out'
                 }}
               />
@@ -141,7 +200,7 @@ export function SystemMarkersLayer({
         </g>
       )
     })
-  }, [systems, hoveredSystem, onSystemClick, onSystemHover, scale])
+  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemHover, scale, homeSystem])
   
   return (
     <g className="system-markers-layer">
@@ -149,5 +208,8 @@ export function SystemMarkersLayer({
     </g>
   )
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const SystemMarkersLayer = memo(SystemMarkersLayerComponent)
 
 

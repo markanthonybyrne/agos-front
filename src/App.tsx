@@ -143,9 +143,10 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <AppContent />
+      {/* Only render app content after data loading is complete */}
+      {/* InitialDataLoader handles showing its own loading screen */}
+      {dataLoadingComplete && <AppContent />}
       <InitialDataLoader onComplete={() => setDataLoadingComplete(true)} />
-      {!dataLoadingComplete && <div className="fixed inset-0 z-[999998] pointer-events-none" />}
       <TickCountdownTimer />
       <AuthTransitionOverlay />
       <Toaster 

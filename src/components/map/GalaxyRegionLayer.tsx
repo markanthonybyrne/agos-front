@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { RegionData } from '@/lib/galaxyUtils'
 import { getRegionColor, getRegionBorderColor } from '@/lib/regionColors'
 import { cn } from '@/lib/utils'
@@ -21,16 +21,33 @@ interface GalaxyRegionLayerProps {
  * based on actual planet positions, following the spiral galaxy layout.
  * Falls back to rectangular bounds if insufficient planets for hull calculation.
  */
-export function GalaxyRegionLayer({ 
+function GalaxyRegionLayerComponent({ 
   regions, 
   gridWidth, 
   gridHeight,
   onRegionClick,
   onRegionHover,
-  hoveredRegion
-}: GalaxyRegionLayerProps) {
+  hoveredRegion,
+  viewportBounds
+}: GalaxyRegionLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
+  // Viewport culling - only render regions that intersect viewport
+  const visibleRegions = useMemo(() => {
+    if (!viewportBounds) return Array.from(regions.values())
+    
+    return Array.from(regions.values()).filter(region => {
+      const { bounds } = region
+      // Check if region bounds intersect viewport
+      return !(
+        bounds.maxX < viewportBounds.minX ||
+        bounds.minX > viewportBounds.maxX ||
+        bounds.maxY < viewportBounds.minY ||
+        bounds.minY > viewportBounds.maxY
+      )
+    })
+  }, [regions, viewportBounds])
+  
   const regionPaths = useMemo(() => {
-    return Array.from(regions.values()).map(region => {
+    return visibleRegions.map(region => {
       const { bounds } = region
       const isHovered = hoveredRegion?.region === region.region
       const color = getRegionColor(region.region)
@@ -107,7 +124,7 @@ export function GalaxyRegionLayer({
         </g>
       )
     })
-  }, [regions, hoveredRegion, onRegionClick, onRegionHover])
+  }, [visibleRegions, hoveredRegion, onRegionClick, onRegionHover])
   
   return (
     <g className="galaxy-region-layer">
@@ -115,5 +132,8 @@ export function GalaxyRegionLayer({
     </g>
   )
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const GalaxyRegionLayer = memo(GalaxyRegionLayerComponent)
 
 
