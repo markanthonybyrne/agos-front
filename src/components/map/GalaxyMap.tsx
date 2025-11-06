@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
 import { useNavigate } from 'react-router-dom'
 import { buildGalaxyData, SystemData, RegionData } from '@/lib/galaxyUtils'
@@ -7,9 +7,14 @@ import { GalaxyRegionLayer } from './GalaxyRegionLayer'
 import { HyperspaceRoutesLayer } from './HyperspaceRoutesLayer'
 import { SystemMarkersLayer } from './SystemMarkersLayer'
 import { GalaxyMapLegend } from './GalaxyMapLegend'
+import { GalacticCoreLayer } from './GalacticCoreLayer'
+import { SpiralArmGuidelinesLayer } from './SpiralArmGuidelinesLayer'
+import { GalacticOrbitalRingsLayer } from './GalacticOrbitalRingsLayer'
 import { Loader } from '@/components/ui/loader'
 import { Button } from '@/components/ui/button'
-import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Home, Eye } from 'lucide-react'
+import { GALACTIC_CORE } from '@/lib/spiralUtils'
+import { getPlanetXY } from '@/lib/coordinates'
 
 const DEFAULT_GRID_WIDTH = 2000
 const DEFAULT_GRID_HEIGHT = 1000
@@ -30,6 +35,8 @@ export function GalaxyMap() {
   const navigate = useNavigate()
   const [hoveredSystem, setHoveredSystem] = useState<SystemData | null>(null)
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null)
+  const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
+  const [zoomedIntoRegion, setZoomedIntoRegion] = useState(false)
   
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
@@ -112,16 +119,67 @@ export function GalaxyMap() {
     }
   }
   
-  // Handle region click - zoom to region
+  // Handle region click - zoom to region (spiral-aware positioning)
   const handleRegionClick = (region: RegionData, event: React.MouseEvent) => {
     event.stopPropagation()
     const targetScale = initialScale * 2.5 // Zoom to 2.5x to show region clearly
     
-    // Calculate pan to center the region
-    const targetPanX = (gridWidth / 2 - region.bounds.centerX) * targetScale
-    const targetPanY = (gridHeight / 2 - region.bounds.centerY) * targetScale
+    // Calculate center from actual planet positions (spiral-aware)
+    // Use planet distribution center instead of rectangular bounds center
+    const planetPoints: { x: number; y: number }[] = []
+    region.systems.forEach(system => {
+      system.planets.forEach(planet => {
+        const xy = getPlanetXY(planet)
+        if (xy) {
+          planetPoints.push(xy)
+        }
+      })
+    })
     
+    let centerX: number
+    let centerY: number
+    
+    if (planetPoints.length > 0) {
+      // Use actual planet distribution center
+      const sumX = planetPoints.reduce((sum, p) => sum + p.x, 0)
+      const sumY = planetPoints.reduce((sum, p) => sum + p.y, 0)
+      centerX = sumX / planetPoints.length
+      centerY = sumY / planetPoints.length
+    } else {
+      // Fallback to bounds center
+      centerX = region.bounds.centerX
+      centerY = region.bounds.centerY
+    }
+    
+    // Calculate pan to center the region
+    const targetPanX = (gridWidth / 2 - centerX) * targetScale
+    const targetPanY = (gridHeight / 2 - centerY) * targetScale
+    
+    setZoomedIntoRegion(true) // Mark that we've zoomed into a region
     zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 600)
+  }
+  
+  // Reset zoomedIntoRegion when zooming out significantly
+  useEffect(() => {
+    const currentZoomRatio = zoomPan.scale / initialScale
+    if (zoomedIntoRegion && currentZoomRatio < 1.5) {
+      setZoomedIntoRegion(false)
+    }
+  }, [zoomPan.scale, initialScale, zoomedIntoRegion])
+  
+  // Reset when using reset button
+  const handleReset = () => {
+    setZoomedIntoRegion(false)
+    zoomPan.reset()
+  }
+  
+  // Navigate to galactic core
+  const handleNavigateToCore = () => {
+    const targetScale = initialScale * 0.8 // Slightly zoomed out to show full galaxy
+    const targetPanX = (gridWidth / 2 - GALACTIC_CORE.x) * targetScale
+    const targetPanY = (gridHeight / 2 - GALACTIC_CORE.y) * targetScale
+    
+    zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 800)
   }
   
   // Calculate viewBox based on zoom/pan - maintain aspect ratio
@@ -228,7 +286,35 @@ export function GalaxyMap() {
         {/* Background - transparent */}
         <rect width={gridWidth} height={gridHeight} fill="transparent" />
         
-        {/* Layer 1: Region Overlays */}
+        {/* Layer 0: Spiral Arm Guidelines (optional, behind other layers) */}
+        {showSpiralGuidelines && (
+          <SpiralArmGuidelinesLayer
+            scale={zoomPan.scale}
+            panX={zoomPan.panX}
+            panY={zoomPan.panY}
+            minScale={initialScale * 2}
+          />
+        )}
+        
+        {/* Layer 1: Galactic Core */}
+        <GalacticCoreLayer
+          scale={zoomPan.scale}
+          panX={zoomPan.panX}
+          panY={zoomPan.panY}
+          containerWidth={gridWidth}
+          containerHeight={gridHeight}
+          minScale={initialScale * 2}
+        />
+        
+        {/* Layer 1.5: Galactic Orbital Rings (dashed circles around core - rendered on top) */}
+        <GalacticOrbitalRingsLayer
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+          scale={zoomPan.scale}
+          minScale={initialScale * 3}
+        />
+        
+        {/* Layer 2: Region Overlays */}
         <GalaxyRegionLayer 
           regions={galaxyData.regions}
           gridWidth={gridWidth}
@@ -238,26 +324,47 @@ export function GalaxyMap() {
           hoveredRegion={hoveredRegion}
         />
         
-        {/* Layer 2: Hyperspace Routes */}
+        {/* Layer 3: Hyperspace Routes */}
         <HyperspaceRoutesLayer 
           systems={galaxyData.systemMap}
-          maxConnectionDistance={75}
+          maxConnectionDistance={zoomPan.scale > initialScale * 2 ? 100 : 75}
         />
         
-        {/* Layer 3: System Markers */}
+        {/* Layer 4: System Markers */}
         <SystemMarkersLayer
           systems={galaxyData.systemMap}
           onSystemClick={handleSystemClick}
           hoveredSystem={hoveredSystem}
           onSystemHover={setHoveredSystem}
+          scale={zoomPan.scale}
+          showNames={zoomedIntoRegion}
         />
       </svg>
       
       {/* UI Overlay: Legend */}
       <GalaxyMapLegend regions={galaxyData.regions} />
       
-      {/* Zoom Controls */}
+      {/* Navigation Controls */}
       <div className="absolute top-20 right-4 z-10 flex flex-col gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleNavigateToCore}
+          className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
+          title="Navigate to Galactic Core"
+        >
+          <Home className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowSpiralGuidelines(!showSpiralGuidelines)}
+          className={`bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90 ${showSpiralGuidelines ? 'bg-blue-900/50' : ''}`}
+          title="Toggle Spiral Arm Guidelines"
+        >
+          <Eye className="w-4 h-4" />
+        </Button>
+        <div className="h-px bg-white/20 my-1" />
         <Button
           variant="outline"
           size="icon"
@@ -279,7 +386,7 @@ export function GalaxyMap() {
         <Button
           variant="outline"
           size="icon"
-          onClick={zoomPan.reset}
+          onClick={handleReset}
           className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
           title="Reset View"
         >

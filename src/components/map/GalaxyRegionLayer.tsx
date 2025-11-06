@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { RegionData } from '@/lib/galaxyUtils'
 import { getRegionColor, getRegionBorderColor } from '@/lib/regionColors'
 import { cn } from '@/lib/utils'
+import { convexHull, hullToPath, Point } from '@/lib/spiralUtils'
+import { getPlanetXY } from '@/lib/coordinates'
 
 interface GalaxyRegionLayerProps {
   regions: Map<number, RegionData>
@@ -15,7 +17,9 @@ interface GalaxyRegionLayerProps {
 /**
  * GalaxyRegionLayer - Renders colored territory overlays for regions
  * 
- * Displays semi-transparent colored regions matching the reference image style.
+ * Displays semi-transparent colored regions using convex hull boundaries
+ * based on actual planet positions, following the spiral galaxy layout.
+ * Falls back to rectangular bounds if insufficient planets for hull calculation.
  */
 export function GalaxyRegionLayer({ 
   regions, 
@@ -32,6 +36,38 @@ export function GalaxyRegionLayer({
       const color = getRegionColor(region.region)
       const borderColor = getRegionBorderColor(region.region)
       
+      // Collect all planet positions from all systems in this region
+      const planetPoints: Point[] = []
+      region.systems.forEach(system => {
+        system.planets.forEach(planet => {
+          const xy = getPlanetXY(planet)
+          if (xy) {
+            planetPoints.push([xy.x, xy.y])
+          }
+        })
+      })
+      
+      // Calculate convex hull if we have enough points, otherwise use rectangular bounds
+      const useConvexHull = planetPoints.length >= 3
+      let pathData: string
+      let centerX: number
+      let centerY: number
+      
+      if (useConvexHull) {
+        const hull = convexHull(planetPoints)
+        pathData = hullToPath(hull)
+        // Calculate center from hull points
+        const sumX = hull.reduce((sum, p) => sum + p[0], 0)
+        const sumY = hull.reduce((sum, p) => sum + p[1], 0)
+        centerX = sumX / hull.length
+        centerY = sumY / hull.length
+      } else {
+        // Fallback to rectangular bounds
+        pathData = `M ${bounds.minX} ${bounds.minY} L ${bounds.maxX} ${bounds.minY} L ${bounds.maxX} ${bounds.maxY} L ${bounds.minX} ${bounds.maxY} Z`
+        centerX = bounds.centerX
+        centerY = bounds.centerY
+      }
+      
       return (
         <g 
           key={`region-${region.region}`}
@@ -41,39 +77,21 @@ export function GalaxyRegionLayer({
           onMouseLeave={() => onRegionHover?.(null)}
           style={{ cursor: 'pointer' }}
         >
-          {/* Region fill - semi-transparent colored overlay */}
-          <rect
-            x={bounds.minX}
-            y={bounds.minY}
-            width={bounds.maxX - bounds.minX}
-            height={bounds.maxY - bounds.minY}
+          {/* Region fill - very subtle colored overlay (no borders) */}
+          <path
+            d={pathData}
             fill={color}
             className="region-overlay"
             style={{
-              opacity: isHovered ? 0.5 : 0.3,
+              opacity: isHovered ? 0.25 : 0.15,
               transition: 'opacity 0.2s ease-in-out'
-            }}
-          />
-          {/* Region border */}
-          <rect
-            x={bounds.minX}
-            y={bounds.minY}
-            width={bounds.maxX - bounds.minX}
-            height={bounds.maxY - bounds.minY}
-            fill="none"
-            stroke={borderColor}
-            strokeWidth={isHovered ? 2.5 : 1.5}
-            className="region-border"
-            style={{
-              opacity: isHovered ? 0.9 : 0.6,
-              transition: 'all 0.2s ease-in-out'
             }}
           />
           {/* Region name label */}
           {region.name && (
             <text
-              x={bounds.centerX}
-              y={bounds.centerY}
+              x={centerX}
+              y={centerY}
               textAnchor="middle"
               className="fill-white font-semibold pointer-events-none"
               style={{
