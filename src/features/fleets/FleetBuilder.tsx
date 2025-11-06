@@ -24,8 +24,12 @@ import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 const fleetSchema = z.object({
   origin_planet_id: z.number().min(1, 'Select an origin planet'),
   destination_coordinate: z.string().min(1, 'Enter destination coordinate'),
-  order_type: z.enum(['attack', 'defend', 'station', 'return']),
+  order_type: z.enum(['attack', 'defend', 'station', 'return', 'colonize', 'transport']),
   auto_return_on_failure: z.boolean().default(false),
+  resources: z.object({
+    tellerium: z.number().min(0).optional(),
+    krypton: z.number().min(0).optional(),
+  }).optional(),
 })
 
 type FleetFormData = z.infer<typeof fleetSchema>
@@ -37,6 +41,7 @@ interface FleetBuilderProps {
 
 export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
   const [ships, setShips] = useState<Record<string, number>>({})
+  const [resources, setResources] = useState<{ tellerium?: number; krypton?: number }>({})
   const [createFleet, { isLoading }] = useCreateFleetMutation()
   const [validateRange, { data: rangeValidation, isLoading: isValidating }] = useValidateFleetRangeMutation()
   const { data: planetsData } = useGetPlanetsQuery()
@@ -69,8 +74,14 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
       origin_planet_id: planetId || undefined,
       order_type: 'attack',
       auto_return_on_failure: false,
+      resources: {
+        tellerium: undefined,
+        krypton: undefined,
+      },
     },
   })
+  
+  const watchedOrderType = form.watch('order_type')
   
   // Set origin planet if planetId is provided
   useEffect(() => {
@@ -185,6 +196,7 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
         destination_y: destinationXY.y,
         order_type: data.order_type,
         auto_return_on_failure: data.auto_return_on_failure,
+        resources: data.order_type === 'transport' ? data.resources : undefined,
       }).unwrap()
 
       toast.success('Fleet created successfully!')
@@ -283,9 +295,78 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
                 <option value="attack">Attack</option>
                 <option value="defend">Defend</option>
                 <option value="station">Station</option>
+                <option value="colonize">Colonize</option>
+                <option value="transport">Transport Resources</option>
                 <option value="return">Return</option>
               </select>
+              {watchedOrderType === 'colonize' && (
+                <Alert className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Colonization requires colonizer ships. The target planet must be unsettled and habitable.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {watchedOrderType === 'transport' && (
+                <Alert className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Select resources to transport to the destination planet.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
+
+            {/* Resource Transport Fields */}
+            {watchedOrderType === 'transport' && originPlanet && (
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-semibold">Resource Transport</h4>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="tellerium_transport">Tellerium</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="tellerium_transport"
+                        type="number"
+                        min={0}
+                        max={originPlanet.tellerium_balance || 0}
+                        value={resources.tellerium || ''}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0
+                          setResources(prev => ({ ...prev, tellerium: value }))
+                          form.setValue('resources', { ...resources, tellerium: value })
+                        }}
+                        placeholder="0"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        Available: {formatNumber(originPlanet.tellerium_balance || 0)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="krypton_transport">Krypton</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="krypton_transport"
+                        type="number"
+                        min={0}
+                        max={originPlanet.krypton_balance || 0}
+                        value={resources.krypton || ''}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0
+                          setResources(prev => ({ ...prev, krypton: value }))
+                          form.setValue('resources', { ...resources, krypton: value })
+                        }}
+                        placeholder="0"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        Available: {formatNumber(originPlanet.krypton_balance || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Ship Selection */}
             <div className="space-y-4">

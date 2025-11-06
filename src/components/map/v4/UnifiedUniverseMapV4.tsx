@@ -11,6 +11,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import * as PIXI from 'pixi.js'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
+import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useAuth } from '@/hooks/useAuth'
 import { useZoomPan } from '@/hooks/useZoomPan'
 import { usePanel } from '@/components/common/PanelManager'
@@ -23,24 +24,33 @@ import {
 } from '@/lib/systemUtils'
 import { getZoomLevel } from '@/lib/zoomLevels'
 import { useUniverseData } from '@/hooks/useUniverseData'
-import { Planet } from '@/types/api.types'
+import { Planet, Incident } from '@/types/api.types'
 import { Loader } from '@/components/ui/loader'
 import { BackgroundLayer } from './layers/BackgroundLayer'
 import { GalaxyLayer } from './layers/GalaxyLayer'
 import { SystemLayer } from './layers/SystemLayer'
 import { PlanetLayer } from './layers/PlanetLayer'
 import { MapControlsPanel } from '../MapControlsPanel'
+import { IncidentLayer } from '@/components/incidents/IncidentLayer'
+import { IncidentDetailPanel } from '@/components/incidents/IncidentDetailPanel'
+import { FogOfWarLayer } from '@/components/map/FogOfWarLayer'
+import { GalacticCoreLayer } from '@/components/map/GalacticCoreLayer'
+import { SpiralArmGuidelinesLayer } from '@/components/map/SpiralArmGuidelinesLayer'
+import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { ViewportBounds } from '@/lib/v3/ViewportProjection'
 import { calculateViewportBounds, ProjectionConfig } from '@/lib/v3/ViewportProjection'
 
-// Default grid dimensions
+// Default grid dimensions (square grid for circular galaxy)
 const DEFAULT_GRID_WIDTH = 2000
-const DEFAULT_GRID_HEIGHT = 1000
+const DEFAULT_GRID_HEIGHT = 2000
 
 export function UnifiedUniverseMapV4() {
   const { empire } = useAuth()
   const { openPanel } = usePanel()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [hoveredIncident, setHoveredIncident] = useState<Incident | null>(null)
+  const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const appRef = useRef<PIXI.Application | null>(null)
   const rootContainerRef = useRef<PIXI.Container | null>(null)
@@ -60,6 +70,9 @@ export function UnifiedUniverseMapV4() {
   
   // Fetch map data to get planets with galaxy_name and system_name
   const { data: mapData } = useGetMapQuery({})
+  
+  // Fetch incidents (filtered by visibility automatically by API)
+  const { data: incidentsData } = useGetIncidentsQuery()
 
   // Enrich planets with names from map data
   const enrichedPlanets = useMemo(() => {
@@ -248,6 +261,20 @@ export function UnifiedUniverseMapV4() {
     zoomPan.setNormalizedZoom(0.67, screen.x, screen.y)
   }, [zoomPan])
 
+  // Handle incident click
+  const handleIncidentClick = useCallback((incident: Incident) => {
+    setSelectedIncident(incident)
+  }, [])
+
+  // Navigate to galactic core
+  const handleNavigateToCore = useCallback(() => {
+    const targetScale = 0.09 // Full galaxy view
+    const targetPanX = (gridWidth / 2 - GALACTIC_CORE.x) * targetScale
+    const targetPanY = (gridHeight / 2 - GALACTIC_CORE.y) * targetScale
+    
+    zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 800)
+  }, [zoomPan, gridWidth, gridHeight])
+
   // Show loading state
   if (isLoadingConfig && !configError) {
     return (
@@ -330,6 +357,118 @@ export function UnifiedUniverseMapV4() {
           </>
         )}
 
+        {/* Spiral Arm Guidelines Layer (SVG overlay) - optional visual guide */}
+        {showSpiralGuidelines && containerSize.width > 0 && (
+          <svg
+            className="absolute pointer-events-none"
+            style={{
+              width: '100%',
+              height: '100%',
+              zIndex: 5,
+              top: 0,
+              left: 0,
+              transform: containerSize.width > 0 
+                ? `translate(${containerSize.width / 2 + zoomPan.panX - (gridWidth / 2) * zoomPan.scale}px, ${containerSize.height / 2 + zoomPan.panY - (gridHeight / 2) * zoomPan.scale}px) scale(${zoomPan.scale})`
+                : 'none',
+              transformOrigin: '0 0',
+            }}
+            viewBox={`0 0 ${gridWidth} ${gridHeight}`}
+            preserveAspectRatio="none"
+          >
+            <SpiralArmGuidelinesLayer
+              scale={zoomPan.scale}
+              panX={zoomPan.panX}
+              panY={zoomPan.panY}
+              minScale={0.15}
+            />
+          </svg>
+        )}
+
+        {/* Galactic Core Layer (SVG overlay) */}
+        {containerSize.width > 0 && (
+          <svg
+            className="absolute pointer-events-none"
+            style={{
+              width: '100%',
+              height: '100%',
+              zIndex: 10,
+              top: 0,
+              left: 0,
+              transform: containerSize.width > 0 
+                ? `translate(${containerSize.width / 2 + zoomPan.panX - (gridWidth / 2) * zoomPan.scale}px, ${containerSize.height / 2 + zoomPan.panY - (gridHeight / 2) * zoomPan.scale}px) scale(${zoomPan.scale})`
+                : 'none',
+              transformOrigin: '0 0',
+            }}
+            viewBox={`0 0 ${gridWidth} ${gridHeight}`}
+            preserveAspectRatio="none"
+          >
+            <GalacticCoreLayer
+              scale={zoomPan.scale}
+              panX={zoomPan.panX}
+              panY={zoomPan.panY}
+              containerWidth={gridWidth}
+              containerHeight={gridHeight}
+              minScale={0.15}
+            />
+          </svg>
+        )}
+
+        {/* Fog of War Layer (SVG overlay) - positioned to match PixiJS container transform */}
+        {containerSize.width > 0 && (
+          <svg
+            className="absolute pointer-events-none"
+            style={{
+              width: '100%',
+              height: '100%',
+              zIndex: 900,
+              top: 0,
+              left: 0,
+              transform: containerSize.width > 0 
+                ? `translate(${containerSize.width / 2 + zoomPan.panX - (gridWidth / 2) * zoomPan.scale}px, ${containerSize.height / 2 + zoomPan.panY - (gridHeight / 2) * zoomPan.scale}px) scale(${zoomPan.scale})`
+                : 'none',
+              transformOrigin: '0 0',
+            }}
+            viewBox={`0 0 ${gridWidth} ${gridHeight}`}
+            preserveAspectRatio="none"
+          >
+            <FogOfWarLayer
+              gridWidth={gridWidth}
+              gridHeight={gridHeight}
+              viewportBounds={viewportBounds}
+              scale={zoomPan.scale}
+            />
+          </svg>
+        )}
+
+        {/* Incident Layer (SVG overlay) */}
+        {incidentsData?.incidents && incidentsData.incidents.length > 0 && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              width: '100%',
+              height: '100%',
+              zIndex: 10,
+            }}
+            viewBox={`0 0 ${gridWidth} ${gridHeight}`}
+            preserveAspectRatio="none"
+          >
+            <g
+              style={{
+                transform: `translate(${zoomPan.panX}px, ${zoomPan.panY}px) scale(${zoomPan.scale})`,
+                transformOrigin: 'center center',
+              }}
+            >
+              <IncidentLayer
+                incidents={incidentsData.incidents}
+                scale={zoomPan.scale}
+                viewportBounds={viewportBounds}
+                onIncidentClick={handleIncidentClick}
+                onIncidentHover={setHoveredIncident}
+              />
+            </g>
+          </svg>
+        )}
+
         {/* Map Controls Panel */}
         <MapControlsPanel
           zoomPan={zoomPan}
@@ -349,6 +488,9 @@ export function UnifiedUniverseMapV4() {
           systemsCount={systemsByKey.size}
           minScale={0.09}
           maxScale={1.554}
+          onNavigateToCore={handleNavigateToCore}
+          showSpiralGuidelines={showSpiralGuidelines}
+          onToggleSpiralGuidelines={setShowSpiralGuidelines}
         />
         
         {/* Loading indicator overlay */}
@@ -396,6 +538,16 @@ export function UnifiedUniverseMapV4() {
                 {hoveredPlanet.owner_empire_id && ` • Owned`}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Incident Detail Panel */}
+        {selectedIncident && (
+          <div className="absolute top-4 right-4 z-50">
+            <IncidentDetailPanel
+              incident={selectedIncident}
+              onClose={() => setSelectedIncident(null)}
+            />
           </div>
         )}
       </div>

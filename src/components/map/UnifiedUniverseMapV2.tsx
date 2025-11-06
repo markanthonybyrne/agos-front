@@ -28,7 +28,7 @@ import { MapControlsPanel } from './MapControlsPanel'
 // Default grid dimensions (will be overridden by config)
 // Universe is now rectangular: 2000 x 1000
 const DEFAULT_GRID_WIDTH = 2000
-const DEFAULT_GRID_HEIGHT = 1000
+const DEFAULT_GRID_HEIGHT = 2000
 
 /**
  * UnifiedUniverseMapV2 - Main component for the 4-level universe map

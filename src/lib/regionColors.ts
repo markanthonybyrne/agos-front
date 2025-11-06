@@ -1,5 +1,59 @@
+import { RegionTheme } from '@/types/api.types'
+
 /**
- * Region Color Palette
+ * Theme-based color palette
+ * Maps region themes to colors that match the theme's aesthetic
+ */
+export const THEME_COLORS: Record<RegionTheme, { fill: string; border: string; solid: string }> = {
+  frozen: {
+    fill: 'rgba(200, 230, 255, 0.3)',
+    border: 'rgba(200, 230, 255, 0.9)',
+    solid: 'rgb(200, 230, 255)',
+  },
+  molten: {
+    fill: 'rgba(255, 100, 50, 0.3)',
+    border: 'rgba(255, 100, 50, 0.9)',
+    solid: 'rgb(255, 100, 50)',
+  },
+  desert: {
+    fill: 'rgba(255, 200, 100, 0.3)',
+    border: 'rgba(255, 200, 100, 0.9)',
+    solid: 'rgb(255, 200, 100)',
+  },
+  oceanic: {
+    fill: 'rgba(100, 150, 255, 0.3)',
+    border: 'rgba(100, 150, 255, 0.9)',
+    solid: 'rgb(100, 150, 255)',
+  },
+  forest: {
+    fill: 'rgba(100, 200, 100, 0.3)',
+    border: 'rgba(100, 200, 100, 0.9)',
+    solid: 'rgb(100, 200, 100)',
+  },
+  urban: {
+    fill: 'rgba(150, 150, 150, 0.3)',
+    border: 'rgba(150, 150, 150, 0.9)',
+    solid: 'rgb(150, 150, 150)',
+  },
+  void: {
+    fill: 'rgba(50, 50, 100, 0.3)',
+    border: 'rgba(100, 100, 150, 0.9)',
+    solid: 'rgb(100, 100, 150)',
+  },
+  habitable: {
+    fill: 'rgba(150, 255, 150, 0.3)',
+    border: 'rgba(150, 255, 150, 0.9)',
+    solid: 'rgb(150, 255, 150)',
+  },
+  industrial: {
+    fill: 'rgba(255, 150, 100, 0.3)',
+    border: 'rgba(255, 150, 100, 0.9)',
+    solid: 'rgb(255, 150, 100)',
+  },
+}
+
+/**
+ * Region Color Palette (legacy - fallback)
  * 
  * Provides distinct colors for 20 regions in the galaxy map.
  * Colors are designed to be visually distinct and work well with
@@ -53,17 +107,33 @@ export const REGION_BORDER_COLORS: Record<number, string> = {
 }
 
 /**
- * Get the color for a region (1-20)
+ * Get the color for a region, optionally using theme
  */
-export function getRegionColor(region: number): string {
+export function getRegionColor(region: number, theme?: RegionTheme): string {
+  if (theme && THEME_COLORS[theme]) {
+    return THEME_COLORS[theme].fill
+  }
   return REGION_COLORS[region] || 'rgba(128, 128, 128, 0.3)'
 }
 
 /**
- * Get the border color for a region (1-20)
+ * Get the border color for a region, optionally using theme
  */
-export function getRegionBorderColor(region: number): string {
+export function getRegionBorderColor(region: number, theme?: RegionTheme): string {
+  if (theme && THEME_COLORS[theme]) {
+    return THEME_COLORS[theme].border
+  }
   return REGION_BORDER_COLORS[region] || 'rgba(255, 255, 255, 0.5)'
+}
+
+/**
+ * Get the solid color for a region, optionally using theme
+ */
+export function getRegionSolidColor(region: number, theme?: RegionTheme): string {
+  if (theme && THEME_COLORS[theme]) {
+    return THEME_COLORS[theme].solid
+  }
+  return getRegionSystemColor(region)
 }
 
 /**

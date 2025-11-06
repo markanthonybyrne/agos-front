@@ -7,7 +7,7 @@ export interface Notification {
   message: string
   timestamp: string // ISO string for Redux serialization
   isRead: boolean
-  category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack' | 'colonization' | 'capture' | 'announcement'
+  category: 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'general' | 'tick' | 'attack' | 'colonization' | 'capture' | 'announcement' | 'incident'
   actionUrl?: string
   data?: any
 }
@@ -336,6 +336,81 @@ const notificationSlice = createSlice({
       // Persist to localStorage
       saveNotificationsToStorage(state.notifications)
     },
+    handleIncidentSpawned: (state, action: PayloadAction<{
+      incident: {
+        id: number
+        type: string
+        name: string
+        location: { x: number; y: number; region: number; system: number }
+      }
+    }>) => {
+      const { incident } = action.payload
+      const typeEmoji = {
+        wormhole: '🌀',
+        asteroid_storm: '☄️',
+        resource_rush: '💎',
+        pirate_raid: '⚔️',
+        anomaly: '✨',
+      }[incident.type] || '📡'
+      
+      state.notifications.unshift({
+        id: `incident_spawned_${incident.id}_${Date.now()}`,
+        type: 'info',
+        title: `${typeEmoji} New Incident: ${incident.name}`,
+        message: `A ${incident.type.replace('_', ' ')} has appeared in Region ${incident.location.region}, System ${incident.location.system}`,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        category: 'incident',
+        data: { incident }
+      })
+      state.unreadCount += 1
+      saveNotificationsToStorage(state.notifications)
+    },
+    handleIncidentExpired: (state, action: PayloadAction<{
+      incident: {
+        id: number
+        type: string
+        name: string
+      }
+    }>) => {
+      const { incident } = action.payload
+      state.notifications.unshift({
+        id: `incident_expired_${incident.id}_${Date.now()}`,
+        type: 'warning',
+        title: `⚠️ Incident Expired: ${incident.name}`,
+        message: `The ${incident.type.replace('_', ' ')} has ended`,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        category: 'incident',
+        data: { incident }
+      })
+      state.unreadCount += 1
+      saveNotificationsToStorage(state.notifications)
+    },
+    handleIncidentInteraction: (state, action: PayloadAction<{
+      incident: {
+        id: number
+        type: string
+        name: string
+      }
+      success: boolean
+      message: string
+      result?: any
+    }>) => {
+      const { incident, success, message, result } = action.payload
+      state.notifications.unshift({
+        id: `incident_interaction_${incident.id}_${Date.now()}`,
+        type: success ? 'success' : 'error',
+        title: success ? `✅ ${incident.name}` : `❌ ${incident.name}`,
+        message: message,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        category: 'incident',
+        data: { incident, result }
+      })
+      state.unreadCount += 1
+      saveNotificationsToStorage(state.notifications)
+    },
   },
 })
 
@@ -356,6 +431,9 @@ export const {
   handleFleetLaunched,
   handlePlanetCaptured,
   handlePlanetColonized,
+  handleIncidentSpawned,
+  handleIncidentExpired,
+  handleIncidentInteraction,
 } = notificationSlice.actions
 
 export default notificationSlice.reducer

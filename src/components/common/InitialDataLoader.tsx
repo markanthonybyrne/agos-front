@@ -162,8 +162,8 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
 
           // OPTIMIZATION: Use API max limit (500) for better performance
           const limit = 500 // API maximum per docs (5x increase from 100)
-          const initialPlanetsToLoad = 2000 // Load 2000 planets initially (fast)
-          const maxPlanetsToLoad = 15000 // Load remaining in background
+          const initialPlanetsToLoad = 5000 // Load 5000 planets initially (fast)
+          const maxPlanetsToLoad = Infinity // Load ALL planets - no limit
           const maxParallelRequests = 20 // Increased parallelism for faster initial load
           
           // PHASE 1: Load player's planets first (fastest, most important)
@@ -223,34 +223,36 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
             dispatch(addPlanets(newFirstPagePlanets))
           }
           
-          const effectiveLimit = limit // Use API max limit (100)
-          const initialPagesNeeded = Math.ceil(initialPlanetsToLoad / effectiveLimit)
-          const totalToLoad = Math.min(total, maxPlanetsToLoad)
-          const totalPages = Math.ceil(totalToLoad / effectiveLimit)
+          // Load ALL planets - no cap
+          const totalToLoad = total // Load all planets from API
+          const totalPages = Math.ceil(totalToLoad / limit) // Calculate total pages needed
 
-          console.log('[InitialDataLoader] Optimized loading strategy:', { 
+          console.log('[InitialDataLoader] Loading ALL planets:', { 
             apiTotal: total,
             playerPlanetsLoaded: allPlanets.length - newFirstPagePlanets.length,
-            initialTarget: initialPlanetsToLoad,
-            maxPlanetsToLoad,
-            effectiveLimit,
-            initialPagesNeeded,
+            limitPerPage: limit,
             totalPages,
-            maxParallel: maxParallelRequests
+            maxParallel: maxParallelRequests,
+            expectedPlanets: totalToLoad
           })
           
-          // PHASE 2: Load initial batch quickly (for immediate use)
+          // PHASE 2: Load ALL remaining pages (not just initial batch)
           dispatch(setLoadingProgress(15))
           
-          if (initialPagesNeeded > 1) {
-            // Create promises for initial batch only
-            const initialPromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
+          // Load all pages beyond the first one
+          const pagesToLoad = totalPages > 1 ? totalPages - 1 : 0
+          
+          if (pagesToLoad > 0) {
+            console.log(`[InitialDataLoader] Loading ${pagesToLoad} pages (${totalToLoad} total planets)...`)
             
-            for (let page = 1; page < initialPagesNeeded && page < totalPages; page++) {
-              const offset = page * effectiveLimit
-              // Skip total on subsequent pages (only returned on first page by default)
-              initialPromises.push(
-                fetch(`${baseUrl}/planets/search?limit=${effectiveLimit}&offset=${offset}`, {
+            // Create promises for ALL pages
+            const allPagePromises: Promise<{ planets: Planet[]; offset: number; page: number }>[] = []
+            
+            // Start from page 1 (offset = limit) since page 0 (offset 0) is already loaded
+            for (let page = 1; page < totalPages; page++) {
+              const offset = page * limit
+              allPagePromises.push(
+                fetch(`${baseUrl}/planets/search?limit=${limit}&offset=${offset}`, {
                   headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
@@ -268,59 +270,58 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
               )
             }
             
-            // Fetch initial batch in parallel (all at once for speed)
-            const initialResults = await Promise.all(initialPromises)
-            const existingIdsAfter = new Set(allPlanets.map(p => p.id))
+            // Process in chunks to update progress and avoid overwhelming
+            const chunkSize = maxParallelRequests
+            const existingIdsAfterFirstPage = new Set(allPlanets.map(p => p.id))
             
-            for (const result of initialResults) {
-              const newPlanets = result.planets.filter(p => !existingIdsAfter.has(p.id))
-              if (newPlanets.length > 0) {
-                allPlanets.push(...newPlanets)
-                dispatch(addPlanets(newPlanets))
-                // Add IDs to the set - can't spread array into Set.add()
-                newPlanets.forEach(p => existingIdsAfter.add(p.id))
+            for (let i = 0; i < allPagePromises.length; i += chunkSize) {
+              const chunk = allPagePromises.slice(i, i + chunkSize)
+              const chunkResults = await Promise.all(chunk)
+              
+              for (const result of chunkResults) {
+                const newPlanets = result.planets.filter(p => !existingIdsAfterFirstPage.has(p.id))
+                if (newPlanets.length > 0) {
+                  allPlanets.push(...newPlanets)
+                  dispatch(addPlanets(newPlanets))
+                  newPlanets.forEach(p => existingIdsAfterFirstPage.add(p.id))
+                }
               }
+              
+              // Update progress: 15% (first page) to 90% (all pages loaded)
+              const progress = 15 + Math.floor(((i + chunk.length) / allPagePromises.length) * 75)
+              dispatch(setLoadingProgress(Math.min(progress, 90)))
+              
+              console.log(`[InitialDataLoader] Loaded ${allPlanets.length}/${totalToLoad} planets (page ${i + chunk.length}/${allPagePromises.length})...`)
             }
             
-            console.log(`[InitialDataLoader] ✅ Loaded initial batch: ${allPlanets.length} planets total`)
+            console.log(`[InitialDataLoader] ✅ Loaded all pages: ${allPlanets.length} planets total`)
           }
           
-          // Complete initial load quickly
+          // Warn if we didn't get all planets (shouldn't happen, but good to check)
+          if (allPlanets.length < totalToLoad) {
+            console.warn(`[InitialDataLoader] ⚠️ Only loaded ${allPlanets.length} out of ${totalToLoad} expected planets`)
+          }
+          
+          // Complete load with ALL planets
           dispatch(setAllPlanets(allPlanets))
-          dispatch(setLoadingProgress(90))
+          dispatch(setLoadingProgress(100))
           dispatch(setLoadingPhase('complete'))
           
-          // Complete immediately so user can interact
+          console.log(`[InitialDataLoader] ✅ Loaded ALL ${allPlanets.length} planets`)
+          
+          // Complete after minimum display time
           const elapsed = loaderStartTimeRef.current ? Date.now() - loaderStartTimeRef.current : 0
           const remainingTime = Math.max(0, MIN_LOADER_DISPLAY_TIME - elapsed)
           
           setTimeout(() => {
-            console.log('[InitialDataLoader] ✅ Initial load complete, allowing user to continue')
             setHasCompleted(true)
             hasLoadedOnceRef.current = true
             hasLoadedThisSession.current = true
             sessionStorage.setItem(SESSION_LOADED_KEY, 'true')
-            
-            // Start background loading of remaining planets (non-blocking)
-            if (allPlanets.length < totalToLoad && totalPages > initialPagesNeeded) {
-              console.log('[InitialDataLoader] Starting background load of remaining planets...')
-              loadRemainingPlanetsInBackground(
-                baseUrl,
-                token!,
-                allPlanets,
-                initialPagesNeeded,
-                totalPages,
-                effectiveLimit,
-                totalToLoad
-              )
-            }
-            
             setTimeout(() => {
               onComplete()
             }, 300)
           }, remainingTime + 200)
-          
-          return // Exit early, background loading continues
         } catch (error) {
           console.error('Error loading planets:', error)
           dispatch(setLoading(false))

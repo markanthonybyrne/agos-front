@@ -123,6 +123,48 @@ export interface Empire {
   active_research_effects?: Record<string, number | boolean> // Active research effects aggregated
 }
 
+// Fog of War Types
+export type DiscoveryStatus = 'visible' | 'fogged' | 'hidden'
+export type DiscoveryMethod = 'homeworld' | 'research' | 'signal' | 'unknown'
+
+export interface FogOfWar {
+  is_visible: boolean
+  discovery_status: DiscoveryStatus
+  discovery_method: DiscoveryMethod
+  region_visible: boolean
+  system_visible: boolean
+  planet_discovered: boolean
+}
+
+// Region and System Types
+export type RegionTheme = 'frozen' | 'molten' | 'desert' | 'oceanic' | 'forest' | 'urban' | 'void' | 'habitable' | 'industrial' | string
+
+export interface Region {
+  region: number
+  name: string
+  theme?: RegionTheme
+  visibility?: {
+    is_visible: boolean
+    discovery_method?: DiscoveryMethod
+  }
+  discovery_status?: DiscoveryStatus
+  x_range: { min: number; max: number }
+  y_range: { min: number; max: number }
+}
+
+export interface System {
+  region: number
+  system: number
+  name: string
+  visibility?: {
+    is_visible: boolean
+  }
+  discovery_method?: DiscoveryMethod
+  discovery_status?: DiscoveryStatus
+  x_range: { min: number; max: number }
+  y_range: { min: number; max: number }
+}
+
 export interface Planet {
   id: number
   name: string
@@ -149,6 +191,7 @@ export interface Planet {
     is_visible: boolean
     discovery_method?: 'homeworld' | 'research' | 'signal' | 'scout'
   }
+  fog_of_war?: FogOfWar // New fog of war data
   discovered?: boolean // Alternative field name
   // X/Y coordinates (0-999 grid) - source of truth for positioning
   x?: number
@@ -158,6 +201,7 @@ export interface Planet {
   system_name?: string | null
   // Region name for new coordinate system
   region_name?: string | null
+  is_habitable?: boolean // For colonization checks
 }
 
 export interface Fleet {
@@ -165,12 +209,16 @@ export interface Fleet {
   ships: Record<string, number>
   origin_coordinate: string
   destination_coordinate: string
-  status: 'stationed' | 'in_transit' | 'arrived'
-  order_type: 'attack' | 'defend' | 'station' | 'return'
+  status: 'stationed' | 'travelling' | 'arrived' | 'in_combat' | 'returning' | 'in_transit'
+  order_type: 'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'
   departure_tick: number
   arrival_tick: number
   travel_time_ticks?: number
   auto_return_on_failure?: boolean
+  resources?: {
+    tellerium: number
+    krypton: number
+  }
 }
 
 export interface Signal {
@@ -182,6 +230,92 @@ export interface Signal {
     tellerium: number
     krypton: number
   }
+  result?: Record<string, any>
+  created_at: string
+}
+
+// Incident Types
+export type IncidentType = 'wormhole' | 'asteroid_storm' | 'resource_rush' | 'pirate_raid' | 'anomaly'
+export type IncidentStatus = 'active' | 'expired' | 'completed'
+
+export interface IncidentLocation {
+  x: number
+  y: number
+  region: number
+  system: number
+}
+
+export interface WormholeIncident {
+  destination_region: number
+  success_chance: number
+  uses: number
+  max_uses: number
+}
+
+export interface AsteroidStormIncident {
+  damage_per_tick: number
+  threat_level: 'low' | 'medium' | 'high'
+}
+
+export interface ResourceRushIncident {
+  resource_type: 'tellerium' | 'krypton' | 'both'
+  bonus_multiplier: number
+}
+
+export interface PirateRaidIncident {
+  threat_level: 'low' | 'medium' | 'high'
+  target_planet_id?: number
+}
+
+export interface AnomalyIncident {
+  discovered: boolean
+  discovered_by_you: boolean
+  research_bonus: number | null
+}
+
+export interface Incident {
+  id: number
+  type: IncidentType
+  name: string
+  description: string
+  location: IncidentLocation
+  radius: number
+  started_at_tick: number
+  expires_at_tick: number | null
+  duration_ticks: number
+  status: IncidentStatus
+  wormhole?: WormholeIncident
+  asteroid_storm?: AsteroidStormIncident
+  resource_rush?: ResourceRushIncident
+  pirate_raid?: PirateRaidIncident
+  anomaly?: AnomalyIncident
+  your_interactions?: number
+}
+
+export interface InteractIncidentRequest {
+  fleet_id?: number // Required for wormhole interactions
+}
+
+export interface InteractIncidentResponse {
+  status: 'success' | 'error'
+  message: string
+  data?: {
+    success: boolean
+    destination?: {
+      x: number
+      y: number
+      region: number
+    }
+    research_bonus?: number
+    revealed_systems?: string[]
+  }
+}
+
+export interface IncidentInteraction {
+  id: number
+  incident_id: number
+  interaction_type: string
+  success: boolean
   result?: Record<string, any>
   created_at: string
 }
@@ -496,6 +630,9 @@ export interface UniverseMap {
   sectors?: Array<VisibleSector>
   galaxies?: Array<VisibleGalaxy>
   planets?: Array<Planet> // Flat array of planets
+  // Region and system arrays (NEW - for fog of war)
+  regions?: Array<Region>
+  systems?: Array<System>
   // Region and system names (from API response)
   region_names?: Record<string, string> // Map of region number to name
   system_names?: Record<string, string> // Map of "region:system" to name
@@ -560,6 +697,55 @@ export interface ExplorationStatus {
   }
   homeworld_location: { quadrant: number; sector: number; galaxy: number }
   max_fleet_range: 'same_galaxy' | 'cross_galaxy' | 'cross_sector' | 'cross_quadrant'
+}
+
+export interface VisibilityResponse {
+  visibility_level: 'region' | 'system' | 'planet' | string
+  visible_regions?: Array<{
+    region: number
+    name: string
+    discovery_method: DiscoveryMethod
+    discovery_status: DiscoveryStatus
+    x_range: { min: number; max: number }
+    y_range: { min: number; max: number }
+  }>
+  visible_systems?: Array<{
+    region: number
+    system: number
+    name: string
+    discovery_method: DiscoveryMethod
+    discovery_status: DiscoveryStatus
+    x_range: { min: number; max: number }
+    y_range: { min: number; max: number }
+  }>
+  visible_galaxies?: Array<{
+    quadrant: number
+    sector: number
+    galaxy: number
+    discovery_method: string
+  }>
+  visible_sectors?: Array<{
+    quadrant: number
+    sector: number
+  }>
+  visible_quadrants?: Array<{
+    quadrant: number
+  }>
+  unlocked_by: {
+    sensor_technology: boolean
+    deep_space_scanning: boolean
+    quantum_sensors?: boolean
+    galactic_mapping?: boolean
+  }
+  fleet_range?: {
+    level: string
+    can_travel_to_sector: boolean
+    can_travel_to_quadrant: boolean
+    unlocked_by: {
+      propulsion_tech: boolean
+      warp_technology: boolean
+    }
+  }
 }
 
 export interface FleetRangeValidation {
@@ -914,10 +1100,18 @@ export interface FleetDetails {
   name: string
   origin_coordinate: FleetCoordinate
   destination_coordinate: FleetCoordinate
+  destination_region?: number
+  destination_system?: number
   ships: FleetShip[]
-  order_type: 'attack' | 'defend' | 'station' | 'return'
-  status: 'stationed' | 'in_transit' | 'arrived' | 'cancelled'
+  order_type: 'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'
+  status: 'stationed' | 'travelling' | 'arrived' | 'in_combat' | 'returning' | 'in_transit' | 'cancelled'
   arrival_tick: string
+  departure_tick?: string
+  travel_time_ticks?: number
+  resources?: {
+    tellerium: number
+    krypton: number
+  }
   owner?: {
     id: number
     name: string
@@ -928,13 +1122,19 @@ export interface FleetDetails {
 export interface CreateFleetRequest {
   ships: Record<string, number> // Associative array: { "fighter": 10, "cruiser": 5 }
   origin_planet_id: number
-  destination_quadrant: number
-  destination_sector: number
-  destination_galaxy: number
-  destination_planet: number
+  destination_quadrant?: number // Legacy support
+  destination_sector?: number // Legacy support
+  destination_galaxy?: number // Legacy support
+  destination_planet?: number // Legacy support
   destination_x: number
   destination_y: number
-  order_type: 'attack' | 'defend' | 'station' | 'return'
+  destination_region?: number
+  destination_system?: number
+  order_type: 'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'
+  resources?: {
+    tellerium?: number
+    krypton?: number
+  }
   auto_return_on_failure?: boolean
   name?: string
 }
@@ -944,8 +1144,12 @@ export interface MoveFleetRequest {
   destination_sector: number
   destination_galaxy: number
   destination_planet: number
-  order_type?: 'attack' | 'defend' | 'station' | 'return'
+  order_type?: 'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'
   auto_return_on_failure?: boolean
+  resources?: {
+    tellerium?: number
+    krypton?: number
+  }
 }
 
 export interface TravelTimeRequest {

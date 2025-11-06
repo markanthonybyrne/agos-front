@@ -15,7 +15,7 @@ export function NotificationTrayPanel() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { notifications, unreadCount } = useAppSelector((state) => state.notifications)
-  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'attack' | 'tick' | 'announcement' | 'colonization' | 'capture'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'construction' | 'fleet' | 'combat' | 'alliance' | 'research' | 'attack' | 'tick' | 'announcement' | 'colonization' | 'capture' | 'incident'>('all')
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
@@ -69,6 +69,8 @@ export function NotificationTrayPanel() {
         return '🌍'
       case 'capture':
         return '🎯'
+      case 'incident':
+        return '📡'
       default:
         return '📢'
     }
@@ -96,6 +98,8 @@ export function NotificationTrayPanel() {
         return 'bg-emerald-500/10 border-emerald-500/20'
       case 'capture':
         return 'bg-orange-500/10 border-orange-500/20'
+      case 'incident':
+        return 'bg-purple-500/10 border-purple-500/20'
       default:
         return 'bg-muted/5 border-border/30'
     }

@@ -277,7 +277,14 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
       )
     
     case PanelType.FLEET_COMMAND:
-      return <FleetCommandPanel planetId={panel.data?.planetId} destinationPlanet={panel.data?.destinationPlanet} />
+      return (
+        <FleetCommandPanel 
+          planetId={panel.data?.planetId} 
+          destinationPlanet={panel.data?.destinationPlanet}
+          orderType={panel.data?.orderType}
+          resources={panel.data?.resources}
+        />
+      )
     
     case PanelType.GALAXY_MAP:
       return <UniverseMap />

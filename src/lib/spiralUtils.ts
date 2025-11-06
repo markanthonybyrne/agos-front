@@ -7,7 +7,7 @@
  * - Region-to-arm mapping
  */
 
-export const GALACTIC_CORE = { x: 1000, y: 500 }
+export const GALACTIC_CORE = { x: 1000, y: 1000 }
 
 /**
  * Region-to-Arm Mapping
@@ -29,6 +29,33 @@ export function getRegionArm(region: number): number | null {
     }
   }
   return null
+}
+
+/**
+ * Get all regions for a specific spiral arm
+ */
+export function getArmRegions(armNumber: number): number[] {
+  return SPIRAL_ARM_REGIONS[armNumber] || []
+}
+
+/**
+ * Navigate along a spiral arm to a specific position
+ * @param armNumber - Spiral arm number (1, 2, or 3)
+ * @param position - Position along arm (0.0 to 1.0, where 0 is core, 1 is outer edge)
+ * @returns Approximate X/Y coordinates along the spiral arm
+ */
+export function getSpiralArmPosition(armNumber: number, position: number): { x: number; y: number } {
+  const baseAngle = ((armNumber - 1) * 2 * Math.PI) / 3 // 0°, 120°, 240°
+  const maxAngle = 7 * Math.PI // Maximum angle for spiral
+  const angle = position * maxAngle
+  const a = 100 // Starting radius
+  const b = 0.12 // Growth rate
+  const radius = a * Math.exp(b * angle)
+  
+  return {
+    x: GALACTIC_CORE.x + radius * Math.cos(baseAngle + angle),
+    y: GALACTIC_CORE.y + radius * Math.sin(baseAngle + angle),
+  }
 }
 
 /**

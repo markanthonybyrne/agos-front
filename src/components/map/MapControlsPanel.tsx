@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Navigation, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Navigation, Search, Home, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,9 @@ interface MapControlsPanelProps {
   systemsCount: number
   minScale?: number
   maxScale?: number
+  onNavigateToCore?: () => void
+  showSpiralGuidelines?: boolean
+  onToggleSpiralGuidelines?: (show: boolean) => void
 }
 
 export function MapControlsPanel({
@@ -35,6 +38,9 @@ export function MapControlsPanel({
   systemsCount,
   minScale = 0.09,
   maxScale = 1.554,
+  onNavigateToCore,
+  showSpiralGuidelines = false,
+  onToggleSpiralGuidelines,
 }: MapControlsPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showJumpPanel, setShowJumpPanel] = useState(false)
@@ -163,18 +169,48 @@ export function MapControlsPanel({
               </div>
             </div>
 
-            {/* Jump */}
+            {/* Navigation */}
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-foreground">Navigation</h4>
-              <Button
-                onClick={() => setShowJumpPanel(true)}
-                className="w-full justify-start gap-2"
-                variant="outline"
-              >
-                <Navigation className="w-4 h-4" />
-                Jump to Coordinates
-              </Button>
+              <div className="flex flex-col gap-2">
+                {onNavigateToCore && (
+                  <Button
+                    onClick={onNavigateToCore}
+                    className="w-full justify-start gap-2"
+                    variant="outline"
+                  >
+                    <Home className="w-4 h-4" />
+                    Navigate to Core
+                  </Button>
+                )}
+                <Button
+                  onClick={() => setShowJumpPanel(true)}
+                  className="w-full justify-start gap-2"
+                  variant="outline"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Jump to Coordinates
+                </Button>
+              </div>
             </div>
+
+            {/* Visual Options */}
+            {onToggleSpiralGuidelines && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Visual Options</h4>
+                <Button
+                  onClick={() => onToggleSpiralGuidelines(!showSpiralGuidelines)}
+                  className={cn(
+                    "w-full justify-start gap-2",
+                    showSpiralGuidelines && "bg-primary/20"
+                  )}
+                  variant="outline"
+                >
+                  <Eye className="w-4 h-4" />
+                  {showSpiralGuidelines ? 'Hide' : 'Show'} Spiral Guidelines
+                </Button>
+              </div>
+            )}
           </div>
         </Card>
       </div>

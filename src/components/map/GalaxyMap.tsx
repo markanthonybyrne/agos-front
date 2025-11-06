@@ -18,7 +18,7 @@ import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { getPlanetXY } from '@/lib/coordinates'
 
 const DEFAULT_GRID_WIDTH = 2000
-const DEFAULT_GRID_HEIGHT = 1000
+const DEFAULT_GRID_HEIGHT = 2000
 
 /**
  * GalaxyMap - Main galaxy-level map component

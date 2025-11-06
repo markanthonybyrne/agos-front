@@ -14,6 +14,9 @@ import {
   handleFleetLaunched,
   handlePlanetCaptured,
   handlePlanetColonized,
+  handleIncidentSpawned,
+  handleIncidentExpired,
+  handleIncidentInteraction,
 } from '@/app/slices/notificationSlice'
 import { initializeTickCountdown, updateCountdownFromWebSocket } from '@/lib/tickService'
 import { initializeEcho, disconnectEcho, getEcho } from '@/lib/websocket'
@@ -821,6 +824,17 @@ export function useWebSocket() {
             if (eventName === 'planet.colonized' || eventName.includes('planet.colonized') || eventName.includes('PlanetColonized')) {
               handlePlanetColonizedEvent(eventData)
             }
+            
+            // Handle incident events
+            if (eventName === 'incident.spawned' || eventName.includes('incident.spawned') || eventName.includes('IncidentSpawned')) {
+              handleIncidentSpawnedEvent(eventData)
+            }
+            if (eventName === 'incident.expired' || eventName.includes('incident.expired') || eventName.includes('IncidentExpired')) {
+              handleIncidentExpiredEvent(eventData)
+            }
+            if (eventName === 'incident.interaction' || eventName.includes('incident.interaction') || eventName.includes('IncidentInteraction')) {
+              handleIncidentInteractionEvent(eventData)
+            }
           }
         })
         
@@ -986,6 +1000,49 @@ export function useWebSocket() {
       privateChannel.listen('planet.colonized', handlePlanetColonizedEvent)
       privateChannel.listen('PlanetColonized', handlePlanetColonizedEvent)
       privateChannelEvents.push('.planet.colonized', 'planet.colonized', 'PlanetColonized')
+      
+      // Handle incident events
+      const handleIncidentSpawnedEvent = (data: any) => {
+        dispatch(handleIncidentSpawned({ incident: data.incident || data }))
+        notifyWithToast(dispatch, {
+          type: 'info',
+          title: `📡 New Incident: ${data.incident?.name || data.name || 'Unknown'}`,
+          message: `A ${(data.incident?.type || data.type || 'incident').replace('_', ' ')} has appeared nearby`,
+          category: 'incident',
+          data: { incident: data.incident || data },
+        })
+        dispatch(apiSlice.util.invalidateTags(['Incident']))
+      }
+      
+      const handleIncidentExpiredEvent = (data: any) => {
+        dispatch(handleIncidentExpired({ incident: data.incident || data }))
+        dispatch(apiSlice.util.invalidateTags(['Incident']))
+      }
+      
+      const handleIncidentInteractionEvent = (data: any) => {
+        dispatch(handleIncidentInteraction({
+          incident: data.incident || data,
+          success: data.success !== false,
+          message: data.message || 'Incident interaction completed',
+          result: data.result || data.data,
+        }))
+        dispatch(apiSlice.util.invalidateTags(['Incident', 'Fleet']))
+      }
+      
+      privateChannel.listen('.incident.spawned', handleIncidentSpawnedEvent)
+      privateChannel.listen('incident.spawned', handleIncidentSpawnedEvent)
+      privateChannel.listen('IncidentSpawned', handleIncidentSpawnedEvent)
+      privateChannel.listen('.incident.expired', handleIncidentExpiredEvent)
+      privateChannel.listen('incident.expired', handleIncidentExpiredEvent)
+      privateChannel.listen('IncidentExpired', handleIncidentExpiredEvent)
+      privateChannel.listen('.incident.interaction', handleIncidentInteractionEvent)
+      privateChannel.listen('incident.interaction', handleIncidentInteractionEvent)
+      privateChannel.listen('IncidentInteraction', handleIncidentInteractionEvent)
+      privateChannelEvents.push(
+        '.incident.spawned', 'incident.spawned', 'IncidentSpawned',
+        '.incident.expired', 'incident.expired', 'IncidentExpired',
+        '.incident.interaction', 'incident.interaction', 'IncidentInteraction'
+      )
       
       // Handle fleet launched event (CRITICAL)
       privateChannel.listen('.fleet.launched', handleFleetLaunchedEvent)

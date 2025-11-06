@@ -1,11 +1,11 @@
+import { useState } from 'react'
 import { Planet } from '@/types/api.types'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useColonizePlanetMutation, useGetPlanetQuery } from '@/api/endpoints/planetsApi'
+import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useNavigate } from 'react-router-dom'
 import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
-import { hierarchicalToXy } from '@/lib/coordinateUtils'
 import { formatResource } from '@/lib/formatters'
 import { 
   Home, 
@@ -17,12 +17,12 @@ import {
   User,
   AlertCircle
 } from 'lucide-react'
-import { useState } from 'react'
-import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
 import { getPlanetImage } from '@/lib/planetImages'
 import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 
 interface PlanetActionPanelProps {
   planet: Planet | null
@@ -34,7 +34,7 @@ interface PlanetActionPanelProps {
 export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: PlanetActionPanelProps) {
   const navigate = useNavigate()
   const { empire } = useAuth()
-  const [colonizePlanet, { isLoading: isColonizing }] = useColonizePlanetMutation()
+  const { openPanel } = usePanel()
   const [showTravelCalculator, setShowTravelCalculator] = useState(false)
   
   // Fetch full planet details if planet ID is available
@@ -48,45 +48,14 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
   const coord = parseCoordinate(displayPlanet.coordinate)
   const isOwned = displayPlanet.owner_empire_id === empire?.id
   const isUnsettled = displayPlanet.state === 'unsettled'
-
-  const handleColonize = async () => {
-    if (!coord) {
-      toast.error('Invalid planet coordinates')
-      return
-    }
-
-    const name = prompt('Enter a name for this planet:')
-    if (!name || name.trim() === '') {
-      return
-    }
-
-    try {
-      // Check if coordinate has all required legacy fields
-      if (coord.quadrant === undefined || coord.sector === undefined || 
-          coord.galaxy === undefined || coord.planet === undefined) {
-        toast.error('Invalid coordinate format for colonization')
-        return
-      }
-      
-      // Calculate x, y coordinates from hierarchical coordinates
-      const xy = hierarchicalToXy(coord.quadrant, coord.sector, coord.galaxy, coord.planet)
-      
-      await colonizePlanet({
-        quadrant: coord.quadrant,
-        sector: coord.sector,
-        galaxy: coord.galaxy,
-        planet: coord.planet,
-        x: xy.x,
-        y: xy.y,
-        name: name.trim(),
-      }).unwrap()
-
-      toast.success(`Planet ${name} colonized successfully!`)
-      onRefresh?.()
-      onClose()
-    } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to colonize planet')
-    }
+  
+  const handleColonize = () => {
+    // Open fleet command panel with colonization order type
+    openPanel(PanelType.FLEET_COMMAND, PanelSize.XLARGE, {
+      destinationPlanet: displayPlanet,
+      orderType: 'colonize',
+    })
+    onClose()
   }
 
   const handleViewDetails = () => {
@@ -247,14 +216,13 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
                 View Details
               </Button>
 
-              {isUnsettled && (
+              {isUnsettled && displayPlanet.is_habitable && (
                 <Button
                   onClick={handleColonize}
-                  disabled={isColonizing}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
                   <Rocket className="w-4 h-4 mr-2" />
-                  {isColonizing ? 'Colonizing...' : 'Colonize'}
+                  Create Colonization Fleet
                 </Button>
               )}
 

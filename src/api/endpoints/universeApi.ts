@@ -1,5 +1,5 @@
 import { apiSlice } from '../apiSlice'
-import { ApiResponse, UniverseMap, Ranking, ExplorationStatus, FleetRangeValidation } from '@/types/api.types'
+import { ApiResponse, UniverseMap, Ranking, ExplorationStatus, FleetRangeValidation, VisibilityResponse } from '@/types/api.types'
 
 export const universeApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -42,35 +42,7 @@ export const universeApi = apiSlice.injectEndpoints({
       query: () => '/empires/my/exploration',
       providesTags: ['Empire', 'Universe'],
     }),
-    getVisibility: builder.query<{
-      visibility_level: string
-      visible_galaxies: Array<{
-        quadrant: number
-        sector: number
-        galaxy: number
-        discovery_method: string
-      }>
-      visible_sectors: Array<{
-        quadrant: number
-        sector: number
-      }>
-      visible_quadrants: Array<{
-        quadrant: number
-      }>
-      unlocked_by: {
-        sensor_technology: boolean
-        deep_space_scanning: boolean
-      }
-      fleet_range: {
-        level: string
-        can_travel_to_sector: boolean
-        can_travel_to_quadrant: boolean
-        unlocked_by: {
-          propulsion_tech: boolean
-          warp_technology: boolean
-        }
-      }
-    }, void>({
+    getVisibility: builder.query<VisibilityResponse, void>({
       query: () => '/universe/visibility',
       providesTags: ['Universe'],
     }),

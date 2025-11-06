@@ -16,9 +16,11 @@ import { VisualShipSelector } from './VisualShipSelector'
 interface FleetCommandPanelProps {
   planetId?: number
   destinationPlanet?: any // Planet object from API
+  orderType?: 'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport' // Pre-selected order type
+  resources?: { tellerium?: number; krypton?: number } // For transport orders
 }
 
-export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandPanelProps) {
+export function FleetCommandPanel({ planetId, destinationPlanet, orderType: initialOrderType, resources: initialResources }: FleetCommandPanelProps) {
   const [step, setStep] = useState<'origin' | 'ships' | 'destination' | 'confirm'>('origin')
   const [selectedOriginPlanet, setSelectedOriginPlanet] = useState<number>(planetId || 0)
   const [selectedShips, setSelectedShips] = useState<Record<string, number>>({})
@@ -32,8 +34,23 @@ export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandP
     }
     return null
   })
-  const [orderType, setOrderType] = useState<'attack' | 'defend' | 'station' | 'return'>('attack')
+  const [orderType, setOrderType] = useState<'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'>(initialOrderType || 'attack')
+  const [resources, setResources] = useState<{ tellerium?: number; krypton?: number }>(initialResources || {})
   const [autoReturn, setAutoReturn] = useState(false)
+  
+  // Auto-advance to ships step if origin is pre-filled
+  useEffect(() => {
+    if (planetId && step === 'origin') {
+      setStep('ships')
+    }
+  }, [planetId, step])
+  
+  // Auto-advance to confirm if destination and order type are pre-filled
+  useEffect(() => {
+    if (selectedDestination && initialOrderType && step === 'destination') {
+      setStep('confirm')
+    }
+  }, [selectedDestination, initialOrderType, step])
 
   const [createFleet, { isLoading }] = useCreateFleetMutation()
   const { data: planetsData } = useGetPlanetsQuery()
@@ -104,6 +121,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandP
         destination_y: destinationXY.y,
         order_type: orderType,
         auto_return_on_failure: autoReturn,
+        resources: orderType === 'transport' ? resources : undefined,
       }).unwrap()
 
       toast.success('Fleet launched successfully!')
@@ -339,7 +357,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandP
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   variant={orderType === 'attack' ? 'default' : 'outline'}
                   onClick={() => setOrderType('attack')}
@@ -365,6 +383,22 @@ export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandP
                   <span>Station</span>
                 </Button>
                 <Button
+                  variant={orderType === 'colonize' ? 'default' : 'outline'}
+                  onClick={() => setOrderType('colonize')}
+                  className="h-16 flex-col gap-2"
+                >
+                  <Zap className="w-6 h-6" />
+                  <span>Colonize</span>
+                </Button>
+                <Button
+                  variant={orderType === 'transport' ? 'default' : 'outline'}
+                  onClick={() => setOrderType('transport')}
+                  className="h-16 flex-col gap-2"
+                >
+                  <ArrowLeftRight className="w-6 h-6" />
+                  <span>Transport</span>
+                </Button>
+                <Button
                   variant={orderType === 'return' ? 'default' : 'outline'}
                   onClick={() => setOrderType('return')}
                   className="h-16 flex-col gap-2"
@@ -373,6 +407,55 @@ export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandP
                   <span>Return</span>
                 </Button>
               </div>
+              
+              {/* Colonization info */}
+              {orderType === 'colonize' && (
+                <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm">
+                  <strong>Colonization Requirements:</strong>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Target planet must be unsettled</li>
+                    <li>Target planet must be habitable</li>
+                    <li>Fleet must contain colonizer ships</li>
+                  </ul>
+                </div>
+              )}
+              
+              {/* Resource transport fields */}
+              {orderType === 'transport' && originPlanet && (
+                <div className="space-y-3 p-4 bg-muted/20 rounded-lg">
+                  <h4 className="font-semibold">Resource Transport</h4>
+                  <div className="space-y-2">
+                    <label className="text-sm">Tellerium</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={originPlanet.tellerium_balance || 0}
+                      value={resources.tellerium || ''}
+                      onChange={(e) => setResources(prev => ({ ...prev, tellerium: parseInt(e.target.value) || 0 }))}
+                      className="w-full p-2 bg-background border border-input rounded-md"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Available: {originPlanet.tellerium_balance || 0}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm">Krypton</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={originPlanet.krypton_balance || 0}
+                      value={resources.krypton || ''}
+                      onChange={(e) => setResources(prev => ({ ...prev, krypton: parseInt(e.target.value) || 0 }))}
+                      className="w-full p-2 bg-background border border-input rounded-md"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Available: {originPlanet.krypton_balance || 0}
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

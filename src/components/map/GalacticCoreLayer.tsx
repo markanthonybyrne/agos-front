@@ -13,7 +13,7 @@ interface GalacticCoreLayerProps {
 /**
  * GalacticCoreLayer - Renders the galactic center image at the center of the universe
  * 
- * Displays the galactic center image at (1000, 500):
+ * Displays the galactic center image at (1000, 1000):
  * - Uses the asset from assets/images/universe/galactic-center.png
  * - Only visible at full galaxy view (low zoom)
  */

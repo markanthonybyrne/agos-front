@@ -30,7 +30,9 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
     planet: fleet.destination_coordinate?.planet || 1,
   })
   const [selectedPlanetId, setSelectedPlanetId] = useState<number | null>(null)
-  const [orderType, setOrderType] = useState<'attack' | 'defend' | 'station' | 'return'>(fleet.order_type || 'station')
+  const [orderType, setOrderType] = useState<'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'>(
+    (fleet.order_type === 'colonize' || fleet.order_type === 'transport' ? 'station' : fleet.order_type) || 'station'
+  )
   const [travelTime, setTravelTime] = useState<any>(null)
   const [isCalculatingTravelTime, setIsCalculatingTravelTime] = useState(false)
   

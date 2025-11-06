@@ -31,7 +31,7 @@ import { MapControlsPanel } from '../MapControlsPanel'
 import { Loader } from '@/components/ui/loader'
 
 const DEFAULT_GRID_WIDTH = 2000
-const DEFAULT_GRID_HEIGHT = 1000
+const DEFAULT_GRID_HEIGHT = 2000
 
 export function UnifiedUniverseMapV3() {
   const { empire } = useAuth()
