@@ -414,7 +414,14 @@ export function UnifiedUniverseMapV4() {
         )}
 
         {/* Fog of War Layer (SVG overlay) - positioned to match PixiJS container transform */}
-        {containerSize.width > 0 && (
+        {(() => {
+          console.log('[UnifiedUniverseMapV4] FogOfWarLayer wrapper check:', {
+            containerSizeWidth: containerSize.width,
+            containerSizeHeight: containerSize.height,
+            willRender: containerSize.width > 0
+          })
+          return containerSize.width > 0
+        })() && (
           <svg
             className="absolute pointer-events-none"
             style={{

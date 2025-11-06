@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
+import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useNavigate } from 'react-router-dom'
 import { buildGalaxyData, SystemData, RegionData } from '@/lib/galaxyUtils'
 import { useZoomPan } from '@/hooks/useZoomPan'
@@ -11,6 +12,10 @@ import { GalacticCoreLayer } from './GalacticCoreLayer'
 import { SpiralArmGuidelinesLayer } from './SpiralArmGuidelinesLayer'
 import { GalacticOrbitalRingsLayer } from './GalacticOrbitalRingsLayer'
 import { PlanetOrbitsLayer } from './PlanetOrbitsLayer'
+import { FogOfWarLayer } from './FogOfWarLayer'
+import { IncidentLayer } from '@/components/incidents/IncidentLayer'
+import { IncidentDetailPanel } from '@/components/incidents/IncidentDetailPanel'
+import { Incident } from '@/types/api.types'
 import { Loader } from '@/components/ui/loader'
 import { Button } from '@/components/ui/button'
 import { ZoomIn, ZoomOut, RotateCcw, Home, Eye, GitBranch } from 'lucide-react'
@@ -39,6 +44,8 @@ export function GalaxyMap() {
   const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
   const [zoomedIntoRegion, setZoomedIntoRegion] = useState(false)
   const [showRoutes, setShowRoutes] = useState(false) // Toggle for hyperspace routes
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [hoveredIncident, setHoveredIncident] = useState<Incident | null>(null)
   
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
@@ -53,6 +60,9 @@ export function GalaxyMap() {
   const { data: mapData, isLoading: isLoadingMap } = useGetMapQuery({ 
     limit: 5000 
   })
+  
+  // Fetch incidents (filtered by visibility automatically by API)
+  const { data: incidentsData } = useGetIncidentsQuery()
   
   // Build galaxy data structure from planets
   const galaxyData = useMemo(() => {
@@ -246,6 +256,33 @@ export function GalaxyMap() {
     const padding = Math.max(finalWidth, finalHeight) * 0.1
     return `${minX - padding} ${minY - padding} ${finalWidth + padding * 2} ${finalHeight + padding * 2}`
   }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight])
+
+  // Calculate viewport bounds for FogOfWarLayer (from viewBox)
+  const viewportBounds = useMemo(() => {
+    const container = zoomPan.containerRef.current
+    if (!container) {
+      return { minX: 0, minY: 0, maxX: gridWidth, maxY: gridHeight }
+    }
+    
+    const rect = container.getBoundingClientRect()
+    const containerWidth = rect.width
+    const containerHeight = rect.height
+    
+    // Calculate visible area in grid coordinates
+    const visibleWidth = containerWidth / zoomPan.scale
+    const visibleHeight = containerHeight / zoomPan.scale
+    
+    // Calculate center point in grid coordinates
+    const centerX = -zoomPan.panX / zoomPan.scale + gridWidth / 2
+    const centerY = -zoomPan.panY / zoomPan.scale + gridHeight / 2
+    
+    return {
+      minX: Math.max(0, centerX - visibleWidth / 2),
+      maxX: Math.min(gridWidth, centerX + visibleWidth / 2),
+      minY: Math.max(0, centerY - visibleHeight / 2),
+      maxY: Math.min(gridHeight, centerY + visibleHeight / 2),
+    }
+  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight])
   
   if (isLoadingConfig || isLoadingMap) {
     return (
@@ -360,7 +397,38 @@ export function GalaxyMap() {
           scale={zoomPan.scale}
           showNames={zoomedIntoRegion}
         />
+        
+        {/* Layer 5: Incidents */}
+        {incidentsData?.incidents && incidentsData.incidents.length > 0 && (
+          <IncidentLayer
+            incidents={incidentsData.incidents}
+            scale={zoomPan.scale}
+            viewportBounds={viewportBounds}
+            onIncidentClick={setSelectedIncident}
+            onIncidentHover={setHoveredIncident}
+          />
+        )}
+        
+        {/* Layer 6: Fog of War - dark cloudy overlay for undiscovered areas (rendered last so it's on top) */}
+        <g style={{ pointerEvents: 'none' }}>
+          <FogOfWarLayer
+            gridWidth={gridWidth}
+            gridHeight={gridHeight}
+            viewportBounds={viewportBounds}
+            scale={zoomPan.scale}
+          />
+        </g>
       </svg>
+      
+      {/* Incident Detail Panel */}
+      {selectedIncident && (
+        <div className="absolute top-4 right-4 z-50">
+          <IncidentDetailPanel
+            incident={selectedIncident}
+            onClose={() => setSelectedIncident(null)}
+          />
+        </div>
+      )}
       
       {/* UI Overlay: Legend */}
       <GalaxyMapLegend regions={galaxyData.regions} />
