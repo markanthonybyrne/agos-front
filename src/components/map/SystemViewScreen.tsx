@@ -33,15 +33,24 @@ export function SystemViewScreen() {
   const systemNum = system ? parseInt(system, 10) : null
   
   // Fetch planets for this system
+  // Note: Remove limit or set it very high to ensure we get all planets in the system
   const { data: mapData, isLoading } = useGetMapQuery({
     region: regionNum || undefined,
     system: systemNum || undefined,
-    limit: 5000
+    limit: 10000 // Increased limit to ensure we get all planets
   })
   
   // Convert galaxy system data to SystemView format
   const systemViewData = useMemo(() => {
-    if (!mapData?.planets || !regionNum || !systemNum) return null
+    if (!mapData?.planets || !regionNum || !systemNum) {
+      console.debug('[SystemViewScreen] Missing data:', {
+        hasPlanets: !!mapData?.planets,
+        planetsCount: mapData?.planets?.length || 0,
+        regionNum,
+        systemNum
+      })
+      return null
+    }
     
     // Filter planets for this specific system
     const systemPlanets = mapData.planets.filter(planet => {
@@ -49,14 +58,58 @@ export function SystemViewScreen() {
       return pRegion === regionNum && pSystem === systemNum
     })
     
-    if (systemPlanets.length === 0) return null
+    console.debug('[SystemViewScreen] Planet filtering:', {
+      totalPlanetsFetched: mapData.planets.length,
+      systemPlanetsFound: systemPlanets.length,
+      targetRegion: regionNum,
+      targetSystem: systemNum,
+      samplePlanets: mapData.planets.slice(0, 5).map(p => ({
+        id: p.id,
+        name: p.name,
+        coordinate: p.coordinate,
+        regionAndSystem: getPlanetRegionAndSystem(p),
+        x: p.x,
+        y: p.y
+      })),
+      systemPlanetsDetails: systemPlanets.map(p => ({
+        id: p.id,
+        name: p.name,
+        coordinate: p.coordinate,
+        x: p.x,
+        y: p.y
+      }))
+    })
+    
+    if (systemPlanets.length === 0) {
+      console.warn('[SystemViewScreen] No planets found for system:', {
+        region: regionNum,
+        system: systemNum,
+        totalPlanets: mapData.planets.length
+      })
+      return null
+    }
     
     // Calculate system center
     const validPositions = systemPlanets
       .map(p => getPlanetXY(p))
       .filter((xy): xy is { x: number; y: number } => xy !== null)
     
-    if (validPositions.length === 0) return null
+    console.debug('[SystemViewScreen] Position calculation:', {
+      totalSystemPlanets: systemPlanets.length,
+      validPositions: validPositions.length,
+      planetsWithoutXY: systemPlanets.filter(p => !getPlanetXY(p)).map(p => ({
+        id: p.id,
+        name: p.name,
+        coordinate: p.coordinate,
+        x: p.x,
+        y: p.y
+      }))
+    })
+    
+    if (validPositions.length === 0) {
+      console.warn('[SystemViewScreen] No valid planet positions found')
+      return null
+    }
     
     const xs = validPositions.map(p => p.x)
     const ys = validPositions.map(p => p.y)

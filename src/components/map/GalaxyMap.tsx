@@ -10,6 +10,7 @@ import { GalaxyMapLegend } from './GalaxyMapLegend'
 import { GalacticCoreLayer } from './GalacticCoreLayer'
 import { SpiralArmGuidelinesLayer } from './SpiralArmGuidelinesLayer'
 import { GalacticOrbitalRingsLayer } from './GalacticOrbitalRingsLayer'
+import { PlanetOrbitsLayer } from './PlanetOrbitsLayer'
 import { Loader } from '@/components/ui/loader'
 import { Button } from '@/components/ui/button'
 import { ZoomIn, ZoomOut, RotateCcw, Home, Eye, GitBranch } from 'lucide-react'
@@ -308,12 +309,20 @@ export function GalaxyMap() {
         />
         
         {/* Layer 1.5: Galactic Orbital Rings (dashed circles around core - rendered on top) */}
-        <GalacticOrbitalRingsLayer
-          gridWidth={gridWidth}
-          gridHeight={gridHeight}
-          scale={zoomPan.scale}
-          minScale={initialScale * 3}
-        />
+        {/* Hide orbital rings when showing planet orbits (zoom level 2.5x - 4.9x) */}
+        {(() => {
+          const zoomRatio = zoomPan.scale / initialScale
+          const showPlanetOrbits = zoomRatio >= 2.5 && zoomRatio < 4.9
+          if (showPlanetOrbits) return null
+          return (
+            <GalacticOrbitalRingsLayer
+              gridWidth={gridWidth}
+              gridHeight={gridHeight}
+              scale={zoomPan.scale}
+              minScale={initialScale * 3}
+            />
+          )
+        })()}
         
         {/* Layer 2: Region Overlays */}
         <GalaxyRegionLayer 
@@ -330,6 +339,16 @@ export function GalaxyMap() {
           systems={galaxyData.systemMap}
           maxConnectionDistance={zoomPan.scale > initialScale * 2 ? 100 : 75}
           showRoutes={showRoutes}
+        />
+        
+        {/* Layer 3.5: Planet Orbits (only at second zoom level, before system view) */}
+        <PlanetOrbitsLayer
+          systems={galaxyData.systemMap}
+          scale={zoomPan.scale}
+          initialScale={initialScale}
+          viewBox={viewBox}
+          minZoomRatio={2.5}
+          maxZoomRatio={4.9}
         />
         
         {/* Layer 4: System Markers */}
