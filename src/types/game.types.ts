@@ -1,10 +1,13 @@
 // Game Entity Types
 export interface Coordinate {
-  quadrant: number
-  sector: number
-  galaxy: number
+  // Legacy hierarchical coordinates
+  quadrant?: number
+  sector?: number
+  galaxy?: number
   system?: number  // System level (5-level hierarchy)
-  planet: number
+  planet?: number
+  // New Region:System:Planet coordinates
+  region?: number
   // X/Y coordinates (0-1999 x 0-999 grid) - source of truth for positioning
   x?: number
   y?: number

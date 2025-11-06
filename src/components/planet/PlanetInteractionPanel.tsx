@@ -62,6 +62,13 @@ export function PlanetInteractionPanel({ planet, onClose }: PlanetInteractionPan
       return
     }
 
+    // Check if coordinate has all required legacy fields
+    if (coord.quadrant === undefined || coord.sector === undefined || 
+        coord.galaxy === undefined || coord.planet === undefined) {
+      toast.error('Invalid coordinate format for colonization')
+      return
+    }
+
     // Get X/Y coordinates - try to get from planet first, otherwise convert from hierarchical
     let planetXY = getPlanetXY(planet)
     if (!planetXY) {

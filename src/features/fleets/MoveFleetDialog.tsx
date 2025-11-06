@@ -53,12 +53,21 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
         originCoord = fleet.origin_coordinate
       } else if ((fleet as any).origin?.coordinate) {
         const parsed = parseCoordinate((fleet as any).origin.coordinate)
-        if (parsed) {
-          originCoord = parsed
+        if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+            parsed.galaxy !== undefined && parsed.planet !== undefined) {
+          originCoord = {
+            quadrant: parsed.quadrant,
+            sector: parsed.sector,
+            galaxy: parsed.galaxy,
+            planet: parsed.planet
+          }
         }
       }
       
-      if (originCoord && destinationCoord) {
+      if (originCoord && destinationCoord && 
+          originCoord.quadrant !== undefined && originCoord.sector !== undefined && 
+          originCoord.galaxy !== undefined && destinationCoord.quadrant !== undefined && 
+          destinationCoord.sector !== undefined && destinationCoord.galaxy !== undefined) {
         validateRange({
           origin_quadrant: originCoord.quadrant,
           origin_sector: originCoord.sector,
@@ -70,7 +79,8 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
       }
     }
     
-    if (destinationCoord.quadrant && destinationCoord.sector && destinationCoord.galaxy) {
+    if (destinationCoord.quadrant !== undefined && destinationCoord.sector !== undefined && 
+        destinationCoord.galaxy !== undefined) {
       validateDestination()
     }
   }, [destinationCoord, fleet, validateRange])
@@ -86,7 +96,8 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
     
     if (planet) {
       const coord = parseCoordinate(planet.coordinate)
-      if (coord) {
+      if (coord && coord.quadrant !== undefined && coord.sector !== undefined && 
+          coord.galaxy !== undefined && coord.planet !== undefined) {
         setDestinationCoord({
           quadrant: coord.quadrant,
           sector: coord.sector,
@@ -108,8 +119,14 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
       originCoord = fleet.origin_coordinate
     } else if ((fleet as any).origin?.coordinate) {
       const parsed = parseCoordinate((fleet as any).origin.coordinate)
-      if (parsed) {
-        originCoord = parsed
+      if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+          parsed.galaxy !== undefined && parsed.planet !== undefined) {
+        originCoord = {
+          quadrant: parsed.quadrant,
+          sector: parsed.sector,
+          galaxy: parsed.galaxy,
+          planet: parsed.planet
+        }
       }
     }
     
@@ -118,10 +135,17 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
       const origin = (fleet as any).origin
       if (origin.coordinate) {
         const parsed = parseCoordinate(origin.coordinate)
-        if (parsed) {
-          originCoord = parsed
+        if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+            parsed.galaxy !== undefined && parsed.planet !== undefined) {
+          originCoord = {
+            quadrant: parsed.quadrant,
+            sector: parsed.sector,
+            galaxy: parsed.galaxy,
+            planet: parsed.planet
+          }
         }
-      } else if (origin.quadrant && origin.sector && origin.galaxy && origin.planet) {
+      } else if (origin.quadrant !== undefined && origin.sector !== undefined && 
+                 origin.galaxy !== undefined && origin.planet !== undefined) {
         originCoord = {
           quadrant: origin.quadrant,
           sector: origin.sector,

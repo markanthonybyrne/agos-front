@@ -26,7 +26,8 @@ export function ZoomControls({
   onZoomToQuadrant,
   className = ''
 }: ZoomControlsProps) {
-  const zoomPercent = Math.round(scale * 100)
+  // Map scale to percentage: 0.09 → 0%, 1.554 → 350%
+  const zoomPercent = Math.round(((scale - minScale) / (maxScale - minScale)) * 350)
 
   return (
     <Card className={`panel-glass border-cyan/20 p-2 ${className}`}>

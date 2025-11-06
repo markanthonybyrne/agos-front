@@ -5,24 +5,36 @@ import { hierarchicalToXy, calculateEuclideanDistance as calculateEuclideanDista
 // Coordinate parsing and formatting
 export function parseCoordinate(coordinate: string | Coordinate): Coordinate | null {
   // If it's already a Coordinate object, return it
-  if (typeof coordinate === 'object' && coordinate !== null && 'quadrant' in coordinate) {
-    return coordinate as Coordinate
+  if (typeof coordinate === 'object' && coordinate !== null) {
+    // Check if it has quadrant (old format) or region (new format)
+    if ('quadrant' in coordinate || 'region' in coordinate) {
+      return coordinate as Coordinate
+    }
   }
   
   // If it's a string, parse it
   if (typeof coordinate === 'string') {
     const parts = coordinate.split(':').map(Number)
-    // Support both 4-level (Q:S:G:P) and 5-level (Q:S:G:Sy:P) formats
-    if (parts.length === 4 && parts.every(p => !isNaN(p))) {
-      // 4-level format (legacy)
+    
+    // Support 3-level Region:System:Planet format (new)
+    if (parts.length === 3 && parts.every(p => !isNaN(p))) {
+      return {
+        region: parts[0],
+        system: parts[1],
+        planet: parts[2],
+      }
+    }
+    // Support 4-level (Q:S:G:P) format (legacy)
+    else if (parts.length === 4 && parts.every(p => !isNaN(p))) {
       return {
         quadrant: parts[0],
         sector: parts[1],
         galaxy: parts[2],
         planet: parts[3],
       }
-    } else if (parts.length === 5 && parts.every(p => !isNaN(p))) {
-      // 5-level format (new)
+    }
+    // Support 5-level (Q:S:G:Sy:P) format (legacy)
+    else if (parts.length === 5 && parts.every(p => !isNaN(p))) {
       return {
         quadrant: parts[0],
         sector: parts[1],
@@ -113,9 +125,9 @@ export function formatCoordinate(coordinate: Coordinate | string | null | undefi
     if (coordinate.trim() === '') {
       return 'Invalid coordinate'
     }
-    // Validate string format (support both 4-level and 5-level)
+    // Validate string format (support 3-level Region:System:Planet, 4-level Q:S:G:P, and 5-level Q:S:G:Sy:P)
     const parts = coordinate.split(':')
-    if ((parts.length === 4 || parts.length === 5) && parts.every(p => !isNaN(Number(p)))) {
+    if ((parts.length === 3 || parts.length === 4 || parts.length === 5) && parts.every(p => !isNaN(Number(p)))) {
       return coordinate
     }
     return 'Invalid coordinate'
@@ -124,11 +136,28 @@ export function formatCoordinate(coordinate: Coordinate | string | null | undefi
   // If it's a Coordinate object, format it
   if (typeof coordinate === 'object' && coordinate !== null) {
     const coord = coordinate as Record<string, any>
+    
+    // Check for new Region:System:Planet format first
+    const region = coord.region
+    const system = coord.system ?? coord.system_number
+    const planet = coord.planet ?? coord.planet_number ?? coord.planet_id
+    
+    if (
+      typeof region === 'number' &&
+      typeof system === 'number' &&
+      typeof planet === 'number' &&
+      !isNaN(region) &&
+      !isNaN(system) &&
+      !isNaN(planet)
+    ) {
+      // New format: Region:System:Planet
+      return `${region}:${system}:${planet}`
+    }
+    
+    // Fallback to old format: Quadrant:Sector:Galaxy:Planet or Quadrant:Sector:Galaxy:System:Planet
     const quadrant = coord.quadrant ?? coord.quadrant_number
     const sector = coord.sector ?? coord.sector_number
     const galaxy = coord.galaxy ?? coord.galaxy_number
-    const system = coord.system ?? coord.system_number
-    const planet = coord.planet ?? coord.planet_number ?? coord.planet_id
     
     if (
       typeof quadrant === 'number' &&
@@ -181,29 +210,53 @@ export function calculateDistance(
   // Fallback to hierarchical coordinates
   const originCoord = typeof origin === 'string' 
     ? parseCoordinate(origin) 
-    : ('quadrant' in (origin as any) ? origin as Coordinate : parseCoordinate((origin as Planet).coordinate))
+    : ('quadrant' in (origin as any) || 'region' in (origin as any) ? origin as Coordinate : parseCoordinate((origin as Planet).coordinate))
   
   const destCoord = typeof destination === 'string'
     ? parseCoordinate(destination)
-    : ('quadrant' in (destination as any) ? destination as Coordinate : parseCoordinate((destination as Planet).coordinate))
+    : ('quadrant' in (destination as any) || 'region' in (destination as any) ? destination as Coordinate : parseCoordinate((destination as Planet).coordinate))
 
   if (!originCoord || !destCoord) {
     return Infinity
   }
 
+  // Try to use X/Y coordinates if available
+  if (originCoord.x !== undefined && originCoord.y !== undefined && 
+      destCoord.x !== undefined && destCoord.y !== undefined) {
+    return calculateEuclideanDistanceUtil(originCoord.x, originCoord.y, destCoord.x, destCoord.y)
+  }
+
   // Simple Manhattan distance (fallback when X/Y not available)
+  // Handle both old and new coordinate formats
   let distance = 0
 
-  if (originCoord.quadrant !== destCoord.quadrant) {
-    distance += Math.abs(originCoord.quadrant - destCoord.quadrant) * 300
+  // Old format: quadrant, sector, galaxy, planet
+  if (originCoord.quadrant !== undefined && destCoord.quadrant !== undefined) {
+    if (originCoord.quadrant !== destCoord.quadrant) {
+      distance += Math.abs(originCoord.quadrant - destCoord.quadrant) * 300
+    }
+    if (originCoord.sector !== undefined && destCoord.sector !== undefined && originCoord.sector !== destCoord.sector) {
+      distance += Math.abs(originCoord.sector - destCoord.sector) * 30
+    }
+    if (originCoord.galaxy !== undefined && destCoord.galaxy !== undefined && originCoord.galaxy !== destCoord.galaxy) {
+      distance += Math.abs(originCoord.galaxy - destCoord.galaxy) * 2
+    }
+    if (originCoord.planet !== undefined && destCoord.planet !== undefined) {
+      distance += Math.abs(originCoord.planet - destCoord.planet)
+    }
   }
-  if (originCoord.sector !== destCoord.sector) {
-    distance += Math.abs(originCoord.sector - destCoord.sector) * 30
+  // New format: region, system, planet
+  else if (originCoord.region !== undefined && destCoord.region !== undefined) {
+    if (originCoord.region !== destCoord.region) {
+      distance += Math.abs(originCoord.region - destCoord.region) * 100
+    }
+    if (originCoord.system !== undefined && destCoord.system !== undefined && originCoord.system !== destCoord.system) {
+      distance += Math.abs(originCoord.system - destCoord.system) * 10
+    }
+    if (originCoord.planet !== undefined && destCoord.planet !== undefined) {
+      distance += Math.abs(originCoord.planet - destCoord.planet)
+    }
   }
-  if (originCoord.galaxy !== destCoord.galaxy) {
-    distance += Math.abs(originCoord.galaxy - destCoord.galaxy) * 2
-  }
-  distance += Math.abs(originCoord.planet - destCoord.planet)
 
   return distance
 }

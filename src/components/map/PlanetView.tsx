@@ -73,7 +73,15 @@ export function PlanetView({ planets, onPlanetClick: _onPlanetClick, className =
       // Try new format first (with origin/destination objects)
       if ((fleet as any).origin?.coordinate) {
         const parsed = parseCoordinate((fleet as any).origin.coordinate)
-        if (parsed) originCoord = parsed
+        if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+            parsed.galaxy !== undefined && parsed.planet !== undefined) {
+          originCoord = {
+            quadrant: parsed.quadrant,
+            sector: parsed.sector,
+            galaxy: parsed.galaxy,
+            planet: parsed.planet
+          }
+        }
       } else if ((fleet as any).origin_coordinate) {
         // Old format
         originCoord = (fleet as any).origin_coordinate
@@ -81,13 +89,25 @@ export function PlanetView({ planets, onPlanetClick: _onPlanetClick, className =
       
       if ((fleet as any).destination?.coordinate) {
         const parsed = parseCoordinate((fleet as any).destination.coordinate)
-        if (parsed) destCoord = parsed
+        if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+            parsed.galaxy !== undefined && parsed.planet !== undefined) {
+          destCoord = {
+            quadrant: parsed.quadrant,
+            sector: parsed.sector,
+            galaxy: parsed.galaxy,
+            planet: parsed.planet
+          }
+        }
       } else if ((fleet as any).destination_coordinate) {
         // Old format
         destCoord = (fleet as any).destination_coordinate
       }
       
-      if (!originCoord || !destCoord) return false
+      if (!originCoord || !destCoord || 
+          originCoord.quadrant === undefined || originCoord.sector === undefined || originCoord.galaxy === undefined ||
+          destCoord.quadrant === undefined || destCoord.sector === undefined || destCoord.galaxy === undefined) {
+        return false
+      }
       
       // Check if both origin and destination are in the current galaxy
       const originInGalaxy = 
@@ -109,8 +129,28 @@ export function PlanetView({ planets, onPlanetClick: _onPlanetClick, className =
       let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number }
       
       if ((fleet as any).origin?.coordinate) {
-        originCoord = parseCoordinate((fleet as any).origin.coordinate)!
-        destCoord = parseCoordinate((fleet as any).destination.coordinate)!
+        const parsedOrigin = parseCoordinate((fleet as any).origin.coordinate)
+        const parsedDest = parseCoordinate((fleet as any).destination.coordinate)
+        if (parsedOrigin && parsedDest && 
+            parsedOrigin.quadrant !== undefined && parsedOrigin.sector !== undefined && 
+            parsedOrigin.galaxy !== undefined && parsedOrigin.planet !== undefined &&
+            parsedDest.quadrant !== undefined && parsedDest.sector !== undefined && 
+            parsedDest.galaxy !== undefined && parsedDest.planet !== undefined) {
+          originCoord = {
+            quadrant: parsedOrigin.quadrant,
+            sector: parsedOrigin.sector,
+            galaxy: parsedOrigin.galaxy,
+            planet: parsedOrigin.planet
+          }
+          destCoord = {
+            quadrant: parsedDest.quadrant,
+            sector: parsedDest.sector,
+            galaxy: parsedDest.galaxy,
+            planet: parsedDest.planet
+          }
+        } else {
+          return null
+        }
       } else {
         originCoord = (fleet as any).origin_coordinate
         destCoord = (fleet as any).destination_coordinate
@@ -121,7 +161,7 @@ export function PlanetView({ planets, onPlanetClick: _onPlanetClick, className =
         origin_coordinate: originCoord,
         destination_coordinate: destCoord
       }
-    }) as typeof filtered
+    }).filter((f): f is NonNullable<typeof f> => f !== null) as typeof filtered
   }, [fleetsData, currentGalaxy])
   
   // Get galaxy X/Y range for scaling

@@ -7,23 +7,77 @@ export interface ZoomPanState {
 }
 
 /**
- * Normalized zoom (0.0-1.0) → Render scale (0.01-7.0)
- * Universe view: scale 0.01 (1% zoom) = normalized 0.0
- * System view: scale 7.0 (700% zoom) = normalized 1.0
+ * Zoom velocity curve for perceptual continuity
+ * Uses exponential easing to make early zoom stages (universe → galaxy) feel vast,
+ * while finer detail (system → planet) feels precise
+ * 
+ * @param t - Normalized input (0.0-1.0)
+ * @returns Eased output (0.0-1.0)
  */
-export function normalizedToRenderScale(normalized: number): number {
-  const minScale = 0.01
-  const maxScale = 7.0
-  return minScale + (normalized * (maxScale - minScale))
+export function zoomVelocityCurve(t: number): number {
+  // Clamp to [0, 1]
+  t = Math.max(0, Math.min(1, t))
+  
+  // Exponential easing: e^(2t - 2) gives a smooth curve
+  // At t=0: e^(-2) ≈ 0.135, normalized to 0
+  // At t=1: e^(0) = 1, normalized to 1
+  // This creates a curve that starts slow and accelerates
+  const exponential = Math.exp(2 * t - 2)
+  const minExp = Math.exp(-2) // ≈ 0.135
+  const maxExp = 1
+  
+  // Normalize to [0, 1]
+  return (exponential - minExp) / (maxExp - minExp)
 }
 
 /**
- * Render scale (0.01-7.0) → Normalized zoom (0.0-1.0)
+ * Inverse of zoomVelocityCurve - converts eased value back to normalized zoom
+ * 
+ * @param eased - Eased value (0.0-1.0)
+ * @returns Normalized zoom (0.0-1.0)
+ */
+export function inverseZoomVelocityCurve(eased: number): number {
+  // Clamp to [0, 1]
+  eased = Math.max(0, Math.min(1, eased))
+  
+  // Reverse the normalization
+  const minExp = Math.exp(-2)
+  const maxExp = 1
+  const exponential = eased * (maxExp - minExp) + minExp
+  
+  // Reverse the exponential: t = (ln(exp) + 2) / 2
+  return (Math.log(exponential) + 2) / 2
+}
+
+/**
+ * Normalized zoom (0.0-1.0) → Render scale (0.09-1.554)
+ * Uses non-linear zoom velocity curve for perceptual continuity
+ * Sector view: scale 0.09 (9% zoom) = normalized 0.0 (0% in UI)
+ * Systems view: scale 1.554 (277% zoom) = normalized 1.0 (350% in UI)
+ */
+export function normalizedToRenderScale(normalized: number): number {
+  const minScale = 0.09
+  const maxScale = 1.554
+  
+  // Apply velocity curve to normalized input for non-linear scaling
+  const eased = zoomVelocityCurve(normalized)
+  
+  return minScale + (eased * (maxScale - minScale))
+}
+
+/**
+ * Render scale (0.09-1.554) → Normalized zoom (0.0-1.0)
+ * Uses inverse zoom velocity curve to convert back from render scale
  */
 export function renderScaleToNormalized(scale: number): number {
-  const minScale = 0.01
-  const maxScale = 7.0
-  return Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
+  const minScale = 0.09
+  const maxScale = 1.554
+  
+  // Convert to linear normalized value first
+  const linearNormalized = Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
+  
+  // Apply inverse velocity curve to get the perceptual normalized zoom
+  return inverseZoomVelocityCurve(linearNormalized)
 }
 
 export interface ViewportBounds {
@@ -84,9 +138,9 @@ export interface UseZoomPanOptions {
  */
 export function useZoomPan(options: UseZoomPanOptions = {}) {
   const {
-    minScale = 0.01,
-    maxScale = 7.0,
-    initialScale = 0.5,
+    minScale = 0.09,
+    maxScale = 1.554,
+    initialScale = 0.09,
     initialPanX = 0,
     initialPanY = 0,
     gridWidth = 1000,
@@ -123,34 +177,77 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
     return { width: 800, height: 600 } // Default fallback
   }, [containerWidth, containerHeight])
 
-  // Calculate pan boundaries based on current scale
+  // Calculate pan boundaries based on current scale and zoom level
   const calculatePanBounds = useCallback((scale: number): ViewportBounds => {
     const container = getContainerDimensions()
     const scaledGridWidth = gridWidth * scale
     const scaledGridHeight = gridHeight * scale
-
-    // At low zoom levels (sector view and below), allow panning off-canvas to reach corners
-    // At higher zoom levels, keep grid centered
-    const isLowZoom = scale < 0.5 // Sector view and below
     
-    if (isLowZoom) {
-      // Allow panning beyond grid boundaries to reach corners
-      // Calculate how much we can pan to see the full grid
+    // Get normalized zoom to determine zoom level
+    const normalizedZoom = renderScaleToNormalized(scale)
+    
+    // Determine zoom level for boundary calculation
+    // Sector level: slow pan, large radius, generous boundaries
+    // System level: precise pan, restricted boundaries
+    const isSectorLevel = normalizedZoom < 0.30  // Sector view
+    const isGalaxyLevel = normalizedZoom >= 0.25 && normalizedZoom < 0.55  // Galaxy view
+    const isSystemLevel = normalizedZoom >= 0.50 && normalizedZoom < 0.80  // System view
+    const isPlanetaryLevel = normalizedZoom >= 0.75  // Planetary view
+    
+    // At sector level, allow panning off-canvas to reach corners
+    // At higher zoom levels, keep grid centered with restricted boundaries
+    if (isSectorLevel) {
+      // Sector level: slow pan, large radius, generous boundaries
+      // At scale 0.54, the grid is typically smaller than the container
+      // Allow panning to move the grid around within the container
+      
+      // Calculate how much the grid can move within the container
+      // If grid is smaller than container, we can pan to center it anywhere
+      const gridWidthPx = scaledGridWidth
+      const gridHeightPx = scaledGridHeight
+      
+      // Maximum pan distance is half the difference between container and grid
+      // If grid is smaller, this allows centering the grid at any position
       let maxPanX = (scaledGridWidth - container.width) / 2
       let maxPanY = (scaledGridHeight - container.height) / 2
       
-      // If grid is smaller than container, allow panning to see empty space
-      // This ensures we can reach corners even when zoomed very far out
+      // If grid is smaller than container (negative maxPan), calculate pan bounds differently
+      // Allow panning to move the grid anywhere within the container
       if (maxPanX < 0) {
-        maxPanX = Math.abs(maxPanX) + container.width * 0.2
+        // Grid fits in container width - allow panning to move grid anywhere
+        // Pan can move the grid center from edge to edge
+        maxPanX = Math.abs(maxPanX) + (container.width - gridWidthPx) / 2
       }
       if (maxPanY < 0) {
-        maxPanY = Math.abs(maxPanY) + container.height * 0.2
+        // Grid fits in container height - allow panning to move grid anywhere
+        maxPanY = Math.abs(maxPanY) + (container.height - gridHeightPx) / 2
       }
       
-      // Add generous padding to allow panning to see the very edges and corners
-      // More padding at lower zoom levels to ensure full universe access
-      const paddingFactor = scale < 0.1 ? 0.3 : scale < 0.3 ? 0.2 : 0.15
+      // Add generous padding at sector level for full universe access
+      // Ensure padding allows smooth panning across the entire grid
+      const paddingFactor = 0.2
+      const paddingX = Math.max(container.width * paddingFactor, gridWidth * scale * 0.15)
+      const paddingY = Math.max(container.height * paddingFactor, gridHeight * scale * 0.15)
+      
+      return {
+        minX: -maxPanX - paddingX,
+        maxX: maxPanX + paddingX,
+        minY: -maxPanY - paddingY,
+        maxY: maxPanY + paddingY
+      }
+    } else if (isGalaxyLevel) {
+      // Galaxy level: moderate pan boundaries
+      let maxPanX = (scaledGridWidth - container.width) / 2
+      let maxPanY = (scaledGridHeight - container.height) / 2
+      
+      if (maxPanX < 0) {
+        maxPanX = Math.abs(maxPanX) + container.width * 0.15
+      }
+      if (maxPanY < 0) {
+        maxPanY = Math.abs(maxPanY) + container.height * 0.15
+      }
+      
+      const paddingFactor = 0.15
       const paddingX = Math.max(container.width * paddingFactor, gridWidth * 0.05)
       const paddingY = Math.max(container.height * paddingFactor, gridHeight * 0.05)
       
@@ -161,17 +258,21 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
         maxY: maxPanY + paddingY
       }
     } else {
-      // At higher zoom levels, keep grid centered (original behavior)
+      // System/Planetary level: precise pan, restricted boundaries
+      // Keep grid centered with strict boundaries
       const maxPanX = Math.max(0, (scaledGridWidth - container.width) / 2)
       const maxPanY = Math.max(0, (scaledGridHeight - container.height) / 2)
       const minPanX = -maxPanX
       const minPanY = -maxPanY
-
+      
+      // Add small padding for system/planetary levels to prevent edge cases
+      const padding = isPlanetaryLevel ? 0 : 10 // Small padding for system level, none for planetary
+      
       return {
-        minX: minPanX,
-        maxX: maxPanX,
-        minY: minPanY,
-        maxY: maxPanY
+        minX: minPanX - padding,
+        maxX: maxPanX + padding,
+        minY: minPanY - padding,
+        maxY: maxPanY + padding
       }
     }
   }, [gridWidth, gridHeight, getContainerDimensions])
@@ -368,6 +469,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}) {
 
     // Calculate pan delta - divide by scale so movement feels consistent across zoom levels
     // At higher zoom (larger scale), same mouse movement moves less in grid space
+    // At scale 0.54, panning should feel responsive and smooth
     const deltaX = (clientX - dragStartRef.current.x) / state.scale
     const deltaY = (clientY - dragStartRef.current.y) / state.scale
 

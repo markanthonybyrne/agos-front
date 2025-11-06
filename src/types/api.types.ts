@@ -156,6 +156,8 @@ export interface Planet {
   // Galaxy and system names for map display
   galaxy_name?: string | null
   system_name?: string | null
+  // Region name for new coordinate system
+  region_name?: string | null
 }
 
 export interface Fleet {
@@ -494,6 +496,9 @@ export interface UniverseMap {
   sectors?: Array<VisibleSector>
   galaxies?: Array<VisibleGalaxy>
   planets?: Array<Planet> // Flat array of planets
+  // Region and system names (from API response)
+  region_names?: Record<string, string> // Map of region number to name
+  system_names?: Record<string, string> // Map of "region:system" to name
   
   // Nested structure (legacy - still supported)
   quadrants_nested?: Array<{

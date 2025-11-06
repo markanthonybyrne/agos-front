@@ -21,6 +21,8 @@ interface MapControlsPanelProps {
   gridWidth: number
   gridHeight: number
   systemsCount: number
+  minScale?: number
+  maxScale?: number
 }
 
 export function MapControlsPanel({
@@ -31,6 +33,8 @@ export function MapControlsPanel({
   gridWidth,
   gridHeight,
   systemsCount,
+  minScale = 0.09,
+  maxScale = 1.554,
 }: MapControlsPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showJumpPanel, setShowJumpPanel] = useState(false)
@@ -113,7 +117,7 @@ export function MapControlsPanel({
                 Zoom: {zoomLevel}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {Math.round(zoomPan.scale * 100)}% • {allPlanets.length.toLocaleString()} planets • {systemsCount.toLocaleString()} systems
+                {Math.round(((zoomPan.scale - minScale) / (maxScale - minScale)) * 350)}% • {allPlanets.length.toLocaleString()} planets • {systemsCount.toLocaleString()} systems
               </div>
             </div>
 

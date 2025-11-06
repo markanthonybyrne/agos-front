@@ -1,4 +1,4 @@
-import { useMemo, memo } from 'react'
+import { useMemo, memo, useState, useEffect } from 'react'
 import { Planet } from '@/types/api.types'
 import { SystemData, calculateOrbitRadius, calculateOrbitAngle } from '@/lib/systemUtils'
 import { getPlanetXY } from '@/lib/coordinates'
@@ -43,10 +43,39 @@ function SystemView({
 }: SystemViewProps) {
   // Use normalized zoom if provided, otherwise calculate from scale
   const effectiveNormalizedZoom = normalizedZoom ?? (() => {
-    const minScale = 0.01
-    const maxScale = 7.0
+    const minScale = 0.09
+    const maxScale = 1.554
     return Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
   })()
+  
+  // Check if we should animate planets (at max zoom)
+  const shouldAnimateOrbits = scale >= 1.4 && scale <= 1.554
+  
+  // Animation time for orbital motion
+  const [animationTime, setAnimationTime] = useState(0)
+  
+  useEffect(() => {
+    if (!shouldAnimateOrbits) return
+    
+    let animationFrameId: number
+    let startTime = performance.now()
+    
+    const animate = (currentTime: number) => {
+      // Calculate elapsed time in seconds (for smooth, slow orbital motion)
+      const elapsed = (currentTime - startTime) / 1000
+      setAnimationTime(elapsed)
+      animationFrameId = requestAnimationFrame(animate)
+    }
+    
+    animationFrameId = requestAnimationFrame(animate)
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [shouldAnimateOrbits])
+  
   // Calculate orbit information for each planet
   const planetOrbits = useMemo(() => {
     return system.planets.map(planet => {
@@ -67,22 +96,22 @@ function SystemView({
   
   // Calculate asset sizes based on normalized zoom (0.0-1.0)
   // Smooth scaling: linear interpolation between min and max based on zoom
-  // Star (sol) size scaling
-  // At universe view (0.0): small (6px)
-  // At system view (1.0): large (80px)
+  // Star (sol) size scaling - reduced at max zoom to prevent clustering
+  // At sector view (0.0): small (6px)
+  // At systems view (1.0): moderate (50px) - reduced from 80px to prevent clustering
   const starSize = useMemo(() => {
     const minSize = 6
-    const maxSize = 80
+    const maxSize = 50  // Reduced from 80px to prevent clustering at max zoom
     const size = minSize + (effectiveNormalizedZoom * (maxSize - minSize))
     return Math.max(minSize, Math.min(maxSize, size))
   }, [effectiveNormalizedZoom])
   
-  // Planet size scaling
-  // At universe view (0.0): tiny (4px)
-  // At system view (1.0): visible (35px)
+  // Planet size scaling - reduced at max zoom to prevent clustering
+  // At sector view (0.0): tiny (4px)
+  // At systems view (1.0): moderate (25px) - reduced from 35px to prevent clustering
   const basePlanetSize = useMemo(() => {
     const minSize = 4
-    const maxSize = 35
+    const maxSize = 25  // Reduced from 35px to prevent clustering at max zoom
     const size = minSize + (effectiveNormalizedZoom * (maxSize - minSize))
     return Math.max(minSize, Math.min(maxSize, size))
   }, [effectiveNormalizedZoom])
@@ -97,8 +126,31 @@ function SystemView({
         
         if (orbitOpacity <= 0) return null
         
-        // Render an orbit line for each planet
-        return planetOrbits.map(({ planet, radius }, index) => {
+        // Render an orbit line for each planet in the system
+        // Use ALL planets from system.planets, not just those in planetOrbits
+        // This ensures every planet gets an orbit line, even if position calculation had issues
+        return system.planets.map(planet => {
+          // Get planet position - use fallback if getPlanetXY fails
+          const planetXY = getPlanetXY(planet) || (() => {
+            // Fallback: use system center as planet position if we can't calculate it
+            // This ensures we still render an orbit line (even if at radius 0)
+            return system.center
+          })()
+          
+          let radius = calculateOrbitRadius(planetXY, system.center)
+          
+          // Skip orbits with invalid radius
+          if (!isFinite(radius) || radius < 0) {
+            return null
+          }
+          
+          // Ensure minimum visible radius for planets at system center
+          // This ensures all planets have visible orbit lines
+          const minRadius = 5 // Minimum 5 units radius for visibility
+          if (radius < minRadius) {
+            radius = minRadius
+          }
+          
           // Calculate animation speed based on radius - larger orbits move slower
           // Base speed: 180 seconds for full cycle, scaled by radius for realism
           const animationDuration = 180 + (radius * 0.15) // Larger orbits take longer
@@ -122,7 +174,7 @@ function SystemView({
               }}
             />
           )
-        })
+        }).filter(Boolean) // Remove any null entries
       })()}
       
       {/* Central star */}
@@ -201,19 +253,40 @@ function SystemView({
         )}
       </g>
       
-      {/* Planets in orbit - show at ALL zoom levels (0% to 700%) */}
+      {/* Planets in orbit - show at ALL zoom levels (0% to 500%) */}
       {/* Planets use their actual X/Y coordinates which already place them in orbits around their sol */}
+      {/* At high zoom (450%-500%), planets animate along their orbits */}
       {/* Performance optimization: render different detail levels based on zoom */}
-      {planetOrbits.map(({ planet, planetXY }) => {
+      {planetOrbits.map(({ planet, planetXY, radius, angle }) => {
         const isHovered = hoveredPlanet?.id === planet.id
+        
+        // Calculate animated position at high zoom (450%-500%)
+        // Use slow orbital speed - larger orbits move slower (Kepler's laws)
+        let currentPlanetX = planetXY.x
+        let currentPlanetY = planetXY.y
+        
+        if (shouldAnimateOrbits && radius > 0) {
+          // Orbital speed: larger radius = slower orbit (realistic physics)
+          // Base speed: 1 full rotation per 300 seconds (5 minutes) for a planet at radius 100
+          // Speed scales inversely with radius
+          const baseOrbitPeriod = 300 // seconds for radius 100
+          const orbitalSpeed = (2 * Math.PI) / (baseOrbitPeriod * (radius / 100))
+          
+          // Calculate current angle based on time
+          const currentAngle = angle + (animationTime * orbitalSpeed)
+          
+          // Calculate position along orbit circle
+          currentPlanetX = system.center.x + (radius * Math.cos(currentAngle))
+          currentPlanetY = system.center.y + (radius * Math.sin(currentAngle))
+        }
         
         // Minimal detail: just a colored dot (fast rendering)
         if (detailLevel === 'minimal') {
           return (
             <circle
               key={planet.id}
-              cx={planetXY.x}
-              cy={planetXY.y}
+              cx={currentPlanetX}
+              cy={currentPlanetY}
               r={Math.max(2, basePlanetSize * 0.3)}
               fill={planet.owner_empire_id ? 'rgba(34, 211, 238, 0.8)' : 'rgba(255, 255, 255, 0.6)'}
               className={cn('planet-dot', isHovered && 'planet-hovered')}
@@ -262,8 +335,8 @@ function SystemView({
                 {/* Planet glow on hover */}
                 {isHovered && (
                   <circle
-                    cx={planetXY.x}
-                    cy={planetXY.y}
+                    cx={currentPlanetX}
+                    cy={currentPlanetY}
                     r={planetSize * 0.7}
                     fill="rgba(255, 255, 255, 0.2)"
                     className="planet-glow"
@@ -271,13 +344,14 @@ function SystemView({
                 )}
                 <image
                   href={planetImage}
-                  x={planetXY.x - planetSize / 2}
-                  y={planetXY.y - planetSize / 2}
+                  x={currentPlanetX - planetSize / 2}
+                  y={currentPlanetY - planetSize / 2}
                   width={planetSize}
                   height={planetSize}
                   className="planet-image"
                   style={{ 
-                    filter: isHovered ? 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.6))' : 'none'
+                    filter: isHovered ? 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.6))' : 'none',
+                    transition: shouldAnimateOrbits ? 'none' : 'filter 0.2s ease-in-out'
                   }}
                 />
               </>
@@ -289,8 +363,8 @@ function SystemView({
                 {(effectiveNormalizedZoom >= 0.75 && effectiveNormalizedZoom < 0.85) && (
                   <g>
                     <text
-                      x={planetXY.x}
-                      y={planetXY.y + planetSize / 2 + 12}
+                      x={currentPlanetX}
+                      y={currentPlanetY + planetSize / 2 + 12}
                       textAnchor="middle"
                       className="fill-white font-mono font-semibold"
                       style={{ 
@@ -301,8 +375,8 @@ function SystemView({
                       Planet {formatCoordinate(planet.coordinate)}
                     </text>
                     <text
-                      x={planetXY.x}
-                      y={planetXY.y + planetSize / 2 + 22}
+                      x={currentPlanetX}
+                      y={currentPlanetY + planetSize / 2 + 22}
                       textAnchor="middle"
                       className="fill-gray-300 font-mono"
                       style={{ 
@@ -318,8 +392,8 @@ function SystemView({
                 {effectiveNormalizedZoom >= 0.85 && isHovered && (
                   <g>
                     <text
-                      x={planetXY.x}
-                      y={planetXY.y + planetSize / 2 + 14}
+                      x={currentPlanetX}
+                      y={currentPlanetY + planetSize / 2 + 14}
                       textAnchor="middle"
                       className="fill-white font-mono font-semibold"
                       style={{ 
@@ -330,8 +404,8 @@ function SystemView({
                       Planet {formatCoordinate(planet.coordinate)}
                     </text>
                     <text
-                      x={planetXY.x}
-                      y={planetXY.y + planetSize / 2 + 24}
+                      x={currentPlanetX}
+                      y={currentPlanetY + planetSize / 2 + 24}
                       textAnchor="middle"
                       className="fill-gray-300 font-mono"
                       style={{ 

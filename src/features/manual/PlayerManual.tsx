@@ -119,17 +119,18 @@ export function PlayerManual() {
           .replace(/^-|-$/g, '')
         
         const HeadingTag = `h${level}` as keyof JSX.IntrinsicElements
+        const headingProps: any = {
+          key: `heading-${index}`,
+          id: id,
+          className: cn(
+            'font-heading font-bold mb-4 mt-8 scroll-mt-20',
+            level === 1 && 'text-4xl glow-cyan border-b border-primary/30 pb-3',
+            level === 2 && 'text-3xl text-primary mt-12',
+            level === 3 && 'text-2xl text-primary/90 mt-8'
+          )
+        }
         elements.push(
-          <HeadingTag
-            key={`heading-${index}`}
-            id={id}
-            className={cn(
-              'font-heading font-bold mb-4 mt-8 scroll-mt-20',
-              level === 1 && 'text-4xl glow-cyan border-b border-primary/30 pb-3',
-              level === 2 && 'text-3xl text-primary mt-12',
-              level === 3 && 'text-2xl text-primary/90 mt-8'
-            )}
-          >
+          <HeadingTag {...headingProps}>
             {title}
           </HeadingTag>
         )

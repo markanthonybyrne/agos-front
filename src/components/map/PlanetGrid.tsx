@@ -35,7 +35,7 @@ export function PlanetGrid({ planets, isLoading, onPlanetClick, selectedPlanetId
   // Populate grid with planets based on planet number
   planets.forEach((planet) => {
     const coord = parseCoordinate(planet.coordinate)
-    if (coord && coord.planet >= 1) {
+    if (coord && coord.planet !== undefined && coord.planet >= 1) {
       const planetIndex = coord.planet - 1 // 0-based index
       const row = Math.floor(planetIndex / gridCols)
       const col = planetIndex % gridCols

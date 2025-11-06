@@ -1,7 +1,7 @@
 /**
  * Zoom Level Definitions and Layer Visibility
  * 
- * Defines normalized zoom ranges (0.0 = Universe, 1.0 = System) and
+ * Defines normalized zoom ranges (0.0 = Sector, 1.0 = Planetary) and
  * smooth opacity transitions for each layer type.
  */
 
@@ -13,39 +13,59 @@ export interface LayerVisibility {
   fadeOutEnd: number     // Normalized zoom where layer fully hidden
 }
 
+/**
+ * Hierarchical zoom level ranges
+ * Discrete ranges with overlapping fade zones for smooth transitions
+ * Starting at sector view (no quadrant/universe view needed)
+ */
+export const ZOOM_LEVEL_RANGES = {
+  sector: { min: 0.00, max: 0.30 },
+  galaxy: { min: 0.25, max: 0.55 },
+  system: { min: 0.50, max: 0.80 },
+  planetary: { min: 0.75, max: 1.00 }
+} as const
+
+export type ZoomLevel = keyof typeof ZOOM_LEVEL_RANGES
+
+/**
+ * Get the current zoom level based on normalized zoom
+ * 
+ * @param normalizedZoom - Normalized zoom level (0.0-1.0)
+ * @returns Current zoom level name
+ */
+export function getZoomLevel(normalizedZoom: number): ZoomLevel {
+  if (normalizedZoom < 0.30) return 'sector'
+  if (normalizedZoom < 0.55) return 'galaxy'
+  if (normalizedZoom < 0.80) return 'system'
+  return 'planetary'
+}
+
 export const LAYER_VISIBILITY: Record<string, LayerVisibility> = {
-  universe: {
-    name: 'Universe',
-    fadeInStart: 0.00,
-    fadeInEnd: 0.01,  // Fully visible immediately at 0% zoom
-    fadeOutStart: 0.08,
-    fadeOutEnd: 0.12
-  },
-  quadrant: {
-    name: 'Quadrant',
-    fadeInStart: 0.00,  // Start showing immediately at 0% zoom
-    fadeInEnd: 0.05,    // Fully visible at low zoom
-    fadeOutStart: 0.15,
-    fadeOutEnd: 0.20
-  },
   sector: {
     name: 'Sector',
-    fadeInStart: 0.00,  // Start showing immediately at 0% zoom
-    fadeInEnd: 0.01,    // Fully visible immediately
-    fadeOutStart: 0.35,
-    fadeOutEnd: 0.45
+    fadeInStart: 0.00,  // Start showing immediately at 0% zoom (sector view)
+    fadeInEnd: 0.00,    // Fully visible immediately at 0% zoom
+    fadeOutStart: 0.22,
+    fadeOutEnd: 0.30    // Fade out as we transition to galaxy
   },
   galaxy: {
     name: 'Galaxy',
-    fadeInStart: 0.00,  // Start showing at 0% zoom (very small)
-    fadeInEnd: 0.40,    // Fully visible at medium zoom (scale ~0.4)
-    fadeOutStart: 0.65,
-    fadeOutEnd: 0.75
+    fadeInStart: 0.20,  // Start fading in during sector→galaxy transition
+    fadeInEnd: 0.30,    // Fully visible at galaxy level
+    fadeOutStart: 0.47,
+    fadeOutEnd: 0.55    // Fade out as we transition to system
   },
   system: {
     name: 'System',
-    fadeInStart: 0.00,  // Start showing at 0% zoom (very small)
-    fadeInEnd: 0.75,    // Fully visible at high zoom (scale ~1.2)
+    fadeInStart: 0.45,  // Start fading in during galaxy→system transition
+    fadeInEnd: 0.55,    // Fully visible at system level
+    fadeOutStart: 0.73,
+    fadeOutEnd: 0.80    // Fade out as we transition to planetary
+  },
+  planetary: {
+    name: 'Planetary',
+    fadeInStart: 0.70,  // Start fading in during system→planetary transition
+    fadeInEnd: 0.80,    // Fully visible at planetary level
     fadeOutStart: 1.00,  // Never fades out
     fadeOutEnd: 1.00
   }
@@ -53,11 +73,11 @@ export const LAYER_VISIBILITY: Record<string, LayerVisibility> = {
 
 /**
  * Orbit line visibility configuration
- * Orbit lines fade in starting at zoom 0.65, fully visible at 0.70-1.00
+ * Orbit lines fade in starting at zoom 0.50, fully visible at 0.55-1.00
  */
 export const ORBIT_LINE_VISIBILITY = {
-  fadeInStart: 0.65,  // Start fading in at 65% normalized zoom (galaxy/system view)
-  fadeInEnd: 0.70,    // Fully visible at 70% (system view)
+  fadeInStart: 0.50,  // Start fading in at 50% normalized zoom (system view)
+  fadeInEnd: 0.55,    // Fully visible at 55% (system view)
   fadeOutStart: 1.00, // Never fades out (stays visible to 100%)
   fadeOutEnd: 1.00
 }
@@ -66,8 +86,8 @@ export const ORBIT_LINE_VISIBILITY = {
  * Calculate layer opacity based on normalized zoom (0.0-1.0)
  * Uses smooth ease-in-out curves for transitions
  * 
- * @param layerName - Name of the layer (universe, quadrant, sector, galaxy, system)
- * @param normalizedZoom - Normalized zoom level (0.0 = Universe, 1.0 = System)
+ * @param layerName - Name of the layer (sector, galaxy, system, planetary)
+ * @param normalizedZoom - Normalized zoom level (0.0 = Sector, 1.0 = Planetary)
  * @returns Opacity value between 0.0 and 1.0
  */
 export function getLayerOpacity(layerName: string, normalizedZoom: number): number {
@@ -101,23 +121,23 @@ export function getLayerOpacity(layerName: string, normalizedZoom: number): numb
 
 /**
  * Calculate orbit line opacity based on normalized zoom
- * Fades in starting at 0.7, fully visible at 0.75-1.00
+ * Fades in starting at 0.50, fully visible at 0.55-1.00
  * 
- * @param normalizedZoom - Normalized zoom level (0.0 = Universe, 1.0 = System)
+ * @param normalizedZoom - Normalized zoom level (0.0 = Sector, 1.0 = Planetary)
  * @returns Opacity value between 0.0 and 1.0
  */
 export function getOrbitLineOpacity(normalizedZoom: number): number {
   if (normalizedZoom < ORBIT_LINE_VISIBILITY.fadeInStart) return 0  // Hidden below system level
   
   if (normalizedZoom >= ORBIT_LINE_VISIBILITY.fadeInStart && normalizedZoom < ORBIT_LINE_VISIBILITY.fadeInEnd) {
-    // Fade in from 0.65 to 0.70
+    // Fade in from 0.50 to 0.55
     const fadeProgress = (normalizedZoom - ORBIT_LINE_VISIBILITY.fadeInStart) / 
       (ORBIT_LINE_VISIBILITY.fadeInEnd - ORBIT_LINE_VISIBILITY.fadeInStart)
     // Smooth ease-in-out curve
     return fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
   }
   
-  // Fully visible from fadeInEnd (0.70) through 1.0 and beyond (for 700% zoom)
+  // Fully visible from fadeInEnd (0.55) through 1.0 and beyond (for 700% zoom)
   if (normalizedZoom >= ORBIT_LINE_VISIBILITY.fadeInEnd) {
     return 1.0  // Fully visible at all high zoom levels including 700%
   }
@@ -127,18 +147,18 @@ export function getOrbitLineOpacity(normalizedZoom: number): number {
 
 /**
  * Calculate orbit line stroke width based on normalized zoom
- * Scales from 1.5px at 0.75 to 2.5px at 1.0
+ * Scales from 1.5px at 0.55 to 2.5px at 1.0
  * 
- * @param normalizedZoom - Normalized zoom level (0.0 = Universe, 1.0 = System)
+ * @param normalizedZoom - Normalized zoom level (0.0 = Sector, 1.0 = Planetary)
  * @returns Stroke width in pixels
  */
 export function getOrbitLineWidth(normalizedZoom: number): number {
-  if (normalizedZoom < 0.65) return 0
-  // Scale from 1.5px at 0.70 to 2.5px at 1.0
+  if (normalizedZoom < 0.50) return 0
+  // Scale from 1.5px at 0.55 to 2.5px at 1.0
   const baseWidth = 1.5
   const maxWidth = 2.5
-  if (normalizedZoom < 0.70) return baseWidth
-  const scale = (normalizedZoom - 0.70) / 0.30  // 0.0 to 1.0 in system range (0.70 to 1.0)
+  if (normalizedZoom < 0.55) return baseWidth
+  const scale = (normalizedZoom - 0.55) / 0.45  // 0.0 to 1.0 in system/planetary range (0.55 to 1.0)
   return baseWidth + (scale * (maxWidth - baseWidth))
 }
 

@@ -43,10 +43,10 @@ export function useTravelTime() {
     }
 
     // Validate planet numbers (API expects 1-10)
-    if (originCoord.planet < 1 || originCoord.planet > 10) {
+    if (originCoord.planet === undefined || originCoord.planet < 1 || originCoord.planet > 10) {
       throw new Error(`Invalid origin planet number: ${originCoord.planet}. Must be between 1-10.`)
     }
-    if (destCoord.planet < 1 || destCoord.planet > 10) {
+    if (destCoord.planet === undefined || destCoord.planet < 1 || destCoord.planet > 10) {
       throw new Error(`Invalid destination planet number: ${destCoord.planet}. Must be between 1-10.`)
     }
 

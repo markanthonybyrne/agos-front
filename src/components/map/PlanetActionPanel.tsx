@@ -61,6 +61,13 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
     }
 
     try {
+      // Check if coordinate has all required legacy fields
+      if (coord.quadrant === undefined || coord.sector === undefined || 
+          coord.galaxy === undefined || coord.planet === undefined) {
+        toast.error('Invalid coordinate format for colonization')
+        return
+      }
+      
       // Calculate x, y coordinates from hierarchical coordinates
       const xy = hierarchicalToXy(coord.quadrant, coord.sector, coord.galaxy, coord.planet)
       

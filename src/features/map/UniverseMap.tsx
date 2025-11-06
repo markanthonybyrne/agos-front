@@ -1,15 +1,15 @@
-import { UnifiedUniverseMapV2 } from '@/components/map/UnifiedUniverseMapV2'
+import { UnifiedUniverseMapV4 } from '@/components/map/v4/UnifiedUniverseMapV4'
 
 /**
  * UniverseMap - Main entry point for the universe map
  * 
- * Now uses the new UnifiedUniverseMapV2 component which implements:
- * - 5-level hierarchy (Quadrant:Sector:Galaxy:System:Planet)
- * - Pre-loading of all planet data
- * - Single flat grid with zoom/pan
- * - System-level rendering with central stars
- * - Navigation overlays
+ * Now uses the new UnifiedUniverseMapV4 component which implements:
+ * - PixiJS WebGL rendering for GPU acceleration
+ * - 4-level hierarchy (Sector:Galaxy:System:Planet)
+ * - Lightweight 2D rendering without image assets
+ * - Smooth zoom/pan transitions
+ * - CSS gradient background matching V2
  */
 export function UniverseMap() {
-  return <UnifiedUniverseMapV2 />
+  return <UnifiedUniverseMapV4 />
 }

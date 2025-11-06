@@ -5,7 +5,7 @@ export const universeApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getMap: builder.query<
       UniverseMap,
-      { quadrant?: number; sector?: number; galaxy?: number }
+      { quadrant?: number; sector?: number; galaxy?: number; region?: number; system?: number; limit?: number; show_discovered_only?: boolean; include_uninhabitable?: boolean }
     >({
       query: (params) => ({
         url: '/universe/map',

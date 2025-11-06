@@ -92,7 +92,9 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
       if (originPlanetForValidation) {
         const origin = parseCoordinate(originPlanetForValidation.coordinate)
         const destination = parseCoordinate(watchedDestination)
-        if (origin && destination) {
+        if (origin && destination && 
+            origin.quadrant !== undefined && origin.sector !== undefined && origin.galaxy !== undefined &&
+            destination.quadrant !== undefined && destination.sector !== undefined && destination.galaxy !== undefined) {
           validateRange({
             origin_quadrant: origin.quadrant,
             origin_sector: origin.sector,

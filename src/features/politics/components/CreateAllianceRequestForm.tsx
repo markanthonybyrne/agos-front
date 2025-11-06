@@ -46,7 +46,18 @@ export function CreateAllianceRequestForm({ onSuccess, onCancel }: CreateAllianc
     const coord = parseCoordinate(value)
     setCoordinates(prev => {
       const newCoords = [...prev]
-      newCoords[index] = coord
+      // Only set if coordinate has required fields
+      if (coord && coord.quadrant !== undefined && coord.sector !== undefined && 
+          coord.galaxy !== undefined && coord.planet !== undefined) {
+        newCoords[index] = {
+          quadrant: coord.quadrant,
+          sector: coord.sector,
+          galaxy: coord.galaxy,
+          planet: coord.planet
+        }
+      } else {
+        newCoords[index] = null
+      }
       return newCoords
     })
   }

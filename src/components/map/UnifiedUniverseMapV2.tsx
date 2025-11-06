@@ -1,8 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
-import { useGetFleetsQuery } from '@/api/endpoints/fleetsApi'
 import { useAuth } from '@/hooks/useAuth'
-import { useZoomPan, normalizedToRenderScale, renderScaleToNormalized } from '@/hooks/useZoomPan'
+import { useZoomPan, normalizedToRenderScale } from '@/hooks/useZoomPan'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { useAppSelector } from '@/app/hooks'
@@ -10,16 +9,14 @@ import { getPlanetXY, parseCoordinate } from '@/lib/coordinates'
 import { 
   groupPlanetsBySystem,
   convertSystemGroupsToData,
-  getPlanetSystemKey,
   type SystemData
 } from '@/lib/systemUtils'
 import { getPlanetImage } from '@/lib/planetImages'
 import { getGalaxyImage, getRandomGalaxyTypeForSystem } from '@/lib/galaxyImages'
-import { getQuadrantXyRange, getSectorXyRange, getGalaxyXyRange, getSystemXyRange } from '@/lib/coordinateUtils'
+import { getSectorXyRange, getGalaxyXyRange } from '@/lib/coordinateUtils'
 import { getLayerOpacity } from '@/lib/zoomLevels'
 import { SystemViewMemo } from './SystemView'
 import { GridOverlay } from './GridOverlay'
-import { QuadrantOverlay } from './QuadrantOverlay'
 import { SectorOverlay } from './SectorOverlay'
 import { LayerWrapper } from './LayerWrapper'
 import { Planet } from '@/types/api.types'
@@ -34,14 +31,16 @@ const DEFAULT_GRID_WIDTH = 2000
 const DEFAULT_GRID_HEIGHT = 1000
 
 /**
- * UnifiedUniverseMapV2 - Main component for the 5-level universe map
+ * UnifiedUniverseMapV2 - Main component for the 4-level universe map
  * 
  * Features:
  * - Pre-loads all planet data before rendering
  * - Single flat grid with zoom/pan
- * - 5 zoom levels: Universe → Quadrant → Sector → Galaxy → System → Planet
+ * - 4 zoom levels: Sector → Galaxy → System → Planetary
+ * - 0% zoom (scale 0.09) = sector view showing all galaxies clearly
+ * - 350% zoom (scale 1.554) = systems view showing all systems clearly and pannable (slightly more zoomed than 277%)
  * - System-level rendering with central stars and orbit lines
- * - Navigation overlays for quadrant/sector
+ * - Navigation overlays for sector
  */
 export function UnifiedUniverseMapV2() {
   const { empire } = useAuth()
@@ -171,12 +170,13 @@ export function UnifiedUniverseMapV2() {
   }, [allPlanets, planetNameLookup])
 
   // Zoom and pan hook
-  // Start at sector level (showing all galaxies across all quadrants)
-  // Extended max scale to allow very high zoom (700%) for detailed system viewing
+  // Start at sector level (showing all galaxies across the universe at 3% zoom)
+  // 0% zoom (minScale) = sector view showing all galaxies clearly (like 9% in old version)
+  // 350% zoom (maxScale) = systems view showing all systems clearly (slightly more zoomed than 277%)
   const zoomPan = useZoomPan({
-    minScale: 0.01,  // Sector view - shows all galaxies
-    maxScale: 7.0,   // Very high zoom for detailed system/planet viewing (allows 700%)
-    initialScale: 0.05, // Start at sector level (5% zoom, normalized ~0.006) - shows all galaxies
+    minScale: 0.09,  // 0% zoom - sector view showing all galaxies clearly
+    maxScale: 1.554,  // 350% zoom - systems view showing all systems clearly (slightly more zoomed than 277%)
+    initialScale: 0.103, // Start at 3% zoom (sector level) - shows all galaxies clearly
     gridWidth: gridWidth,
     gridHeight: gridHeight
   })
@@ -247,19 +247,19 @@ export function UnifiedUniverseMapV2() {
     return names
   }, [enrichedPlanets, mapData])
 
-  // Get normalized zoom (0.0 = Universe, 1.0 = System)
+  // Get normalized zoom (0.0 = Sector, 1.0 = Systems)
+  // 0% zoom (scale 0.09) = sector view showing all galaxies clearly
+  // 350% zoom (scale 1.554) = systems view showing all systems clearly (slightly more zoomed than 277%)
   const normalizedZoom = zoomPan.normalizedZoom
 
-  // Determine current zoom level (backward compatibility)
-  // Start at sector level (no quadrant view) - shows all galaxies across all quadrants
-  // Extended sector view to show galaxies at more zoom levels with better spacing
+  // Determine current zoom level based on normalized zoom
   const zoomLevel = useMemo(() => {
-    const scale = zoomPan.scale
-    if (scale < 0.5) return 'sector'  // Sector view - shows galaxies with more zoom room (1%-50%)
-    if (scale < 0.8) return 'galaxy'  // Galaxy view - shows systems with stars (50%-80%)
-    if (scale < 3.0) return 'system'  // System view - shows full system details (80%-300%)
-    return 'planet'  // Very high zoom for individual planet detail (300%+)
-  }, [zoomPan.scale])
+    const normalized = zoomPan.normalizedZoom
+    if (normalized < 0.30) return 'sector'  // Sector view - shows all galaxies clearly
+    if (normalized < 0.55) return 'galaxy'  // Galaxy view - shows systems with stars
+    if (normalized < 0.80) return 'system'  // System view - shows full system details
+    return 'planet'  // Planetary view - individual planet detail (at max zoom, shows all systems)
+  }, [zoomPan.normalizedZoom])
 
   // Debug: Log viewport and system distribution (once per mount)
   useEffect(() => {
@@ -347,12 +347,15 @@ export function UnifiedUniverseMapV2() {
   }, [zoomPan.containerRef])
 
   // Calculate dynamic viewBox FIRST (needed by visibleSystems)
-  // Calculate dynamic viewBox based on actual container dimensions to ensure content always fills viewport
+  // Calculate dynamic viewBox preserving grid aspect ratio (2:1) to prevent coordinate distortion
   // No rounding for perfectly smooth panning at every zoom level
   // Keep all values precise to prevent any snapping or jumping
   const roundedPanX = zoomPan.panX  // No rounding - completely smooth
   const roundedPanY = zoomPan.panY  // No rounding - completely smooth
   const roundedScale = zoomPan.scale  // No rounding - completely smooth
+  
+  // Grid aspect ratio (2:1) - preserve this to maintain spatial relationships
+  const gridAspectRatio = gridWidth / gridHeight
   
   const dynamicViewBox = useMemo(() => {
     if (containerSize.width === 0 || containerSize.height === 0) {
@@ -361,7 +364,6 @@ export function UnifiedUniverseMapV2() {
     
     const containerWidth = containerSize.width
     const containerHeight = containerSize.height
-    const containerAspectRatio = containerWidth / containerHeight
     
     // Calculate what grid coordinates are visible based on current scale and pan
     const scale = roundedScale
@@ -373,13 +375,27 @@ export function UnifiedUniverseMapV2() {
     const centerX = -panX / scale + gridWidth / 2
     const centerY = -panY / scale + gridHeight / 2
     
-    // Calculate visible width/height in grid coordinates
-    const visibleGridWidth = containerWidth / scale
-    const visibleGridHeight = containerHeight / scale
+    // Calculate visible width/height in grid coordinates based on container size
+    // Preserve grid aspect ratio - don't stretch to match container
+    let visibleGridWidth = containerWidth / scale
+    let visibleGridHeight = containerHeight / scale
     
-    // Calculate bounds - allow extending beyond grid at low zoom levels
-    const isLowZoom = scale < 0.5 // Sector view and below
-    const allowOffCanvas = isLowZoom
+    // Adjust visible area to preserve grid aspect ratio
+    // If container is wider than grid aspect, we'll see more width (letterboxing)
+    // If container is taller than grid aspect, we'll see more height (pillarboxing)
+    const visibleAspectRatio = visibleGridWidth / visibleGridHeight
+    if (visibleAspectRatio > gridAspectRatio) {
+      // Container is wider relative to grid - adjust height to match grid aspect
+      visibleGridHeight = visibleGridWidth / gridAspectRatio
+    } else {
+      // Container is taller relative to grid - adjust width to match grid aspect
+      visibleGridWidth = visibleGridHeight * gridAspectRatio
+    }
+    
+    // Calculate bounds - allow extending beyond grid at sector level
+    const normalizedZoom = zoomPan.normalizedZoom
+    const isSectorLevel = normalizedZoom < 0.30
+    const allowOffCanvas = isSectorLevel
     
     let minX = centerX - visibleGridWidth / 2
     let maxX = centerX + visibleGridWidth / 2
@@ -397,43 +413,46 @@ export function UnifiedUniverseMapV2() {
     let width = maxX - minX
     let height = maxY - minY
     
-    // Adjust to match container aspect ratio so viewBox fills viewport
-    const currentAspectRatio = width / height
-    if (containerAspectRatio > currentAspectRatio) {
-      // Container is wider - increase width
-      const newWidth = height * containerAspectRatio
-      const widthDiff = newWidth - width
-      width = newWidth
-      if (!allowOffCanvas) {
-        minX = Math.max(0, minX - widthDiff / 2)
-        maxX = Math.min(gridWidth, maxX + widthDiff / 2)
-      } else {
-        minX = minX - widthDiff / 2
-        maxX = maxX + widthDiff / 2
-      }
-    } else if (containerAspectRatio < currentAspectRatio) {
-      // Container is taller - increase height
-      const newHeight = width / containerAspectRatio
-      const heightDiff = newHeight - height
-      height = newHeight
-      if (!allowOffCanvas) {
-        minY = Math.max(0, minY - heightDiff / 2)
-        maxY = Math.min(gridHeight, maxY + heightDiff / 2)
-      } else {
+    // Ensure aspect ratio is preserved (should already be, but double-check)
+    const calculatedAspect = width / height
+    if (Math.abs(calculatedAspect - gridAspectRatio) > 0.001) {
+      // Correct any minor drift to maintain exact aspect ratio
+      if (calculatedAspect > gridAspectRatio) {
+        height = width / gridAspectRatio
+        const heightDiff = height - (maxY - minY)
         minY = minY - heightDiff / 2
         maxY = maxY + heightDiff / 2
+      } else {
+        width = height * gridAspectRatio
+        const widthDiff = width - (maxX - minX)
+        minX = minX - widthDiff / 2
+        maxX = maxX + widthDiff / 2
       }
     }
     
     // Add generous padding to prevent items from popping in/out during pan
-    // More padding at lower zoom levels for smoother panning
-    const paddingFactor = isLowZoom ? (scale < 0.1 ? 0.2 : scale < 0.3 ? 0.15 : 0.1) : 0.1
+    // More padding at sector level for smoother panning
+    const paddingFactor = isSectorLevel ? 0.15 : 0.1
     const padding = Math.max(width, height) * paddingFactor
     
     let viewBoxX = minX - padding
     let viewBoxY = minY - padding
     let viewBoxWidth = width + padding * 2
     let viewBoxHeight = height + padding * 2
+    
+    // Ensure padding preserves aspect ratio
+    const paddedAspect = viewBoxWidth / viewBoxHeight
+    if (Math.abs(paddedAspect - gridAspectRatio) > 0.001) {
+      if (paddedAspect > gridAspectRatio) {
+        viewBoxHeight = viewBoxWidth / gridAspectRatio
+        const heightDiff = viewBoxHeight - (height + padding * 2)
+        viewBoxY = viewBoxY - heightDiff / 2
+      } else {
+        viewBoxWidth = viewBoxHeight * gridAspectRatio
+        const widthDiff = viewBoxWidth - (width + padding * 2)
+        viewBoxX = viewBoxX - widthDiff / 2
+      }
+    }
     
     // Only clamp to grid boundaries if not allowing off-canvas panning
     if (!allowOffCanvas) {
@@ -444,6 +463,7 @@ export function UnifiedUniverseMapV2() {
     }
     
     // No rounding - keep values completely precise for smooth panning at every zoom level
+    // Maintain spatial relationships during pan/zoom operations
     return {
       viewBox: `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`,
       bounds: {
@@ -453,7 +473,7 @@ export function UnifiedUniverseMapV2() {
         maxY: viewBoxY + viewBoxHeight
       }
     }
-  }, [roundedPanX, roundedPanY, roundedScale, containerSize.width, containerSize.height, gridWidth, gridHeight])
+  }, [roundedPanX, roundedPanY, roundedScale, containerSize.width, containerSize.height, gridWidth, gridHeight, gridAspectRatio, zoomPan.normalizedZoom])
 
   // Filter entities visible in viewport
   // At all zoom levels except individual system zoom, show ALL entities in viewport
@@ -464,17 +484,17 @@ export function UnifiedUniverseMapV2() {
     const bounds = dynamicViewBox.bounds
     const scale = zoomPan.scale
     
-    // When NOT zoomed into individual systems (scale < 3.0), show ALL entities in viewport
-    // This includes universe, quadrant, sector, galaxy, and system overview levels
-    if (scale < 3.0) {
+    // When NOT zoomed into individual systems (scale < 1.5), show ALL entities in viewport
+    // This includes sector, galaxy, and system overview levels
+    if (scale < 1.5) {
       const allInViewport: SystemData[] = []
       
       // At low zoom levels, use the extended bounds from dynamicViewBox
       // No additional padding needed since viewBox already has generous padding
-      const padding = scale >= 2.5 ? 40      // Medium-high: moderate padding
-        : scale >= 1.5 ? 60                  // Medium-high: generous padding
-        : scale >= 0.8 ? 100                  // Medium: very generous padding
-        : scale >= 0.5 ? 150                  // Medium: very generous padding
+      const padding = scale >= 1.2 ? 40      // Medium-high: moderate padding
+        : scale >= 0.8 ? 60                  // Medium: generous padding
+        : scale >= 0.5 ? 100                 // Medium: very generous padding
+        : scale >= 0.2 ? 150                 // Low: very generous padding
         : scale >= 0.1 ? 200                 // Low: maximum padding
         : 300                                 // Very low: extra maximum padding
       
@@ -497,15 +517,14 @@ export function UnifiedUniverseMapV2() {
       return allInViewport
     }
     
-    // When zoomed into individual systems (scale >= 3.0), apply filtering to prevent overlap
+    // When zoomed into individual systems (scale >= 1.5), apply filtering to prevent overlap
     const allInViewport: SystemData[] = []
     
     // Padding based on zoom level - more padding at lower zoom for smoother panning
-    const padding = scale >= 7.0 ? 5   // Very high zoom: minimal padding, single system
-      : scale > 5.0 ? 15                // Very high zoom: small padding
-      : scale > 4.0 ? 25                // High zoom: moderate padding
-      : scale > 3.0 ? 40                // System zoom: moderate padding
-      : 50                               // Fallback
+    const padding = scale >= 1.554 ? 5   // 350% zoom (max): minimal padding
+      : scale > 1.3 ? 15                 // 300% zoom: small padding
+      : scale > 1.1 ? 25                 // 250% zoom: moderate padding
+      : 40                               // Fallback
     
     // Collect systems in viewport
     systemsByKey.forEach(system => {
@@ -523,20 +542,17 @@ export function UnifiedUniverseMapV2() {
     })
     
     // Calculate minimum distance between systems based on zoom level
-    const minSystemDistance = scale >= 7.0 ? 200  // Very high zoom: large spacing (single system)
-      : scale > 5.6 ? 150                         // 560% zoom: large spacing for 2-3 systems
-      : scale > 4.48 ? 100                        // 448% zoom: medium-large spacing
-      : scale > 4.0 ? 80                          // 400% zoom: medium spacing
-      : scale > 3.0 ? 60                          // 300% zoom: medium spacing
-      : 50                                         // Fallback
+    // At max zoom (1.554), reduce spacing to show more systems clearly
+    const minSystemDistance = scale >= 1.554 ? 70   // 350% zoom: medium spacing for systems view
+      : scale > 1.3 ? 60                           // 300% zoom: smaller spacing
+      : scale > 1.1 ? 50                           // 250% zoom: small spacing
+      : 40                                         // Fallback
     
-    // Maximum number of systems to show at individual system zoom levels
-    const maxSystems = scale >= 7.0 ? 1     // 700%+: 1 system (detailed planet view)
-      : scale > 5.6 ? 2                      // 560%: 2 systems (still very detailed)
-      : scale > 4.48 ? 4                     // 448%: 4 systems (detailed but more visible)
-      : scale > 4.0 ? 6                      // 400%: 6 systems
-      : scale > 3.0 ? 10                     // 300%: 10 systems
-      : 15                                    // Fallback
+    // Maximum number of systems to show - at max zoom, show all systems in viewport
+    const maxSystems = scale >= 1.554 ? 100  // 350% zoom: show all systems (no limit)
+      : scale > 1.3 ? 50                     // 300% zoom: show many systems
+      : scale > 1.1 ? 30                     // 250% zoom: show moderate systems
+      : 20                                    // Fallback
     
     // Filter by distance and max systems
     const viewportCenterX = (bounds.minX + bounds.maxX) / 2
@@ -645,21 +661,35 @@ export function UnifiedUniverseMapV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPlanets.length, enrichedPlanets, mapData, zoomLevel, zoomPan.scale, visibleSystems.length, visiblePlanets.length, isLoadingConfig, isLoadingPlanets])
 
-  // Handle system click
+  // Handle system click - use normalized zoom for consistent transitions
   const handleSystemClick = (system: SystemData) => {
-    if (zoomLevel === 'system') {
-      // Zoom out to galaxy
+    const currentNormalized = zoomPan.normalizedZoom
+    
+    // Determine target zoom level based on current zoom
+    // Use hierarchical zoom thresholds for smooth transitions
+    if (currentNormalized >= 0.50 && currentNormalized < 0.80) {
+      // Currently at system level - zoom out to galaxy level
       const galaxyRange = getGalaxyXyRange(system.quadrant, system.sector, system.galaxy)
       const centerX = (galaxyRange.x_min + galaxyRange.x_max) / 2
       const centerY = (galaxyRange.y_min + galaxyRange.y_max) / 2
       const screen = zoomPan.gridToScreen(centerX, centerY)
-      zoomPan.setZoom(0.4, screen.x, screen.y)
-    } else {
-      // Zoom in to system
+      // Zoom to galaxy level (normalized 0.30-0.40 for smooth transition)
+      zoomPan.setNormalizedZoom(0.35, screen.x, screen.y)
+    } else if (currentNormalized >= 0.75) {
+      // Currently at planetary level - zoom out to system level
       const centerX = system.center.x
       const centerY = system.center.y
       const screen = zoomPan.gridToScreen(centerX, centerY)
-      zoomPan.setZoom(0.6, screen.x, screen.y)
+      // Zoom to system level (normalized 0.65-0.70 for smooth transition)
+      zoomPan.setNormalizedZoom(0.67, screen.x, screen.y)
+      setSelectedSystem(system)
+    } else {
+      // Zoom in to system level
+      const centerX = system.center.x
+      const centerY = system.center.y
+      const screen = zoomPan.gridToScreen(centerX, centerY)
+      // Zoom to system level (normalized 0.65-0.70 for smooth transition)
+      zoomPan.setNormalizedZoom(0.67, screen.x, screen.y)
       setSelectedSystem(system)
     }
   }
@@ -684,18 +714,6 @@ export function UnifiedUniverseMapV2() {
   // If planets are actively loading, show a loading indicator but don't block the map
   // This allows the map to render while planets load in the background
   const isPlanetsLoading = isLoadingPlanets && allPlanets.length === 0
-
-  // Convert grid coordinates to viewport position
-  const gridToViewport = (gridX: number, gridY: number) => {
-    const screen = zoomPan.gridToScreen(gridX, gridY)
-    const container = zoomPan.containerRef.current
-    if (!container) return { x: 0, y: 0 }
-    const rect = container.getBoundingClientRect()
-    return {
-      x: screen.x,
-      y: screen.y
-    }
-  }
 
   // Debug logging removed for performance - only log in development if needed
   // if (process.env.NODE_ENV === 'development') {
@@ -748,14 +766,14 @@ export function UnifiedUniverseMapV2() {
             transition: 'none', // Disable CSS transitions - we handle updates manually
           }}
           viewBox={dynamicViewBox.viewBox}
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
         >
           <g>
           {/* Transparent background */}
           <rect width={gridWidth} height={gridHeight} fill="transparent" />
           
-          {/* Grid overlay - hide at 700% zoom (scale >= 7.0) */}
-          {zoomPan.scale < 7.0 && (
+          {/* Grid overlay - hide at 350% zoom (scale >= 1.554) */}
+          {zoomPan.scale < 1.554 && (
             <GridOverlay
               width={gridWidth}
               height={gridHeight}
@@ -766,22 +784,6 @@ export function UnifiedUniverseMapV2() {
           )}
 
           {/* Navigation overlays with layer fading */}
-          <LayerWrapper layerName="quadrant" normalizedZoom={normalizedZoom}>
-            <QuadrantOverlay
-              gridWidth={gridWidth}
-              gridHeight={gridHeight}
-              scale={zoomPan.scale}
-              viewportBounds={zoomPan.viewportBounds}
-              onQuadrantClick={(quadrant) => {
-                const range = getQuadrantXyRange(quadrant)
-                const centerX = (range.x_min + range.x_max) / 2
-                const centerY = (range.y_min + range.y_max) / 2
-                const screen = zoomPan.gridToScreen(centerX, centerY)
-                // Zoom to sector level using normalized zoom
-                zoomPan.setNormalizedZoom(0.05, screen.x, screen.y)
-              }}
-            />
-          </LayerWrapper>
           <LayerWrapper layerName="sector" normalizedZoom={normalizedZoom}>
             <SectorOverlay
               gridWidth={gridWidth}
@@ -793,7 +795,8 @@ export function UnifiedUniverseMapV2() {
                 const centerX = (range.x_min + range.x_max) / 2
                 const centerY = (range.y_min + range.y_max) / 2
                 const screen = zoomPan.gridToScreen(centerX, centerY)
-                zoomPan.setNormalizedZoom(0.15, screen.x, screen.y)
+                // Zoom to sector level (normalized 0.05-0.10 for smooth transition)
+                zoomPan.setNormalizedZoom(0.08, screen.x, screen.y)
               }}
             />
           </LayerWrapper>
@@ -828,8 +831,8 @@ export function UnifiedUniverseMapV2() {
                       onClick={() => handleSystemClick(system)}
                       style={{ pointerEvents: 'all' }}
                     />
-                    {/* Show galaxy name - visible from 0.02 scale onwards in sector view */}
-                    {zoomPan.scale >= 0.02 && (() => {
+                    {/* Show galaxy name - visible from 0% zoom (0.09 scale) onwards in sector view */}
+                    {zoomPan.scale >= 0.09 && (() => {
                       const galaxyKey = `${system.quadrant}:${system.sector}:${system.galaxy}`
                       const galaxyName = galaxyNames.get(galaxyKey)
                       return galaxyName && galaxyName.trim() ? (
@@ -848,7 +851,7 @@ export function UnifiedUniverseMapV2() {
                       ) : null
                     })()}
                     {/* Show system identifier below galaxy name (only if no galaxy name shown) */}
-                    {zoomPan.scale >= 0.02 && !(galaxyNames.get(`${system.quadrant}:${system.sector}:${system.galaxy}`)?.trim()) && (
+                    {zoomPan.scale >= 0.09 && !(galaxyNames.get(`${system.quadrant}:${system.sector}:${system.galaxy}`)?.trim()) && (
                       <text
                         x={system.center.x}
                         y={system.center.y + imageSize / 2 + 12}
@@ -937,7 +940,8 @@ export function UnifiedUniverseMapV2() {
                     className="galaxy-marker"
                     onClick={() => {
                       const screen = zoomPan.gridToScreen(centerX, centerY)
-                      zoomPan.setZoom(0.6, screen.x, screen.y)
+                      // Zoom to galaxy level using normalized zoom for consistent transitions
+                      zoomPan.setNormalizedZoom(0.35, screen.x, screen.y)
                     }}
                   >
                     <image
@@ -1044,6 +1048,8 @@ export function UnifiedUniverseMapV2() {
           gridWidth={gridWidth}
           gridHeight={gridHeight}
           systemsCount={systemsByKey.size}
+          minScale={0.09}
+          maxScale={1.554}
         />
         
         {/* Loading indicator overlay for planets (non-blocking) */}

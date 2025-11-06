@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Ship, MapPin, Clock, Shield, Target, ArrowLeftRight, Zap, Send, CheckCircle } from 'lucide-react'
 import { formatCoordinate, calculateDistance, parseCoordinate } from '@/lib/coordinates'
+import { convertToLegacyCoordinate } from '@/lib/coordinateConversion'
 import { hierarchicalToXy } from '@/lib/coordinateUtils'
 import { Coordinate } from '@/types/game.types'
 import { toast } from 'sonner'
@@ -76,22 +77,29 @@ export function FleetCommandPanel({ planetId, destinationPlanet }: FleetCommandP
       return
     }
 
+    // Convert coordinate to legacy format for API compatibility
+    const legacyCoord = convertToLegacyCoordinate(selectedDestination)
+    if (!legacyCoord) {
+      toast.error('Invalid destination coordinate format')
+      return
+    }
+
     // Convert hierarchical coordinates to X/Y coordinates
     const destinationXY = hierarchicalToXy(
-      selectedDestination.quadrant,
-      selectedDestination.sector,
-      selectedDestination.galaxy,
-      selectedDestination.planet
+      legacyCoord.quadrant,
+      legacyCoord.sector,
+      legacyCoord.galaxy,
+      legacyCoord.planet
     )
 
     try {
       await createFleet({
         ships: selectedShips,
         origin_planet_id: selectedOriginPlanet,
-        destination_quadrant: selectedDestination.quadrant,
-        destination_sector: selectedDestination.sector,
-        destination_galaxy: selectedDestination.galaxy,
-        destination_planet: selectedDestination.planet,
+        destination_quadrant: legacyCoord.quadrant,
+        destination_sector: legacyCoord.sector,
+        destination_galaxy: legacyCoord.galaxy,
+        destination_planet: legacyCoord.planet,
         destination_x: destinationXY.x,
         destination_y: destinationXY.y,
         order_type: orderType,

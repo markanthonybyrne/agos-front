@@ -437,18 +437,40 @@ export function UnifiedUniverseMap() {
             let destCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
 
             if ((fleet as any).origin?.coordinate) {
-              originCoord = parseCoordinate((fleet as any).origin.coordinate)
+              const parsed = parseCoordinate((fleet as any).origin.coordinate)
+              if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+                  parsed.galaxy !== undefined && parsed.planet !== undefined) {
+                originCoord = {
+                  quadrant: parsed.quadrant,
+                  sector: parsed.sector,
+                  galaxy: parsed.galaxy,
+                  planet: parsed.planet
+                }
+              }
             } else if ((fleet as any).origin_coordinate) {
               originCoord = (fleet as any).origin_coordinate
             }
 
             if ((fleet as any).destination?.coordinate) {
-              destCoord = parseCoordinate((fleet as any).destination.coordinate)
+              const parsed = parseCoordinate((fleet as any).destination.coordinate)
+              if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
+                  parsed.galaxy !== undefined && parsed.planet !== undefined) {
+                destCoord = {
+                  quadrant: parsed.quadrant,
+                  sector: parsed.sector,
+                  galaxy: parsed.galaxy,
+                  planet: parsed.planet
+                }
+              }
             } else if ((fleet as any).destination_coordinate) {
               destCoord = (fleet as any).destination_coordinate
             }
 
-            if (!originCoord || !destCoord) return null
+            if (!originCoord || !destCoord || 
+                originCoord.quadrant === undefined || originCoord.sector === undefined || originCoord.galaxy === undefined ||
+                destCoord.quadrant === undefined || destCoord.sector === undefined || destCoord.galaxy === undefined) {
+              return null
+            }
 
             // Find planets
             const originPlanet = planets.find(p => {
@@ -540,6 +562,9 @@ export function UnifiedUniverseMap() {
     const hierarchical = xyToHierarchical(centerX, centerY)
     
     // Get the galaxy range
+    if (hierarchical.quadrant === undefined || hierarchical.sector === undefined || hierarchical.galaxy === undefined) {
+      return null
+    }
     const galaxyRange = getGalaxyXyRange(hierarchical.quadrant, hierarchical.sector, hierarchical.galaxy)
     
     // Check if viewport is mostly within this galaxy
@@ -583,6 +608,9 @@ export function UnifiedUniverseMap() {
     const parsed = parseCoordinate(firstPlanet.coordinate)
     if (!parsed) return null
 
+    if (parsed.quadrant === undefined || parsed.sector === undefined || parsed.galaxy === undefined) {
+      return null
+    }
     const galaxyRange = getGalaxyXyRange(parsed.quadrant, parsed.sector, parsed.galaxy)
     const centerX = (galaxyRange.x_min + galaxyRange.x_max) / 2
     const centerY = (galaxyRange.y_min + galaxyRange.y_max) / 2

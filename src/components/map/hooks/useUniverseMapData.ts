@@ -27,11 +27,23 @@ function projectCoordinateToXY(coordString: string | undefined): { x: number; y:
   if (!coordString) return null
   const c = parseCoordinate(coordString)
   if (!c) return null
+  
+  // Use X/Y coordinates if available (new format)
+  if (c.x !== undefined && c.y !== undefined) {
+    return { x: c.x, y: c.y }
+  }
+  
+  // Fallback to hierarchical coordinates (old format)
   // Deterministic 2D placement based on hierarchical indices
   // Spread quadrants far apart, sectors medium, galaxies closer, planets tight
-  const x = c.quadrant * 5000 + c.sector * 800 + c.galaxy * 120 + (c.planet % 10) * 20
-  const y = c.quadrant * 500 + c.sector * 600 + (c.galaxy % 5) * 140 + (c.planet % 13) * 18
-  return { x, y }
+  if (c.quadrant !== undefined && c.sector !== undefined && 
+      c.galaxy !== undefined && c.planet !== undefined) {
+    const x = c.quadrant * 5000 + c.sector * 800 + c.galaxy * 120 + (c.planet % 10) * 20
+    const y = c.quadrant * 500 + c.sector * 600 + (c.galaxy % 5) * 140 + (c.planet % 13) * 18
+    return { x, y }
+  }
+  
+  return null
 }
 
 export function useUniverseMapData() {
