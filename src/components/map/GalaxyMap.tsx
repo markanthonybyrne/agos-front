@@ -12,7 +12,7 @@ import { SpiralArmGuidelinesLayer } from './SpiralArmGuidelinesLayer'
 import { GalacticOrbitalRingsLayer } from './GalacticOrbitalRingsLayer'
 import { Loader } from '@/components/ui/loader'
 import { Button } from '@/components/ui/button'
-import { ZoomIn, ZoomOut, RotateCcw, Home, Eye } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Home, Eye, GitBranch } from 'lucide-react'
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { getPlanetXY } from '@/lib/coordinates'
 
@@ -37,6 +37,7 @@ export function GalaxyMap() {
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null)
   const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
   const [zoomedIntoRegion, setZoomedIntoRegion] = useState(false)
+  const [showRoutes, setShowRoutes] = useState(false) // Toggle for hyperspace routes
   
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
@@ -324,10 +325,11 @@ export function GalaxyMap() {
           hoveredRegion={hoveredRegion}
         />
         
-        {/* Layer 3: Hyperspace Routes */}
+        {/* Layer 3: Hyperspace Routes (toggleable at any zoom level) */}
         <HyperspaceRoutesLayer 
           systems={galaxyData.systemMap}
           maxConnectionDistance={zoomPan.scale > initialScale * 2 ? 100 : 75}
+          showRoutes={showRoutes}
         />
         
         {/* Layer 4: System Markers */}
@@ -363,6 +365,15 @@ export function GalaxyMap() {
           title="Toggle Spiral Arm Guidelines"
         >
           <Eye className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowRoutes(!showRoutes)}
+          className={`bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90 ${showRoutes ? 'bg-blue-900/50' : ''}`}
+          title="Toggle Hyperspace Routes"
+        >
+          <GitBranch className="w-4 h-4" />
         </Button>
         <div className="h-px bg-white/20 my-1" />
         <Button

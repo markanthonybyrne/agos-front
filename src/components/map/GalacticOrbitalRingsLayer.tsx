@@ -33,7 +33,7 @@ export function GalacticOrbitalRingsLayer({
     // Start from inner radius and increase by fixed increments
     const ringSpacing = 150 // Distance between rings
     const startRadius = 200
-    const endRadius = Math.min(maxRadius, 800) // Limit to reasonable distance
+    const endRadius = Math.min(maxRadius, 950) // Limit to reasonable distance (extended to include one more ring)
     
     for (let radius = startRadius; radius <= endRadius; radius += ringSpacing) {
       // Calculate opacity based on distance (fade out near edges, but more visible overall)

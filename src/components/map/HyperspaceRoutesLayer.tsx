@@ -5,6 +5,7 @@ import { getRegionSystemColor } from '@/lib/regionColors'
 interface HyperspaceRoutesLayerProps {
   systems: SystemData[]
   maxConnectionDistance?: number
+  showRoutes?: boolean // Only show routes when zoomed into a region
 }
 
 /**
@@ -16,8 +17,13 @@ interface HyperspaceRoutesLayerProps {
  */
 export function HyperspaceRoutesLayer({ 
   systems, 
-  maxConnectionDistance = 75 
+  maxConnectionDistance = 75,
+  showRoutes = false
 }: HyperspaceRoutesLayerProps) {
+  // Don't render routes if not zoomed into a region
+  if (!showRoutes) {
+    return null
+  }
   const routes = useMemo(() => {
     const connections: Array<{ 
       x1: number
