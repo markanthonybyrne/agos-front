@@ -203,22 +203,46 @@ export function EVEStyleMapControls({
         <button
           onClick={() => setIsMinimized(false)}
           className={cn(
-            "pointer-events-auto w-12 h-12 rounded-full",
+            "pointer-events-auto w-12 h-12 rounded-full relative",
             "bg-gray-900/95 border-2 border-gray-700/50",
             "shadow-2xl shadow-black/50",
             "backdrop-blur-md",
             "flex items-center justify-center",
             "hover:bg-gray-800/95 hover:border-gray-600/70",
             "transition-all duration-300",
-            "group"
+            "group overflow-visible"
           )}
           style={{
             background: 'radial-gradient(circle at center, rgba(20, 20, 25, 0.95) 0%, rgba(10, 10, 15, 0.98) 100%)',
           }}
           title="Show Map Controls"
         >
+          {/* Cyan pulse effect on hover - similar to ticker countdown */}
+          {/* Expanding ping layer - extends beyond button for visible glow */}
+          <div 
+            className="absolute rounded-full bg-cyan-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              left: '-8px',
+              top: '-8px',
+              right: '-8px',
+              bottom: '-8px',
+              animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+            }}
+          />
+          {/* Pulsing glow layer - extends beyond button for visible glow */}
+          <div 
+            className="absolute rounded-full bg-cyan-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              left: '-8px',
+              top: '-8px',
+              right: '-8px',
+              bottom: '-8px',
+              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }}
+          />
+          
           {/* Small engine indicator */}
-          <div className="relative w-6 h-6 flex items-center justify-center">
+          <div className="relative w-6 h-6 flex items-center justify-center z-10">
             <div className="absolute w-4 h-4 rounded-full border border-[#FFAA00]/40" style={{
               boxShadow: '0 0 4px rgba(255, 170, 0, 0.3)',
             }} />
@@ -243,7 +267,7 @@ export function EVEStyleMapControls({
             })}
           </div>
           {/* Chevron up icon */}
-          <ChevronUp className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+          <ChevronUp className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 text-gray-400 group-hover:text-cyan-400 transition-colors z-10" />
         </button>
       </div>
     )
