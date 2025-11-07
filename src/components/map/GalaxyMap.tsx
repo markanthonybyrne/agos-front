@@ -647,6 +647,7 @@ export function GalaxyMap() {
           showNames={zoomedIntoRegion}
           viewportBounds={viewportBounds}
           homeSystem={homeSystem}
+          initialScale={initialScale}
         />
         
         {/* Layer 5: Incidents */}

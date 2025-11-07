@@ -63,12 +63,22 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
   // Handle main menu item click
   const handleMainMenuItemClick = useCallback(
     (item: MainMenuItem) => {
+      // Check if item has submenu first
       if (item.subMenuItems && item.subMenuItems.length > 0) {
         // Toggle submenu expansion
-        setExpandedMainMenuItem(
-          expandedMainMenuItem === item.id ? null : item.id
-        )
-      } else if (item.navigateTo) {
+        setExpandedMainMenuItem((prev) => {
+          // If this item is already expanded, collapse it
+          if (prev === item.id) {
+            return null
+          }
+          // Otherwise, expand this item
+          return item.id
+        })
+        return // Don't proceed to other handlers if there's a submenu
+      }
+      
+      // No submenu, handle other actions
+      if (item.navigateTo) {
         // Navigate to route
         navigate(item.navigateTo)
         setIsCollapsed(true)
@@ -84,7 +94,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
         setExpandedMainMenuItem(null)
       }
     },
-    [expandedMainMenuItem, openPanel, navigate]
+    [openPanel, navigate]
   )
 
   // Handle submenu item click
@@ -331,8 +341,13 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
                   {selectedCategoryConfig.label}
                 </h3>
                 <button
-                  onClick={() => setIsCollapsed(true)}
-                  className="w-8 h-8 flex items-center justify-center bg-transparent border-0 text-gray-300 hover:text-cyan-400 transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsCollapsed(true)
+                    setExpandedMainMenuItem(null)
+                  }}
+                  className="w-8 h-8 flex items-center justify-center bg-transparent border-0 text-gray-300 hover:text-cyan-400 transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -348,12 +363,18 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => handleMainMenuItemClick(item)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleMainMenuItemClick(item)
+                    }}
                     className={cn(
                       'w-full px-4 py-3 flex items-center justify-between',
                       'text-left transition-all duration-200',
                       'hover:bg-gray-800/50 hover:text-cyan-300',
-                      'text-white border-b border-gray-800/50'
+                      'text-white border-b border-gray-800/50',
+                      'cursor-pointer',
+                      expandedMainMenuItem === item.id && 'bg-gray-800/30 text-cyan-300'
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -376,10 +397,13 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
       {/* Submenu Panel - slides out from main menu, full height */}
       {!isCollapsed && expandedMainMenuItem && selectedCategoryConfig && (() => {
         const expandedItem = selectedCategoryConfig.mainMenuItems.find(
-          item => item.id === expandedMainMenuItem && item.subMenuItems && item.subMenuItems.length > 0
+          (item) => item.id === expandedMainMenuItem && item.subMenuItems && item.subMenuItems.length > 0
         )
         
-        if (!expandedItem) return null
+        // Check if item exists and has submenu items
+        if (!expandedItem) {
+          return null
+        }
         
         return (
           <div
@@ -401,10 +425,12 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
                     {expandedItem.label}
                   </h3>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                       setExpandedMainMenuItem(null)
                     }}
-                    className="w-8 h-8 flex items-center justify-center bg-transparent border-0 text-gray-300 hover:text-cyan-400 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center bg-transparent border-0 text-gray-300 hover:text-cyan-400 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -416,12 +442,17 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
                 {expandedItem.subMenuItems!.map((subItem) => (
                   <button
                     key={subItem.id}
-                    onClick={() => handleSubMenuItemClick(subItem)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleSubMenuItemClick(subItem)
+                    }}
                     className={cn(
                       'w-full px-4 py-3 flex items-center',
                       'text-left transition-all duration-200',
                       'hover:bg-gray-800/50 hover:text-cyan-300',
-                      'text-white border-b border-gray-800/50'
+                      'text-white border-b border-gray-800/50',
+                      'cursor-pointer'
                     )}
                   >
                     <span className="text-sm font-medium">{subItem.label}</span>

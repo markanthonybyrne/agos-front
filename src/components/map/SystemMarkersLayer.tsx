@@ -11,6 +11,7 @@ interface SystemMarkersLayerProps {
   scale?: number // Current zoom scale for adjusting marker size
   showNames?: boolean // Whether to show system names (only after zooming into region)
   homeSystem?: SystemData | null // User's home system - always visible
+  initialScale?: number // Initial/default zoom scale to show "You are here" indicator
 }
 
 /**
@@ -30,7 +31,8 @@ function SystemMarkersLayerComponent({
   scale = 1,
   showNames = false,
   viewportBounds,
-  homeSystem
+  homeSystem,
+  initialScale
 }: SystemMarkersLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
   // Viewport culling - only render systems visible in viewport
   // ALWAYS include home system even if outside viewport
@@ -58,7 +60,16 @@ function SystemMarkersLayerComponent({
   }, [systems, viewportBounds, homeSystem])
   
   const markers = useMemo(() => {
-    return visibleSystems.map(system => {
+    // Sort systems so home system is rendered last (appears on top)
+    const sortedSystems = [...visibleSystems].sort((a, b) => {
+      const aIsHome = homeSystem && a.region === homeSystem.region && a.system === homeSystem.system
+      const bIsHome = homeSystem && b.region === homeSystem.region && b.system === homeSystem.system
+      if (aIsHome && !bIsHome) return 1 // Home system comes after
+      if (!aIsHome && bIsHome) return -1 // Non-home comes before
+      return 0 // Keep original order for others
+    })
+    
+    return sortedSystems.map(system => {
       const isHovered = hoveredSystem?.region === system.region && 
                        hoveredSystem?.system === system.system
       
@@ -77,7 +88,21 @@ function SystemMarkersLayerComponent({
       
       // Marker size scales with zoom and system importance
       // Home system is always larger and more prominent
-      const baseSize = isHomeSystem ? 6 : (isKeySystem ? 4 : 3)
+      // At default zoom: 100% larger (2x), at 33% zoom: 100% larger (2x), at other zooms: 50% larger (1.5x)
+      let baseSize = isHomeSystem ? 6 : (isKeySystem ? 4 : 3)
+      
+      // Apply size multiplier for home system based on zoom level
+      if (isHomeSystem && initialScale) {
+        const zoomRatio = scale / initialScale
+        const isDefaultZoom = Math.abs(scale - initialScale) < initialScale * 0.15
+        const is33PercentZoom = Math.abs(zoomRatio - 0.33) < 0.05 // Within 5% tolerance of 33% zoom
+        
+        if (isDefaultZoom || is33PercentZoom) {
+          baseSize = baseSize * 2.0 // 100% larger at default zoom or 33% zoom
+        } else {
+          baseSize = baseSize * 1.5 // 50% larger at other zoom levels
+        }
+      }
       const markerSize = isHovered 
         ? baseSize * 1.5 
         : baseSize * Math.min(1.2, 1 + (scale - 1) * 0.1)
@@ -163,6 +188,86 @@ function SystemMarkersLayerComponent({
             />
           )}
           
+          {/* "You are here" indicator - shown at all zoom levels */}
+          {isHomeSystem && (
+            <g className="you-are-here-indicator" pointerEvents="none">
+              {/* Arrow pointing down */}
+              <path
+                d={`M ${system.center.x} ${system.center.y - markerSize - 40} 
+                    L ${system.center.x - 8} ${system.center.y - markerSize - 20} 
+                    L ${system.center.x + 8} ${system.center.y - markerSize - 20} Z`}
+                fill="#00FFFF"
+                stroke="#00FFFF"
+                strokeWidth={1.5}
+                opacity={0.9}
+                style={{
+                  filter: 'drop-shadow(0 0 4px rgba(0, 255, 255, 0.8)) drop-shadow(0 0 2px rgba(0, 255, 255, 0.6))'
+                }}
+              />
+              {/* Vertical line connecting arrow to marker */}
+              <line
+                x1={system.center.x}
+                y1={system.center.y - markerSize - 20}
+                x2={system.center.x}
+                y2={system.center.y - markerSize - 4}
+                stroke="#00FFFF"
+                strokeWidth={2}
+                opacity={0.7}
+                strokeDasharray="3 3"
+                style={{
+                  filter: 'drop-shadow(0 0 3px rgba(0, 255, 255, 0.6))'
+                }}
+              />
+              {/* "You are here" text with glass background and cut corner */}
+              {/* Main background with cut corner effect (10px x 10px notch on bottom-right) */}
+              {/* Box: 100px wide, 20px high (top: y-68, bottom: y-48) */}
+              {/* Path goes clockwise: top-left -> top-right -> right edge (down to cut start) -> cut (left then up) -> right edge continues -> bottom-left -> close */}
+              <path
+                d={`M ${system.center.x - 50} ${system.center.y - markerSize - 68} 
+                    L ${system.center.x + 50} ${system.center.y - markerSize - 68} 
+                    L ${system.center.x + 50} ${system.center.y - markerSize - 58} 
+                    L ${system.center.x + 40} ${system.center.y - markerSize - 58} 
+                    L ${system.center.x + 40} ${system.center.y - markerSize - 48} 
+                    L ${system.center.x - 50} ${system.center.y - markerSize - 48} Z`}
+                fill="rgba(28, 32, 36, 0.85)"
+                stroke="rgba(0, 255, 255, 0.3)"
+                strokeWidth={1}
+                strokeLinejoin="miter"
+                strokeLinecap="butt"
+                style={{
+                  filter: 'blur(0.5px)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                }}
+              />
+              {/* Glass overlay for depth - also with cut corner (top 10px only) */}
+              <path
+                d={`M ${system.center.x - 50} ${system.center.y - markerSize - 68} 
+                    L ${system.center.x + 50} ${system.center.y - markerSize - 68} 
+                    L ${system.center.x + 50} ${system.center.y - markerSize - 63} 
+                    L ${system.center.x + 40} ${system.center.y - markerSize - 63} 
+                    L ${system.center.x + 40} ${system.center.y - markerSize - 58} 
+                    L ${system.center.x - 50} ${system.center.y - markerSize - 58} Z`}
+                fill="rgba(255, 255, 255, 0.08)"
+              />
+              {/* Text - white, no glow */}
+              <text
+                x={system.center.x}
+                y={system.center.y - markerSize - 56}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="white"
+                style={{
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  pointerEvents: 'none'
+                }}
+              >
+                You are here
+              </text>
+            </g>
+          )}
+          
           {/* System name label with glass effect */}
           {showName && (
             <g className="system-label">
@@ -219,10 +324,11 @@ function SystemMarkersLayerComponent({
         </g>
       )
     })
-  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemRightClick, onSystemHover, scale, homeSystem])
+  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemRightClick, onSystemHover, scale, homeSystem, initialScale])
   
   return (
     <g className="system-markers-layer">
+      {/* Markers are already sorted so home system renders last (on top) */}
       {markers}
     </g>
   )
