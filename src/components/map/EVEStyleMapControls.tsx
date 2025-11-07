@@ -16,7 +16,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
@@ -93,6 +95,7 @@ export function EVEStyleMapControls({
   maxZoom = 1.554,
 }: EVEStyleMapControlsProps & { minZoom?: number; maxZoom?: number }) {
   const [engineActive, setEngineActive] = useState(true)
+  const [isMinimized, setIsMinimized] = useState(false)
   
   // Calculate zoom progress (0-100%) based on current zoom relative to min/max
   const zoomProgress = useMemo(() => {
@@ -193,8 +196,80 @@ export function EVEStyleMapControls({
   const mainCircleRadius = 96
   const buttonDistance = mainCircleRadius + 45 // Distance from center to button center
 
+  // If minimized, show a compact button to restore
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+        <button
+          onClick={() => setIsMinimized(false)}
+          className={cn(
+            "pointer-events-auto w-12 h-12 rounded-full",
+            "bg-gray-900/95 border-2 border-gray-700/50",
+            "shadow-2xl shadow-black/50",
+            "backdrop-blur-md",
+            "flex items-center justify-center",
+            "hover:bg-gray-800/95 hover:border-gray-600/70",
+            "transition-all duration-300",
+            "group"
+          )}
+          style={{
+            background: 'radial-gradient(circle at center, rgba(20, 20, 25, 0.95) 0%, rgba(10, 10, 15, 0.98) 100%)',
+          }}
+          title="Show Map Controls"
+        >
+          {/* Small engine indicator */}
+          <div className="relative w-6 h-6 flex items-center justify-center">
+            <div className="absolute w-4 h-4 rounded-full border border-[#FFAA00]/40" style={{
+              boxShadow: '0 0 4px rgba(255, 170, 0, 0.3)',
+            }} />
+            {[0, 90, 180, 270].map((angle) => {
+              const rad = (angle * Math.PI) / 180
+              const radius = 6
+              const x = Math.cos(rad) * radius
+              const y = Math.sin(rad) * radius
+              return (
+                <div
+                  key={angle}
+                  className="absolute w-1 h-1 bg-[#FFAA00] rounded-full"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    transform: `translate(${x}px, ${y}px) translate(-50%, -50%)`,
+                    opacity: 0.7,
+                    boxShadow: '0 0 3px rgba(255, 170, 0, 0.6)',
+                  }}
+                />
+              )
+            })}
+          </div>
+          {/* Chevron up icon */}
+          <ChevronUp className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+      {/* Minimize Button - Positioned above the control panel */}
+      <button
+        onClick={() => setIsMinimized(true)}
+        className={cn(
+          "pointer-events-auto absolute left-1/2 transform -translate-x-1/2 -top-8",
+          "w-8 h-8 rounded-full",
+          "bg-gray-900/90 border border-gray-600/40",
+          "flex items-center justify-center",
+          "hover:bg-gray-800/90 hover:border-gray-500/60",
+          "transition-all duration-200",
+          "shadow-lg shadow-black/30",
+          "backdrop-blur-sm",
+          "group"
+        )}
+        title="Minimize Controls"
+      >
+        <ChevronDown className="w-3 h-3 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+      </button>
+      
       {/* Main Circular Control Panel with Function Buttons */}
       <div className="relative pointer-events-auto" style={{ width: '350px', height: '350px' }}>
         {/* Function Buttons - Positioned around the main circle */}
