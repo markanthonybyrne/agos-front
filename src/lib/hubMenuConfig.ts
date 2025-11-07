@@ -41,6 +41,7 @@ export interface SubMenuItem {
   panelType?: PanelType
   panelSize?: PanelSize
   panelData?: any
+  subMenuItems?: SubMenuItem[] // Support nested submenus
   onClick?: () => void
 }
 
@@ -83,14 +84,56 @@ export const hubMenuConfig: HubCategory[] = [
           {
             id: 'activity-log',
             label: 'Activity Log',
-            panelType: PanelType.COMBAT_LOGS,
-            panelSize: PanelSize.LARGE,
+            // Provide nested submenu to demonstrate third-level panel
+            subMenuItems: [
+              {
+                id: 'recent-combat',
+                label: 'Recent Combat',
+                panelType: PanelType.COMBAT_LOGS,
+                panelSize: PanelSize.MEDIUM,
+                panelData: { filter: 'recent' },
+              },
+              {
+                id: 'filters',
+                label: 'Filters',
+                subMenuItems: [
+                  {
+                    id: 'filter-combat',
+                    label: 'Combat Only',
+                    panelType: PanelType.COMBAT_LOGS,
+                    panelSize: PanelSize.MEDIUM,
+                    panelData: { filter: 'combat' },
+                  },
+                  {
+                    id: 'filter-diplomacy',
+                    label: 'Diplomacy',
+                    panelType: PanelType.COMBAT_LOGS,
+                    panelSize: PanelSize.MEDIUM,
+                    panelData: { filter: 'diplomacy' },
+                  },
+                ],
+              },
+            ],
           },
           {
             id: 'combat-history',
             label: 'Combat History',
-            panelType: PanelType.COMBAT_LOGS,
-            panelSize: PanelSize.LARGE,
+            subMenuItems: [
+              {
+                id: 'by-date',
+                label: 'By Date',
+                panelType: PanelType.COMBAT_LOGS,
+                panelSize: PanelSize.MEDIUM,
+                panelData: { view: 'history-date' },
+              },
+              {
+                id: 'by-participant',
+                label: 'By Participant',
+                panelType: PanelType.COMBAT_LOGS,
+                panelSize: PanelSize.MEDIUM,
+                panelData: { view: 'history-participant' },
+              },
+            ],
           },
         ],
       },
@@ -144,9 +187,22 @@ export const hubMenuConfig: HubCategory[] = [
           {
             id: 'view-all',
             label: 'View All',
-            panelType: PanelType.MARKET,
-            panelSize: PanelSize.LARGE,
-            panelData: { view: 'transactions' },
+            subMenuItems: [
+              {
+                id: 'recent-transactions',
+                label: 'Recent',
+                panelType: PanelType.MARKET,
+                panelSize: PanelSize.MEDIUM,
+                panelData: { view: 'transactions', filter: 'recent' },
+              },
+              {
+                id: 'high-value',
+                label: 'High Value',
+                panelType: PanelType.MARKET,
+                panelSize: PanelSize.MEDIUM,
+                panelData: { view: 'transactions', filter: 'high-value' },
+              },
+            ],
           },
         ],
       },
@@ -341,13 +397,26 @@ export const hubMenuConfig: HubCategory[] = [
     mainMenuItems: [
       {
         id: 'help',
-        label: 'Help',
+        label: 'Help ergergh',
         icon: HelpCircle,
         subMenuItems: [
           {
             id: 'documentation',
             label: 'Documentation',
-            // No panel type - could navigate or open external link
+            subMenuItems: [
+              {
+                id: 'player-guide',
+                label: 'Player Guide sdhstrjd',
+                panelType: PanelType.SETTINGS,
+                panelSize: PanelSize.LARGE,
+              },
+              {
+                id: 'api-docs',
+                label: 'API Documentation',
+                panelType: PanelType.NOTIFICATIONS,
+                panelSize: PanelSize.LARGE,
+              },
+            ],
           },
         ],
       },

@@ -282,41 +282,10 @@ function SystemMarkersLayerComponent({
             </g>
           )}
           
-          {/* System name label with glass effect */}
+          {/* System name label - no background or border */}
           {showName && (
             <g className="system-label">
-              {/* Background rectangle with glass effect - calculate width based on text length */}
-              <rect
-                x={system.center.x - (systemLabel.length * 3.2 + 4)}
-                y={system.center.y + markerSize + 4}
-                width={(systemLabel.length * 6.4) + 8}
-                height={14}
-                fill="rgba(28, 32, 36, 0.75)"
-                opacity={0.9}
-                stroke={isHomeSystem ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.3)'}
-                strokeWidth={isHomeSystem ? 1.5 : 1}
-                rx={0}
-                className="system-label-bg"
-                style={{
-                  filter: 'blur(0.5px)',
-                  backdropFilter: 'blur(8px)',
-                  WebkitBackdropFilter: 'blur(8px)',
-                  transition: 'all 0.2s ease-in-out'
-                }}
-              />
-              {/* Glass overlay for depth */}
-              <rect
-                x={system.center.x - (systemLabel.length * 3.2 + 4)}
-                y={system.center.y + markerSize + 4}
-                width={(systemLabel.length * 6.4) + 8}
-                height={7}
-                fill="rgba(255, 255, 255, 0.08)"
-                rx={0}
-                style={{
-                  pointerEvents: 'none'
-                }}
-              />
-              {/* Text */}
+              {/* Text only - no background or border */}
               <text
                 x={system.center.x}
                 y={system.center.y + markerSize + 13}

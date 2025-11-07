@@ -18,12 +18,12 @@ import { GalaxyMapLegend } from './GalaxyMapLegend'
 import { GalacticCoreLayer } from './GalacticCoreLayer'
 import { SpiralArmGuidelinesLayer } from './SpiralArmGuidelinesLayer'
 import { GalacticOrbitalRingsLayer } from './GalacticOrbitalRingsLayer'
-import { PlanetOrbitsLayer } from './PlanetOrbitsLayer'
+// import { PlanetOrbitsLayer } from './PlanetOrbitsLayer' // Disabled - orbit lines removed at region level
 import { FogOfWarLayer } from './FogOfWarLayer'
 import { IncidentLayer } from '@/components/incidents/IncidentLayer'
 import { IncidentDetailPanel } from '@/components/incidents/IncidentDetailPanel'
 import { Incident } from '@/types/api.types'
-import { Loader } from '@/components/ui/loader'
+// import { Loader } from '@/components/ui/loader' // Replaced with blurred glass overlay
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { getPlanetXY } from '@/lib/coordinates'
 
@@ -55,6 +55,8 @@ export function GalaxyMap() {
   const [contextMenuSystem, setContextMenuSystem] = useState<SystemData | null>(null)
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
   const [showContextMenu, setShowContextMenu] = useState(false)
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
+  const [isFadingOut, setIsFadingOut] = useState(false)
   
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
@@ -535,18 +537,26 @@ export function GalaxyMap() {
   
   // Wait for planets to be loaded from Redux store before rendering map
   // This ensures we have all 8,000+ planets available
-  if (isLoadingConfig || isLoadingMap || !planetsLoaded || planetsToUse.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full w-full">
-        <Loader />
-        <div className="mt-4">
-          <p className="text-sm text-muted-foreground">
-            {!planetsLoaded ? `Loading ${planetsToUse.length.toLocaleString()} planets...` : 'Loading galaxy map...'}
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // Show blurred glass overlay while loading
+  const isLoading = isLoadingConfig || isLoadingMap || !planetsLoaded || planetsToUse.length === 0
+  
+  // Handle loading overlay fade-out
+  useEffect(() => {
+    if (!isLoading && showLoadingOverlay) {
+      // Start fade-out animation
+      setIsFadingOut(true)
+      // Remove overlay after fade-out animation completes
+      const timer = setTimeout(() => {
+        setShowLoadingOverlay(false)
+        setIsFadingOut(false)
+      }, 600) // Wait for fade-out animation (500ms) + small buffer
+      return () => clearTimeout(timer)
+    } else if (isLoading) {
+      // Show overlay when loading starts
+      setIsFadingOut(false)
+      setShowLoadingOverlay(true)
+    }
+  }, [isLoading, showLoadingOverlay])
   
   return (
     <div 
@@ -558,6 +568,19 @@ export function GalaxyMap() {
       onWheel={zoomPan.onWheel}
       onContextMenu={handleMapContextMenu}
     >
+      {/* Blurred glass overlay while loading - fades out when complete */}
+      {showLoadingOverlay && (
+        <div
+          className="fixed inset-0 z-[10000] pointer-events-none"
+          style={{
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            animation: isFadingOut ? 'fadeOutGlass 0.5s ease-out forwards' : 'fadeInGlass 0.3s ease-out forwards',
+          }}
+        />
+      )}
+      
       {/* SVG map */}
       <svg
         className="absolute inset-0 w-full h-full"
@@ -592,21 +615,14 @@ export function GalaxyMap() {
           minScale={initialScale * 2}
         />
         
-        {/* Layer 1.5: Galactic Orbital Rings (dashed circles around core - rendered on top) */}
-        {/* Hide orbital rings when showing planet orbits (zoom level 2.5x - 4.9x) */}
-        {(() => {
-          const zoomRatio = zoomPan.scale / initialScale
-          const showPlanetOrbits = zoomRatio >= 2.5 && zoomRatio < 4.9
-          if (showPlanetOrbits) return null
-          return (
-            <GalacticOrbitalRingsLayer
-              gridWidth={gridWidth}
-              gridHeight={gridHeight}
-              scale={zoomPan.scale}
-              minScale={initialScale * 3}
-            />
-          )
-        })()}
+        {/* Layer 1.5: Galactic Orbital Rings (dashed circles around core - region boundaries) */}
+        {/* Show region boundary lines up to system view threshold (5x initial scale) */}
+        <GalacticOrbitalRingsLayer
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+          scale={zoomPan.scale}
+          maxScale={initialScale * 5} // Show up to system view threshold
+        />
         
         {/* Layer 2: Region Overlays */}
         <GalaxyRegionLayer 
@@ -627,15 +643,15 @@ export function GalaxyMap() {
           viewportBounds={viewportBounds}
         />
         
-        {/* Layer 3.5: Planet Orbits (only at second zoom level, before system view) */}
-        <PlanetOrbitsLayer
+        {/* Layer 3.5: Planet Orbits - Disabled at region level per user request */}
+        {/* <PlanetOrbitsLayer
           systems={galaxyData.systemMap}
           scale={zoomPan.scale}
           initialScale={initialScale}
           viewBox={viewBox}
           minZoomRatio={2.5}
           maxZoomRatio={4.9}
-        />
+        /> */}
         
         {/* Layer 4: System Markers */}
         <SystemMarkersLayer
@@ -914,6 +930,39 @@ export function GalaxyMap() {
           onClose={closeContextMenu}
         />
       )}
+      
+      {/* CSS animations for loading overlay */}
+      <style>{`
+        @keyframes fadeInGlass {
+          from {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            background-color: rgba(0, 0, 0, 0);
+            opacity: 0;
+          }
+          to {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background-color: rgba(0, 0, 0, 0.5);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes fadeOutGlass {
+          from {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background-color: rgba(0, 0, 0, 0.5);
+            opacity: 1;
+          }
+          to {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            background-color: rgba(0, 0, 0, 0);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   )
 }

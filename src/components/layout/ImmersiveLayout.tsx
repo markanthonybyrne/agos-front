@@ -65,11 +65,12 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
         {/* Window Manager for desktop windows */}
         <WindowManager />
         
-        {/* Main content in center - planets, map, etc */}
-        {/* Padding adjusts based on sidebar state (sidebar component handles its own state) */}
-        <main className="relative z-0 pt-16 pl-16">
-          {children}
-        </main>
+                {/* Main content in center - planets, map, etc */}
+                {/* Padding adjusts based on sidebar state (sidebar component handles its own state) */}
+                {/* Sidebar is now 48px wide */}
+                <main className="relative z-0 pt-16 pl-12">
+                  {children}
+                </main>
       </div>
     </div>
   )

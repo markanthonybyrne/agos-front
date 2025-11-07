@@ -36,7 +36,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        'relative inline-flex items-center justify-center rounded-full bg-muted border border-border overflow-hidden',
+        'relative inline-flex items-center justify-center rounded-full bg-[#17191D] border-0 overflow-hidden',
         sizeClass,
         className
       )}
@@ -51,14 +51,14 @@ export function Avatar({
       ) : (
         <div
           className={cn(
-            'absolute inset-0 flex items-center justify-center font-semibold text-foreground bg-gradient-to-br from-primary/20 to-primary/10',
+            'absolute inset-0 flex items-center justify-center font-semibold text-white bg-[#17191D]',
             'flex'
           )}
         >
           {name ? (
-            <span className="select-none">{initials}</span>
+            <span className="select-none text-white">{initials}</span>
           ) : (
-            fallbackIcon || <User className="w-1/2 h-1/2 text-muted-foreground" />
+            fallbackIcon || <User className="w-1/2 h-1/2 text-white" />
           )}
         </div>
       )}

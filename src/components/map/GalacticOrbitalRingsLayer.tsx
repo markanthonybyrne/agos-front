@@ -5,7 +5,8 @@ interface GalacticOrbitalRingsLayerProps {
   gridWidth: number
   gridHeight: number
   scale: number
-  minScale?: number // Only show rings below this scale (full galaxy view)
+  minScale?: number // Only show rings below this scale (full galaxy view) - deprecated, use maxScale instead
+  maxScale?: number // Show rings up to this scale (region boundaries should show up to system view threshold)
 }
 
 /**
@@ -13,15 +14,21 @@ interface GalacticOrbitalRingsLayerProps {
  * 
  * Creates concentric dashed circles emanating from the galactic core,
  * representing orbital rings or distance markers from the center.
+ * These are region boundary lines that should be visible up to system view level.
  */
 export function GalacticOrbitalRingsLayer({
   gridWidth,
   gridHeight,
   scale,
-  minScale = 0.2, // Only show at full galaxy view
+  minScale, // Deprecated - kept for backward compatibility
+  maxScale, // Show up to this scale (e.g., initialScale * 5 for system view threshold)
 }: GalacticOrbitalRingsLayerProps) {
-  // Only render if zoomed out enough (full galaxy view)
-  const shouldShow = scale <= minScale
+  // Show if scale is within range
+  // If maxScale is provided, show up to that scale (for region boundaries)
+  // If only minScale is provided (backward compatibility), show below that scale
+  const shouldShow = maxScale !== undefined 
+    ? scale <= maxScale 
+    : (minScale !== undefined ? scale <= minScale : true)
 
   const orbitalRings = useMemo(() => {
     if (!shouldShow) return []

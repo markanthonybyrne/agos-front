@@ -7,10 +7,11 @@ import { SystemViewMemo } from './SystemView'
 import { SystemData } from '@/lib/systemUtils'
 import { getPlanetXY, parseCoordinate } from '@/lib/coordinates'
 import { Planet } from '@/types/api.types'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
-import { Loader } from '@/components/ui/loader'
+// import { Loader } from '@/components/ui/loader' // Replaced with blurred glass overlay
+import { WarpTransition } from './WarpTransition'
 
 /**
  * SystemViewScreen - Detailed system view screen
@@ -28,9 +29,17 @@ export function SystemViewScreen() {
   const navigate = useNavigate()
   const { openPanel } = usePanel()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
+  const [showWarp, setShowWarp] = useState(true)
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
+  const [isFadingOut, setIsFadingOut] = useState(false)
   
   const regionNum = region ? parseInt(region, 10) : null
   const systemNum = system ? parseInt(system, 10) : null
+  
+  // Show warp animation on mount
+  useEffect(() => {
+    setShowWarp(true)
+  }, [])
   
   // Fetch planets for this system
   // Note: Remove limit or set it very high to ensure we get all planets in the system
@@ -153,18 +162,23 @@ export function SystemViewScreen() {
     })
   }
   
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full w-full">
-        <Loader />
-        <div className="mt-4">
-          <p className="text-sm text-muted-foreground">
-            Loading system...
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // Handle loading overlay fade-out
+  useEffect(() => {
+    if (!isLoading && showLoadingOverlay) {
+      // Start fade-out animation
+      setIsFadingOut(true)
+      // Remove overlay after fade-out animation completes
+      const timer = setTimeout(() => {
+        setShowLoadingOverlay(false)
+        setIsFadingOut(false)
+      }, 600) // Wait for fade-out animation (500ms) + small buffer
+      return () => clearTimeout(timer)
+    } else if (isLoading) {
+      // Show overlay when loading starts
+      setIsFadingOut(false)
+      setShowLoadingOverlay(true)
+    }
+  }, [isLoading, showLoadingOverlay])
   
   if (!systemViewData) {
     return (
@@ -179,61 +193,169 @@ export function SystemViewScreen() {
   }
   
   return (
-    <div 
-      className="fixed inset-0 overflow-hidden z-0"
-      style={{ 
-        backgroundColor: 'transparent',
-      }}
-    >
-      {/* Back button */}
-      <div className="absolute top-4 left-4 z-10">
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/map')}
-          className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Galaxy Map
-        </Button>
-      </div>
+    <>
+      {/* Blurred glass overlay while loading - fades out when complete */}
+      {showLoadingOverlay && (
+        <div
+          className="fixed inset-0 z-[10000] pointer-events-none"
+          style={{
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            animation: isFadingOut ? 'fadeOutGlass 0.5s ease-out forwards' : 'fadeInGlass 0.3s ease-out forwards',
+          }}
+        />
+      )}
       
-      {/* System name header */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-        <div className="bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
-          <h2 className="text-white text-lg font-semibold">
-            {systemViewData.system_name || `System ${regionNum}:${systemNum}`}
-          </h2>
-          {systemViewData.galaxy_name && (
-            <p className="text-white/70 text-sm">
-              {systemViewData.galaxy_name}
-            </p>
-          )}
-        </div>
-      </div>
+      {/* Frosted glass blur overlay - creates glass effect on background */}
+      {showWarp && (
+        <div
+          className="fixed inset-0 z-[9998] pointer-events-none"
+          style={{
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            animation: 'fadeInBlur 0.4s ease-out forwards',
+          }}
+        />
+      )}
       
-      {/* SVG system view */}
-      <svg
-        className="absolute inset-0 w-full h-full"
-        style={{
-          width: '100%',
-          height: '100%',
+      {/* Zoom animation wrapper - system view content zooms in */}
+      <div 
+        className="fixed inset-0 overflow-hidden"
+        style={{ 
+          backgroundColor: 'transparent',
+          zIndex: showWarp ? 9999 : 0,
+          animation: showWarp ? `zoomInFocus 800ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards` : 'none',
+          transformOrigin: 'center center',
         }}
-        viewBox={`0 0 ${systemViewData.bounds.x_max - systemViewData.bounds.x_min + 200} ${systemViewData.bounds.y_max - systemViewData.bounds.y_min + 200}`}
-        preserveAspectRatio="xMidYMid meet"
       >
-        <g transform={`translate(${100 - systemViewData.bounds.x_min}, ${100 - systemViewData.bounds.y_min})`}>
-          <SystemViewMemo
-            system={systemViewData}
-            scale={1.5}
-            normalizedZoom={0.8}
-            detailLevel="full"
-            onPlanetClick={handlePlanetClick}
-            onPlanetHover={setHoveredPlanet}
-            hoveredPlanet={hoveredPlanet}
-            systemName={systemViewData.system_name}
+        {/* Transition completion handler */}
+        {showWarp && (
+          <WarpTransition
+            duration={800}
+            onComplete={() => setShowWarp(false)}
+            className="hidden"
           />
-        </g>
-      </svg>
-    </div>
+        )}
+        
+        {/* Back button */}
+        <div className="absolute top-4 left-4 z-10">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/map')}
+            className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Galaxy Map
+          </Button>
+        </div>
+        
+        {/* System name header */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+          <div className="bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
+            <h2 className="text-white text-lg font-semibold">
+              {systemViewData.system_name || `System ${regionNum}:${systemNum}`}
+            </h2>
+            {systemViewData.galaxy_name && (
+              <p className="text-white/70 text-sm">
+                {systemViewData.galaxy_name}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* SVG system view */}
+        <svg
+          className="absolute inset-0 w-full h-full"
+          style={{
+            width: '100%',
+            height: '100%',
+          }}
+          viewBox={`0 0 ${systemViewData.bounds.x_max - systemViewData.bounds.x_min + 200} ${systemViewData.bounds.y_max - systemViewData.bounds.y_min + 200}`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <g transform={`translate(${100 - systemViewData.bounds.x_min}, ${100 - systemViewData.bounds.y_min})`}>
+            <SystemViewMemo
+              system={systemViewData}
+              scale={1.5}
+              normalizedZoom={0.8}
+              detailLevel="full"
+              onPlanetClick={handlePlanetClick}
+              onPlanetHover={setHoveredPlanet}
+              hoveredPlanet={hoveredPlanet}
+              systemName={systemViewData.system_name}
+            />
+          </g>
+        </svg>
+      </div>
+      
+      {/* CSS animations */}
+      <style>{`
+        @keyframes fadeInGlass {
+          from {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            background-color: rgba(0, 0, 0, 0);
+            opacity: 0;
+          }
+          to {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background-color: rgba(0, 0, 0, 0.5);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes fadeOutGlass {
+          from {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background-color: rgba(0, 0, 0, 0.5);
+            opacity: 1;
+          }
+          to {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            background-color: rgba(0, 0, 0, 0);
+            opacity: 0;
+          }
+        }
+        
+        @keyframes fadeInBlur {
+          from {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            background-color: rgba(0, 0, 0, 0);
+          }
+          to {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background-color: rgba(0, 0, 0, 0.4);
+          }
+        }
+        
+        @keyframes zoomInFocus {
+          0% {
+            opacity: 0;
+            transform: scale(0.2);
+            filter: blur(25px);
+          }
+          30% {
+            opacity: 0.5;
+            filter: blur(15px);
+          }
+          60% {
+            opacity: 0.8;
+            filter: blur(5px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+            filter: blur(0px);
+          }
+        }
+      `}</style>
+    </>
   )
 }

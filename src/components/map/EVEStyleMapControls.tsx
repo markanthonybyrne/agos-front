@@ -95,7 +95,7 @@ export function EVEStyleMapControls({
   maxZoom = 1.554,
 }: EVEStyleMapControlsProps & { minZoom?: number; maxZoom?: number }) {
   const [engineActive, setEngineActive] = useState(true)
-  const [isMinimized, setIsMinimized] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(true)
   
   // Calculate zoom progress (0-100%) based on current zoom relative to min/max
   const zoomProgress = useMemo(() => {
