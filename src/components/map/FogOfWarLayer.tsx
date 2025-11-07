@@ -197,10 +197,12 @@ export function FogOfWarLayer({
 
         // Medium padding for system-level reveals
         const padding = 60
+        // Calculate center from planet positions (more accurate than bounds)
         const centerX = (minX + maxX) / 2
         const centerY = (minY + maxY) / 2
-        const width = maxX - minX + padding * 2
-        const height = maxY - minY + padding * 2
+        // Ensure minimum size for reveals
+        const width = Math.max(maxX - minX, 40) + padding * 2
+        const height = Math.max(maxY - minY, 40) + padding * 2
 
         systemRevealsFromPlanets.push({
           centerX,
@@ -234,12 +236,13 @@ export function FogOfWarLayer({
       
       if (!inViewport) return
       
-      // Medium padding for system-level reveals
+      // Use system center directly (this is the actual system position)
+      // Calculate reveal size from bounds with padding
       const revealPadding = 60
-      const centerX = (bounds.minX + bounds.maxX) / 2
-      const centerY = (bounds.minY + bounds.maxY) / 2
-      const width = bounds.maxX - bounds.minX + revealPadding * 2
-      const height = bounds.maxY - bounds.minY + revealPadding * 2
+      const centerX = center.x  // Use actual system center
+      const centerY = center.y  // Use actual system center
+      const width = Math.max(bounds.maxX - bounds.minX, 40) + revealPadding * 2  // Ensure minimum size
+      const height = Math.max(bounds.maxY - bounds.minY, 40) + revealPadding * 2  // Ensure minimum size
 
       systemRevealsFromSystems.push({
         centerX,
@@ -281,9 +284,12 @@ export function FogOfWarLayer({
     }
   }, [planets, systems, viewportBounds, hasFullVisibility])
 
-  // Calculate fog bounds - cover entire grid with padding (in grid coordinates)
+  // Calculate fog bounds - cover entire viewport with generous padding
+  // This ensures the fog always covers the full screen, even when panning/zooming
   const fogBounds = useMemo(() => {
-    const padding = 1000
+    // Cover the entire grid plus large padding to ensure full viewport coverage
+    // This prevents the fog from appearing as a smaller rectangle
+    const padding = Math.max(gridWidth, gridHeight) * 2 // Very large padding to cover any viewport
     return {
       x: -padding,
       y: -padding,

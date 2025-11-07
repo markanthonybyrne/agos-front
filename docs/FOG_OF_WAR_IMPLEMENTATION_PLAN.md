@@ -36,18 +36,16 @@ This document outlines the plan to fix the fog of war layer on the galaxy map to
    - Add `gridWidth` and `gridHeight` props (already exist)
 
 2. **Implement Three-Tier Reveal System**
-   - **Region-Level Reveals**: 
+   - **Region-Level Reveals**:
      - Filter planets where `fog_of_war.region_visible === true`
      - Group by `coordinate.region`
      - Create large elliptical reveal areas covering all planets in each region
      - Use smooth radial gradients for edges
-   
    - **System-Level Reveals**:
      - Filter planets where `fog_of_war.system_visible === true` AND `fog_of_war.region_visible === false`
      - Group by `coordinate.region:coordinate.system` key
      - Create medium elliptical reveal areas covering all planets in each system
      - Use smooth radial gradients for edges
-   
    - **Planet-Level Reveals**:
      - Filter planets where `fog_of_war.planet_discovered === true` AND `fog_of_war.system_visible === false` AND `fog_of_war.region_visible === false`
      - Create small circular reveal areas around each individual planet
@@ -106,16 +104,14 @@ This document outlines the plan to fix the fog of war layer on the galaxy map to
 
 ### Reveal Area Sizing
 
-- **Region-Level**: 
+- **Region-Level**:
   - Calculate bounding box of all planets in region
   - Add padding: 100px
   - Create elliptical reveal with smooth gradient
-  
 - **System-Level**:
   - Calculate bounding box of all planets in system
   - Add padding: 60px
   - Create elliptical reveal with smooth gradient
-  
 - **Planet-Level**:
   - Fixed radius: 40px
   - Create circular reveal with smooth gradient
@@ -126,20 +122,20 @@ Use radial gradients for smooth reveal edges:
 
 ```typescript
 // Region-level gradient
-gradient.addColorStop(0, "rgba(0, 0, 0, 1)")      // Fully opaque at center
-gradient.addColorStop(0.6, "rgba(0, 0, 0, 0.95)")  // Mostly opaque
-gradient.addColorStop(0.85, "rgba(0, 0, 0, 0.8)")  // Fading
-gradient.addColorStop(1, "rgba(0, 0, 0, 0)")       // Transparent at edge
+gradient.addColorStop(0, 'rgba(0, 0, 0, 1)') // Fully opaque at center
+gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.95)') // Mostly opaque
+gradient.addColorStop(0.85, 'rgba(0, 0, 0, 0.8)') // Fading
+gradient.addColorStop(1, 'rgba(0, 0, 0, 0)') // Transparent at edge
 
 // System-level gradient
-gradient.addColorStop(0, "rgba(0, 0, 0, 0.9)")
-gradient.addColorStop(0.7, "rgba(0, 0, 0, 0.8)")
-gradient.addColorStop(1, "rgba(0, 0, 0, 0)")
+gradient.addColorStop(0, 'rgba(0, 0, 0, 0.9)')
+gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.8)')
+gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
 
 // Planet-level gradient
-gradient.addColorStop(0, "rgba(0, 0, 0, 0.8)")
-gradient.addColorStop(0.6, "rgba(0, 0, 0, 0.6)")
-gradient.addColorStop(1, "rgba(0, 0, 0, 0)")
+gradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)')
+gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.6)')
+gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
 ```
 
 ### SVG vs Canvas Approach
@@ -194,28 +190,34 @@ const svgY = (planet.coordinate.y / gridHeight) * viewBoxHeight
 ## Implementation Steps
 
 ### Step 1: Update FogOfWarLayer Interface
+
 - Add `planets: Planet[]` prop
 - Remove dependency on visibility ranges
 
 ### Step 2: Implement Planet Grouping
+
 - Group planets by visibility tier (region/system/planet)
 - Calculate bounding boxes for each group
 
 ### Step 3: Implement Reveal Areas
+
 - Create SVG masks or use composite operations
 - Render reveals with smooth gradients
 - Order: region → system → planet
 
 ### Step 4: Apply Visual Effects
+
 - Add opacity/blur to planets based on `discovery_status`
 - Test with different visibility states
 
 ### Step 5: Integration
+
 - Update GalaxyMap to pass planets
 - Test end-to-end
 - Optimize performance
 
 ### Step 6: Testing
+
 - Test all visibility scenarios
 - Test performance with large planet counts
 - Test edge cases (no visibility, full visibility, etc.)
@@ -236,4 +238,3 @@ const svgY = (planet.coordinate.y / gridHeight) * viewBoxHeight
 - Use actual planet positions, not rectangular ranges
 - Smooth gradients are key for professional RTS-style appearance
 - Performance optimization: only render reveals in viewport
-

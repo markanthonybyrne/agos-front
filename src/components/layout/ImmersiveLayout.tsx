@@ -42,8 +42,8 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
         }}
       />
       
-      {/* Cosmic overlay effects */}
-      <div className="fixed inset-0 bg-space-dark/60 pointer-events-none" />
+      {/* Cosmic overlay effects - reduced opacity since FOW provides darkening */}
+      <div className="fixed inset-0 bg-space-dark/30 pointer-events-none" />
       
       {/* Animated stars layer */}
       <div className="fixed inset-0 pointer-events-none cosmic-stars" />
