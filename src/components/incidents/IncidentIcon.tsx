@@ -85,3 +85,4 @@ export function IncidentIcon({ incident, size = 24, className }: IncidentIconPro
   )
 }
 
+

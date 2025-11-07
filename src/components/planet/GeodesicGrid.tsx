@@ -31,111 +31,208 @@ function normalize(v: { x: number; y: number; z: number }) {
   return len > 0 ? { x: v.x/len, y: v.y/len, z: v.z/len } : v
 }
 
-// Simple geodesic sphere using spherical coordinates
-function generateGeodesicSphere() {
-  const cells: GridCell[] = []
-  let cellId = 0
-  
-  // Icosahedron vertices (12 points where pentagons will be)
-  const t = (1.0 + Math.sqrt(5.0)) / 2.0
-  const pentagonCenters = [
-    normalize({ x: -1, y: t, z: 0 }),
-    normalize({ x: 1, y: t, z: 0 }),
-    normalize({ x: -1, y: -t, z: 0 }),
-    normalize({ x: 1, y: -t, z: 0 }),
-    normalize({ x: 0, y: -1, z: t }),
-    normalize({ x: 0, y: 1, z: t }),
-    normalize({ x: 0, y: -1, z: -t }),
-    normalize({ x: 0, y: 1, z: -t }),
-    normalize({ x: t, y: 0, z: -1 }),
-    normalize({ x: t, y: 0, z: 1 }),
-    normalize({ x: -t, y: 0, z: -1 }),
-    normalize({ x: -t, y: 0, z: 1 }),
+const GEODESIC_FREQUENCY = 3
+
+type Vertex3 = { x: number; y: number; z: number }
+
+function dot(a: Vertex3, b: Vertex3) {
+  return a.x * b.x + a.y * b.y + a.z * b.z
+}
+
+function cross(a: Vertex3, b: Vertex3): Vertex3 {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  }
+}
+
+function subtract(a: Vertex3, b: Vertex3): Vertex3 {
+  return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }
+}
+
+function createIcosahedron(): { vertices: Vertex3[]; faces: number[][] } {
+  const t = (1 + Math.sqrt(5)) / 2
+
+  const rawVertices: Vertex3[] = [
+    { x: -1, y: t, z: 0 },
+    { x: 1, y: t, z: 0 },
+    { x: -1, y: -t, z: 0 },
+    { x: 1, y: -t, z: 0 },
+    { x: 0, y: -1, z: t },
+    { x: 0, y: 1, z: t },
+    { x: 0, y: -1, z: -t },
+    { x: 0, y: 1, z: -t },
+    { x: t, y: 0, z: -1 },
+    { x: t, y: 0, z: 1 },
+    { x: -t, y: 0, z: -1 },
+    { x: -t, y: 0, z: 1 },
   ]
-  
-  // Check if a point is near a pentagon center
-  function isNearPentagon(point: { x: number; y: number; z: number }, threshold = 0.3): boolean {
-    return pentagonCenters.some(pent => {
-      const dx = point.x - pent.x
-      const dy = point.y - pent.y
-      const dz = point.z - pent.z
-      return Math.sqrt(dx*dx + dy*dy + dz*dz) < threshold
-    })
+
+  const vertices = rawVertices.map(normalize)
+
+  const faces: number[][] = [
+    [0, 11, 5],
+    [0, 5, 1],
+    [0, 1, 7],
+    [0, 7, 10],
+    [0, 10, 11],
+    [1, 5, 9],
+    [5, 11, 4],
+    [11, 10, 2],
+    [10, 7, 6],
+    [7, 1, 8],
+    [3, 9, 4],
+    [3, 4, 2],
+    [3, 2, 6],
+    [3, 6, 8],
+    [3, 8, 9],
+    [4, 9, 5],
+    [2, 4, 11],
+    [6, 2, 10],
+    [8, 6, 7],
+    [9, 8, 1],
+  ]
+
+  return { vertices, faces }
+}
+
+function generateGeodesicSphere(frequency = GEODESIC_FREQUENCY) {
+  const { vertices: baseVertices, faces: baseFaces } = createIcosahedron()
+
+  const vertexMap = new Map<string, number>()
+  const vertices: Vertex3[] = []
+  const faces: number[][] = []
+
+  function addVertex(point: Vertex3): number {
+    const normalizedPoint = normalize(point)
+    const key = `${normalizedPoint.x.toFixed(6)}|${normalizedPoint.y.toFixed(6)}|${normalizedPoint.z.toFixed(6)}`
+    const existing = vertexMap.get(key)
+    if (existing !== undefined) return existing
+    const idx = vertices.length
+    vertices.push(normalizedPoint)
+    vertexMap.set(key, idx)
+    return idx
   }
-  
-  // Generate cells using rings
-  const rings = 8 // Number of latitude rings
-  
-  for (let ring = 0; ring < rings; ring++) {
-    const theta = (Math.PI * ring) / (rings - 1) // 0 to PI
-    const ringRadius = Math.sin(theta)
-    const y = Math.cos(theta)
-    
-    if (ringRadius < 0.15) continue // Skip very small rings near poles
-    
-    // Calculate number of cells around this ring
-    const cellSize = 0.18 // Size of each cell
-    const circumference = 2 * Math.PI * ringRadius
-    const cellCount = Math.max(6, Math.floor(circumference / (cellSize * Math.sqrt(3))))
-    
-    for (let i = 0; i < cellCount; i++) {
-      const phi = (2 * Math.PI * i) / cellCount
-      
-      // Calculate cell center
-      const centerX = ringRadius * Math.cos(phi)
-      const centerZ = ringRadius * Math.sin(phi)
-      const center = normalize({ x: centerX, y, z: centerZ })
-      
-      // Check if this should be a pentagon
-      const isPentagon = isNearPentagon(center)
-      const sides = isPentagon ? 5 : 6
-      
-      // Generate vertices around center in local tangent plane
-      const vertices: Array<{ x: number; y: number; z: number }> = []
-      
-      // Tangent vectors for this point
-      const tangentEast = normalize({ 
-        x: -Math.sin(phi), 
-        y: 0, 
-        z: Math.cos(phi) 
-      })
-      
-      const tangentNorth = normalize({
-        x: -Math.cos(theta) * Math.cos(phi),
-        y: Math.sin(theta),
-        z: -Math.cos(theta) * Math.sin(phi)
-      })
-      
-      // Generate vertices
-      for (let v = 0; v < sides; v++) {
-        const angle = (2 * Math.PI * v) / sides
-        // Rotate for flat-top hexagons
-        const rotatedAngle = angle + Math.PI / 6
-        
-        const localX = cellSize * Math.cos(rotatedAngle)
-        const localY = cellSize * Math.sin(rotatedAngle)
-        
-        // Transform to world coordinates
-        const worldX = centerX + localX * tangentEast.x + localY * tangentNorth.x
-        const worldY = y + localX * tangentEast.y + localY * tangentNorth.y
-        const worldZ = centerZ + localX * tangentEast.z + localY * tangentNorth.z
-        
-        // Project onto sphere
-        const vertex = normalize({ x: worldX, y: worldY, z: worldZ })
-        vertices.push(vertex)
+
+  baseFaces.forEach((face) => {
+    const [aIdx, bIdx, cIdx] = face
+    const a = baseVertices[aIdx]
+    const b = baseVertices[bIdx]
+    const c = baseVertices[cIdx]
+
+    const indexRows: number[][] = []
+
+    for (let i = 0; i <= frequency; i++) {
+      const row: number[] = []
+      for (let j = 0; j <= frequency - i; j++) {
+        const k = frequency - i - j
+        const point = {
+          x: (a.x * i + b.x * j + c.x * k) / frequency,
+          y: (a.y * i + b.y * j + c.y * k) / frequency,
+          z: (a.z * i + b.z * j + c.z * k) / frequency,
+        }
+        row.push(addVertex(point))
       }
-      
-      cells.push({
-        id: cellId++,
-        vertices,
-        projected: [],
-        center,
-        projectedCenter: { x: 0, y: 0 },
-        isPentagon,
-      })
+      indexRows.push(row)
     }
+
+    for (let i = 0; i < frequency; i++) {
+      for (let j = 0; j < frequency - i; j++) {
+        const v1 = indexRows[i][j]
+        const v2 = indexRows[i + 1][j]
+        const v3 = indexRows[i][j + 1]
+        faces.push([v1, v2, v3])
+
+        if (j < frequency - i - 1) {
+          const v4 = indexRows[i + 1][j + 1]
+          faces.push([v2, v4, v3])
+        }
+      }
+    }
+  })
+
+  const faceCenters = faces.map((face) => {
+    const [i0, i1, i2] = face
+    const v0 = vertices[i0]
+    const v1 = vertices[i1]
+    const v2 = vertices[i2]
+    return normalize({
+      x: (v0.x + v1.x + v2.x) / 3,
+      y: (v0.y + v1.y + v2.y) / 3,
+      z: (v0.z + v1.z + v2.z) / 3,
+    })
+  })
+
+  const vertexFaces: number[][] = Array.from({ length: vertices.length }, () => [])
+  faces.forEach((face, faceIndex) => {
+    face.forEach((vertexIndex) => {
+      vertexFaces[vertexIndex].push(faceIndex)
+    })
+  })
+
+  function sortFaceCentersAroundVertex(center: Vertex3, faceIndices: number[]) {
+    if (faceIndices.length === 0) return [] as Vertex3[]
+
+    const normal = normalize(center)
+    const reference = Math.abs(normal.y) < 0.9 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 }
+    let tangent = cross(reference, normal)
+    const tangentLength = Math.sqrt(dot(tangent, tangent))
+    if (tangentLength < 1e-6) {
+      tangent = cross({ x: 0, y: 0, z: 1 }, normal)
+    }
+    tangent = normalize(tangent)
+    const bitangent = cross(normal, tangent)
+
+    return faceIndices
+      .map((faceIndex) => faceCenters[faceIndex])
+      .map((point) => {
+        const diff = subtract(point, {
+          x: normal.x * dot(point, normal),
+          y: normal.y * dot(point, normal),
+          z: normal.z * dot(point, normal),
+        })
+        const u = dot(diff, tangent)
+        const v = dot(diff, bitangent)
+        const angle = Math.atan2(v, u)
+        return { point, angle }
+      })
+      .sort((a, b) => a.angle - b.angle)
+      .map(({ point }) => point)
   }
-  
+
+  let cellId = 0
+  const cells: GridCell[] = []
+
+  vertexFaces.forEach((facesForVertex, vertexIndex) => {
+    if (facesForVertex.length < 5) {
+      return
+    }
+
+    const center = vertices[vertexIndex]
+    const polygonVertices = sortFaceCentersAroundVertex(center, facesForVertex)
+    const uniqueVertices = polygonVertices.filter((vertex, index, array) => {
+      const key = `${vertex.x.toFixed(6)}|${vertex.y.toFixed(6)}|${vertex.z.toFixed(6)}`
+      return (
+        index ===
+        array.findIndex((v) => `${v.x.toFixed(6)}|${v.y.toFixed(6)}|${v.z.toFixed(6)}` === key)
+      )
+    })
+
+    if (uniqueVertices.length < 5) {
+      return
+    }
+
+    cells.push({
+      id: cellId++,
+      vertices: uniqueVertices,
+      projected: [],
+      center,
+      projectedCenter: { x: 0, y: 0 },
+      isPentagon: uniqueVertices.length === 5,
+    })
+  })
+
   return cells
 }
 
