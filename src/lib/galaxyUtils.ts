@@ -38,9 +38,15 @@ export interface SystemData {
 
 /**
  * Extract region and system from a planet's coordinate
+ * Prefers stored region/system columns over computed values
  */
 export function getPlanetRegionAndSystem(planet: Planet): { region: number | null; system: number | null } {
-  // Try to get from coordinate object
+  // Prefer stored region/system columns (backend stores these now)
+  if (typeof planet.region === 'number' && typeof planet.system === 'number') {
+    return { region: planet.region, system: planet.system }
+  }
+  
+  // Fallback: Try to get from coordinate object
   if (typeof planet.coordinate === 'object' && planet.coordinate !== null) {
     const coord = planet.coordinate as any
     // Try new Region:System format first
@@ -53,7 +59,7 @@ export function getPlanetRegionAndSystem(planet: Planet): { region: number | nul
     }
   }
   
-  // Try to parse from coordinate string
+  // Fallback: Try to parse from coordinate string
   if (typeof planet.coordinate === 'string') {
     const parts = planet.coordinate.split(':').map(Number)
     // New format: "R:S:P" (Region:System:Planet)

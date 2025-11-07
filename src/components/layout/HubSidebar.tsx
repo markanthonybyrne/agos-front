@@ -274,13 +274,13 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
               setSelectedCategory('personal')
               setIsCollapsed(false)
             }}
-            className="w-full bg-transparent border-0 p-0 cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+            className="w-full h-[48px] bg-transparent border-0 p-0 cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0 flex items-center justify-center"
           >
             <Avatar
               src={getUserAvatarUrl(meData?.user)}
               name={meData?.user?.username || 'User'}
               size="sm"
-              className="border-0 w-full aspect-square rounded-none [&>div]:rounded-none [&>div]:bg-[#17191D] [&>div>div]:bg-[#17191D] [&>div>div]:text-white [&>div>span]:text-white"
+              className="border-0 w-[48px] h-[48px] rounded-none [&>div]:w-full [&>div]:h-full [&>div]:rounded-none [&>div]:bg-[#17191D]/80 [&>div]:backdrop-blur-sm [&>div>div]:bg-[#17191D]/80 [&>div>div]:text-white [&>div>span]:text-white"
             />
           </button>
 

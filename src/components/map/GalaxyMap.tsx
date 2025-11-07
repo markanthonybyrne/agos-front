@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
+import { useGetUniverseConfigQuery, useGetMapQuery, useGetVisibilityQuery } from '@/api/endpoints/universeApi'
 import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useNavigate } from 'react-router-dom'
 import { buildGalaxyData, SystemData, RegionData } from '@/lib/galaxyUtils'
@@ -26,6 +26,8 @@ import { Incident } from '@/types/api.types'
 // import { Loader } from '@/components/ui/loader' // Replaced with blurred glass overlay
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { getPlanetXY } from '@/lib/coordinates'
+import { isPlanetVisible } from '@/lib/visibilityUtils'
+import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
 
 const DEFAULT_GRID_WIDTH = 2000
 const DEFAULT_GRID_HEIGHT = 2000
@@ -87,38 +89,164 @@ export function GalaxyMap() {
   // Fetch incidents (filtered by visibility automatically by API)
   const { data: incidentsData } = useGetIncidentsQuery()
   
-  // Build galaxy data structure from planets
-  // Use planets from Redux store (all 8,000+) instead of limited mapData
-  const galaxyData = useMemo(() => {
+  // Fetch visibility data to filter planets/systems/regions
+  const { data: visibilityData } = useGetVisibilityQuery()
+  
+  // Filter planets by visibility before building galaxy data
+  const visiblePlanets = useMemo(() => {
     if (!planetsToUse || planetsToUse.length === 0) {
-      return { regions: new Map(), systems: new Map(), systemMap: [] }
+      return []
     }
     
+    // Filter planets that are visible based on fog of war or visibility data
+    return planetsToUse.filter(planet => {
+      // Check planet's own visibility flags first (most direct)
+      if (planet.fog_of_war) {
+        if (!planet.fog_of_war.is_visible) return false
+      } else if (planet.visibility) {
+        if (!planet.visibility.is_visible) return false
+      } else {
+        // Fallback: Check against visibility data
+        if (!isPlanetVisible(planet, visibilityData)) return false
+      }
+      
+      return true
+    })
+  }, [planetsToUse, visibilityData])
+  
+  // Build galaxy data structure from visible planets only
+  const galaxyData = useMemo(() => {
     // Build galaxy data with region and system names from API response
     const regionNames = mapData?.region_names || {}
     const systemNames = mapData?.system_names || {}
-    return buildGalaxyData(planetsToUse, regionNames, systemNames)
-  }, [planetsToUse, mapData?.region_names, mapData?.system_names])
+    
+    // If no visible planets, still create empty regions with names for the legend
+    if (!visiblePlanets || visiblePlanets.length === 0) {
+      const regions = new Map<number, RegionData>()
+      // Create all 20 regions with names (for legend display)
+      for (let i = 1; i <= 20; i++) {
+        const regionName = regionNames[i.toString()] || regionNames[i] || null
+        const trimmedName = regionName && typeof regionName === 'string' ? regionName.trim() : null
+        regions.set(i, {
+          region: i,
+          name: trimmedName,
+          systems: [],
+          bounds: {
+            minX: 0,
+            maxX: gridWidth,
+            minY: 0,
+            maxY: gridHeight,
+            centerX: gridWidth / 2,
+            centerY: gridHeight / 2,
+          }
+        })
+      }
+      return { regions, systems: new Map(), systemMap: [] }
+    }
+    
+    const built = buildGalaxyData(visiblePlanets, regionNames, systemNames)
+    
+    // Ensure all 20 regions exist in the map (even if empty) for legend display
+    // This preserves region names even when regions have no visible planets
+    // Also update existing regions to ensure they have names from regionNames map
+    for (let i = 1; i <= 20; i++) {
+      const existingRegion = built.regions.get(i)
+      
+      // Get region name from regionNames map (most reliable source)
+      const regionName = regionNames[i.toString()] || regionNames[i] || null
+      const trimmedName = regionName && typeof regionName === 'string' ? regionName.trim() : null
+      
+      // Try to get name from any planet (even if not visible) as fallback
+      let fallbackName: string | null = null
+      if (!trimmedName && planetsToUse.length > 0) {
+        const planetWithRegion = planetsToUse.find(p => {
+          const { region } = getPlanetRegionAndSystem(p)
+          return region === i
+        })
+        fallbackName = planetWithRegion?.region_name?.trim() || null
+      }
+      
+      const finalName = trimmedName || fallbackName
+      
+      if (existingRegion) {
+        // Update existing region to ensure it has the name from regionNames map
+        // Only update if we have a name and the existing one is different/null
+        if (finalName && existingRegion.name !== finalName) {
+          built.regions.set(i, {
+            ...existingRegion,
+            name: finalName
+          })
+        }
+      } else {
+        // Create missing region
+        built.regions.set(i, {
+          region: i,
+          name: finalName,
+          systems: [],
+          bounds: {
+            minX: 0,
+            maxX: gridWidth,
+            minY: 0,
+            maxY: gridHeight,
+            centerX: gridWidth / 2,
+            centerY: gridHeight / 2,
+          }
+        })
+      }
+    }
+    
+    return built
+  }, [visiblePlanets, mapData?.region_names, mapData?.system_names, planetsToUse, gridWidth, gridHeight])
   
-  // Find the user's home system
+  // Find the user's home system (always visible, even if not in visible planets)
   const homeSystem = useMemo(() => {
-    if (!empire?.homeworld_planet_id || !planetsToUse || planetsToUse.length === 0) {
+    if (!empire?.homeworld_planet_id) {
       return null
     }
     
-    // Find the homeworld planet from Redux store (all planets) or mapData
-    const homeworldPlanet = planetsToUse.find(p => p.id === empire.homeworld_planet_id)
+    // First try to find in visible planets
+    let homeworldPlanet = visiblePlanets.find(p => p.id === empire.homeworld_planet_id)
+    
+    // If not found in visible planets, try all planets (home system should always be visible)
+    if (!homeworldPlanet && planetsToUse.length > 0) {
+      homeworldPlanet = planetsToUse.find(p => p.id === empire.homeworld_planet_id)
+    }
+    
     if (!homeworldPlanet) {
       return null
     }
     
-    // Find the system containing this homeworld
-    const homeSystem = galaxyData.systemMap.find(system => 
+    // Find the system containing this homeworld (check visible systems first, then all)
+    let homeSystem = galaxyData.systemMap.find(system => 
       system.planets.some(p => p.id === empire.homeworld_planet_id)
     )
     
+    // If not found in visible systems, build a temporary system data for homeworld
+    if (!homeSystem && homeworldPlanet) {
+      const { region, system } = getPlanetRegionAndSystem(homeworldPlanet)
+      if (region !== null && system !== null) {
+        // Build a minimal system data for home system
+        const xy = getPlanetXY(homeworldPlanet)
+        if (xy) {
+          homeSystem = {
+            region,
+            system,
+            name: homeworldPlanet.system_name || null,
+            center: xy,
+            bounds: {
+              minX: xy.x - 10,
+              maxX: xy.x + 10,
+              minY: xy.y - 10,
+              maxY: xy.y + 10,
+            },
+            planets: [homeworldPlanet],
+          }
+        }
+      }
+    }
+    
     return homeSystem || null
-  }, [empire?.homeworld_planet_id, planetsToUse, galaxyData.systemMap])
+  }, [empire?.homeworld_planet_id, visiblePlanets, planetsToUse, galaxyData.systemMap])
   
   // Initialize zoom/pan - start with scale to fit entire galaxy
   // Use actual window/viewport dimensions for responsive sizing
@@ -665,6 +793,7 @@ export function GalaxyMap() {
           viewportBounds={viewportBounds}
           homeSystem={homeSystem}
           initialScale={initialScale}
+          visibilityData={visibilityData}
         />
         
         {/* Layer 5: Incidents */}
@@ -685,6 +814,9 @@ export function GalaxyMap() {
             gridHeight={gridHeight}
             viewportBounds={viewportBounds}
             scale={zoomPan.scale}
+            planets={mapData?.planets || planetsToUse.filter(p => p.fog_of_war?.is_visible !== false)}
+            systems={galaxyData.systemMap}
+            homeSystem={homeSystem}
           />
         </g>
       </svg>

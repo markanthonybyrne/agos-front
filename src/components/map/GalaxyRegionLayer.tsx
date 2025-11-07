@@ -1,9 +1,11 @@
-import { useMemo, memo } from 'react'
+import { useMemo, memo, useCallback } from 'react'
 import { RegionData } from '@/lib/galaxyUtils'
 import { getRegionColor, getRegionBorderColor } from '@/lib/regionColors'
 import { cn } from '@/lib/utils'
 import { convexHull, hullToPath, Point } from '@/lib/spiralUtils'
 import { getPlanetXY } from '@/lib/coordinates'
+import { VisibilityResponse } from '@/types/api.types'
+import { isRegionVisible, getVisibleRegions } from '@/lib/visibilityUtils'
 
 interface GalaxyRegionLayerProps {
   regions: Map<number, RegionData>
@@ -12,6 +14,7 @@ interface GalaxyRegionLayerProps {
   onRegionClick?: (region: RegionData, event: React.MouseEvent) => void
   onRegionHover?: (region: RegionData | null) => void
   hoveredRegion?: RegionData | null
+  visibilityData?: VisibilityResponse // Visibility data for fog of war filtering
 }
 
 /**
@@ -28,23 +31,42 @@ function GalaxyRegionLayerComponent({
   onRegionClick,
   onRegionHover,
   hoveredRegion,
-  viewportBounds
+  viewportBounds,
+  visibilityData
 }: GalaxyRegionLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
-  // Viewport culling - only render regions that intersect viewport
+  // Get set of visible region numbers for fast lookup
+  const visibleRegionNumbers = useMemo(() => getVisibleRegions(visibilityData), [visibilityData])
+  
+  // Filter regions by visibility and viewport
   const visibleRegions = useMemo(() => {
-    if (!viewportBounds) return Array.from(regions.values())
+    let filtered = Array.from(regions.values())
     
-    return Array.from(regions.values()).filter(region => {
-      const { bounds } = region
-      // Check if region bounds intersect viewport
-      return !(
-        bounds.maxX < viewportBounds.minX ||
-        bounds.minX > viewportBounds.maxX ||
-        bounds.maxY < viewportBounds.minY ||
-        bounds.minY > viewportBounds.maxY
-      )
-    })
-  }, [regions, viewportBounds])
+    // Filter by visibility
+    if (visibilityData && visibleRegionNumbers.size > 0) {
+      filtered = filtered.filter(region => visibleRegionNumbers.has(region.region))
+    }
+    
+    // Filter by viewport bounds
+    if (viewportBounds) {
+      filtered = filtered.filter(region => {
+        const { bounds } = region
+        // Check if region bounds intersect viewport
+        return !(
+          bounds.maxX < viewportBounds.minX ||
+          bounds.minX > viewportBounds.maxX ||
+          bounds.maxY < viewportBounds.minY ||
+          bounds.minY > viewportBounds.maxY
+        )
+      })
+    }
+    
+    return filtered
+  }, [regions, viewportBounds, visibleRegionNumbers, visibilityData])
+  
+  // Check if a region is visible (for blocking interactions)
+  const isRegionVisibleForInteraction = useCallback((region: RegionData): boolean => {
+    return isRegionVisible(region.region, visibilityData)
+  }, [visibilityData])
   
   const regionPaths = useMemo(() => {
     return visibleRegions.map(region => {
@@ -89,10 +111,26 @@ function GalaxyRegionLayerComponent({
         <g 
           key={`region-${region.region}`}
           className={cn('region-group', isHovered && 'region-hovered')}
-          onClick={(e) => onRegionClick?.(region, e)}
-          onMouseEnter={() => onRegionHover?.(region)}
+          onClick={(e) => {
+            // Block clicks on hidden regions
+            if (!isRegionVisibleForInteraction(region)) {
+              e.stopPropagation()
+              return
+            }
+            onRegionClick?.(region, e)
+          }}
+          onMouseEnter={() => {
+            // Only trigger hover for visible regions
+            if (isRegionVisibleForInteraction(region)) {
+              onRegionHover?.(region)
+            }
+          }}
           onMouseLeave={() => onRegionHover?.(null)}
-          style={{ cursor: 'pointer' }}
+          style={{ 
+            cursor: isRegionVisibleForInteraction(region) ? 'pointer' : 'default',
+            opacity: isRegionVisibleForInteraction(region) ? 1 : 0.3,
+            pointerEvents: isRegionVisibleForInteraction(region) ? 'auto' : 'none'
+          }}
         >
           {/* Region fill - very subtle colored overlay (no borders) */}
           <path
@@ -124,7 +162,7 @@ function GalaxyRegionLayerComponent({
         </g>
       )
     })
-  }, [visibleRegions, hoveredRegion, onRegionClick, onRegionHover])
+  }, [visibleRegions, hoveredRegion, onRegionClick, onRegionHover, isRegionVisibleForInteraction])
   
   return (
     <g className="galaxy-region-layer">

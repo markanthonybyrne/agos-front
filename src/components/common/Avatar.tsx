@@ -13,10 +13,10 @@ interface AvatarProps {
 }
 
 const sizeClasses = {
-  sm: 'w-8 h-8 text-xs',
-  md: 'w-10 h-10 text-sm',
-  lg: 'w-16 h-16 text-lg',
-  xl: 'w-24 h-24 text-xl',
+  sm: 'text-xs',
+  md: 'text-sm',
+  lg: 'text-lg',
+  xl: 'text-xl',
 }
 
 export function Avatar({
@@ -36,7 +36,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        'relative inline-flex items-center justify-center rounded-full bg-[#17191D] border-0 overflow-hidden',
+        'relative inline-flex items-center justify-center rounded-full bg-[#17191D]/80 backdrop-blur-sm border-0 overflow-hidden',
         sizeClass,
         className
       )}
@@ -45,13 +45,13 @@ export function Avatar({
         <img
           src={avatarUrl}
           alt={alt || name || 'Avatar'}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover opacity-90"
           onError={() => setImageError(true)}
         />
       ) : (
         <div
           className={cn(
-            'absolute inset-0 flex items-center justify-center font-semibold text-white bg-[#17191D]',
+            'absolute inset-0 flex items-center justify-center font-semibold text-white bg-[#17191D]/80',
             'flex'
           )}
         >

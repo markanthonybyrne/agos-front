@@ -193,6 +193,9 @@ export interface Planet {
   }
   fog_of_war?: FogOfWar // New fog of war data
   discovered?: boolean // Alternative field name
+  // Stored region/system columns (preferred over computed values)
+  region?: number
+  system?: number
   // X/Y coordinates (0-999 grid) - source of truth for positioning
   x?: number
   y?: number

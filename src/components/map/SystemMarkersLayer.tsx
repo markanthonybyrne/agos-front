@@ -1,6 +1,8 @@
-import { useMemo, memo } from 'react'
+import { useMemo, memo, useCallback } from 'react'
 import { SystemData } from '@/lib/galaxyUtils'
 import { getRegionSystemColor } from '@/lib/regionColors'
+import { VisibilityResponse } from '@/types/api.types'
+import { isSystemVisible, getVisibleSystems } from '@/lib/visibilityUtils'
 
 interface SystemMarkersLayerProps {
   systems: SystemData[]
@@ -12,6 +14,7 @@ interface SystemMarkersLayerProps {
   showNames?: boolean // Whether to show system names (only after zooming into region)
   homeSystem?: SystemData | null // User's home system - always visible
   initialScale?: number // Initial/default zoom scale to show "You are here" indicator
+  visibilityData?: VisibilityResponse // Visibility data for fog of war filtering
 }
 
 /**
@@ -32,32 +35,64 @@ function SystemMarkersLayerComponent({
   showNames = false,
   viewportBounds,
   homeSystem,
-  initialScale
+  initialScale,
+  visibilityData
 }: SystemMarkersLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
-  // Viewport culling - only render systems visible in viewport
-  // ALWAYS include home system even if outside viewport
+  // Get set of visible system keys for fast lookup
+  const visibleSystemKeys = useMemo(() => getVisibleSystems(visibilityData), [visibilityData])
+  
+  // Filter systems by visibility and viewport
+  // ALWAYS include home system even if outside viewport or not in visibility data
   const visibleSystems = useMemo(() => {
-    if (!viewportBounds) return systems
+    let filtered = systems
     
-    const viewportSystems = systems.filter(system => {
-      // Always include home system
-      if (homeSystem && system.region === homeSystem.region && system.system === homeSystem.system) {
-        return true
-      }
-      
-      const { x, y } = system.center
-      // Add padding for smooth rendering during panning
-      const padding = 50
-      return (
-        x >= viewportBounds.minX - padding &&
-        x <= viewportBounds.maxX + padding &&
-        y >= viewportBounds.minY - padding &&
-        y <= viewportBounds.maxY + padding
-      )
-    })
+    // Filter by visibility (except home system)
+    if (visibilityData && visibleSystemKeys.size > 0) {
+      filtered = systems.filter(system => {
+        // Always include home system
+        if (homeSystem && system.region === homeSystem.region && system.system === homeSystem.system) {
+          return true
+        }
+        
+        // Check if system is in visible systems set
+        const systemKey = `${system.region}:${system.system}`
+        return visibleSystemKeys.has(systemKey)
+      })
+    }
     
-    return viewportSystems
-  }, [systems, viewportBounds, homeSystem])
+    // Filter by viewport bounds
+    if (viewportBounds) {
+      filtered = filtered.filter(system => {
+        // Always include home system
+        if (homeSystem && system.region === homeSystem.region && system.system === homeSystem.system) {
+          return true
+        }
+        
+        const { x, y } = system.center
+        // Add padding for smooth rendering during panning
+        const padding = 50
+        return (
+          x >= viewportBounds.minX - padding &&
+          x <= viewportBounds.maxX + padding &&
+          y >= viewportBounds.minY - padding &&
+          y <= viewportBounds.maxY + padding
+        )
+      })
+    }
+    
+    return filtered
+  }, [systems, viewportBounds, homeSystem, visibleSystemKeys, visibilityData])
+  
+  // Check if a system is visible (for blocking interactions)
+  const isSystemVisibleForInteraction = useCallback((system: SystemData): boolean => {
+    // Home system is always interactable
+    if (homeSystem && system.region === homeSystem.region && system.system === homeSystem.system) {
+      return true
+    }
+    
+    // Check visibility
+    return isSystemVisible(system.region, system.system, visibilityData)
+  }, [homeSystem, visibilityData])
   
   const markers = useMemo(() => {
     // Sort systems so home system is rendered last (appears on top)
@@ -117,24 +152,65 @@ function SystemMarkersLayerComponent({
         ? 'Home System' 
         : (system.name || `System ${system.region}:${system.system}`)
       
+      // Determine visual effects based on fog of war discovery status
+      // Check planets in this system to determine overall discovery status
+      let systemDiscoveryStatus: 'visible' | 'fogged' = 'visible'
+      if (!isHomeSystem) {
+        const planets = system.planets || []
+        if (planets.length > 0) {
+          // If any planet has region_visible, system is fully visible
+          if (planets.some(p => p.fog_of_war?.region_visible === true)) {
+            systemDiscoveryStatus = 'visible'
+          }
+          // If any planet has system_visible (but not region_visible), system is fogged
+          else if (planets.some(p => p.fog_of_war?.system_visible === true && p.fog_of_war?.region_visible === false)) {
+            systemDiscoveryStatus = 'fogged'
+          }
+          // If any planet is discovered (but system/region not visible), system is fogged
+          else if (planets.some(p => p.fog_of_war?.planet_discovered === true)) {
+            systemDiscoveryStatus = 'fogged'
+          }
+        }
+      }
+      
+      // Apply visual effects based on discovery status
+      const systemOpacity = systemDiscoveryStatus === 'visible' ? 1.0 : 0.6
+      const systemBlur = systemDiscoveryStatus === 'fogged' ? 2 : 0
+      
       return (
         <g
           key={`system-${system.region}-${system.system}`}
           className="system-marker"
           onClick={(e) => {
+            // Block clicks on hidden systems
+            if (!isSystemVisibleForInteraction(system)) {
+              e.stopPropagation()
+              return
+            }
             // Only handle left clicks
             if (e.button === 0 || e.type === 'click') {
               onSystemClick?.(system)
             }
           }}
           onContextMenu={(e) => {
+            // Block right-clicks on hidden systems
+            if (!isSystemVisibleForInteraction(system)) {
+              e.preventDefault()
+              e.stopPropagation()
+              return
+            }
             e.preventDefault()
             e.stopPropagation()
             onSystemRightClick?.(system, e)
           }}
           onMouseEnter={() => onSystemHover?.(system)}
           onMouseLeave={() => onSystemHover?.(null)}
-          style={{ cursor: 'pointer' }}
+          style={{ 
+            cursor: isSystemVisibleForInteraction(system) ? 'pointer' : 'default',
+            opacity: isSystemVisibleForInteraction(system) ? systemOpacity : 0.3,
+            filter: systemBlur > 0 ? `blur(${systemBlur}px)` : 'none',
+            pointerEvents: isSystemVisibleForInteraction(system) ? 'auto' : 'none'
+          }}
         >
           {/* Outer glow - enhanced for home system */}
           <circle
@@ -307,7 +383,7 @@ function SystemMarkersLayerComponent({
         </g>
       )
     })
-  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemRightClick, onSystemHover, scale, homeSystem, initialScale])
+  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemRightClick, onSystemHover, scale, homeSystem, initialScale, isSystemVisibleForInteraction])
   
   return (
     <g className="system-markers-layer">
