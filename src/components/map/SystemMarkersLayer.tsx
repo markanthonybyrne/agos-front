@@ -240,6 +240,20 @@ function SystemMarkersLayerComponent({
                   WebkitBackdropFilter: 'blur(8px)',
                 }}
               />
+              {/* Cyan glowing stripe at top - 2px */}
+              <line
+                x1={system.center.x - 50}
+                y1={system.center.y - markerSize - 68}
+                x2={system.center.x + 50}
+                y2={system.center.y - markerSize - 68}
+                stroke="#00FFFF"
+                strokeWidth={2}
+                strokeLinecap="round"
+                style={{
+                  filter: 'drop-shadow(0 0 10px rgba(0, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(0, 255, 255, 0.7)) drop-shadow(0 0 2px rgba(0, 255, 255, 0.5))',
+                  opacity: 0.9
+                }}
+              />
               {/* Glass overlay for depth - also with cut corner (top 10px only) */}
               <path
                 d={`M ${system.center.x - 50} ${system.center.y - markerSize - 68} 

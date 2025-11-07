@@ -744,8 +744,17 @@ export function GalaxyMap() {
                 transform: 'translateX(-50%)',
               }}
             >
-              <div className="panel-glass border border-cyan-500/30 rounded-none px-4 py-3 shadow-2xl shadow-cyan-500/10 min-w-[200px]">
-                <div className="space-y-1.5">
+              <div className="panel-glass border border-cyan-500/30 rounded-none px-4 py-3 shadow-2xl shadow-cyan-500/10 min-w-[200px] relative">
+                {/* Glowing Cyan Stripe at Top */}
+                <div 
+                  className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
+                  style={{
+                    height: '2px',
+                    background: 'linear-gradient(to right, transparent 0%, #00FFFF 20%, #00FFFF 80%, transparent 100%)',
+                    boxShadow: '0 0 10px rgba(0, 255, 255, 0.9), 0 0 5px rgba(0, 255, 255, 0.7), 0 0 2px rgba(0, 255, 255, 0.5)',
+                  }}
+                />
+                <div className="space-y-1.5" style={{ paddingTop: 'calc(0.25rem + 2px)' }}>
                   <div className="flex items-center justify-between gap-3">
                     <h4 className="font-semibold text-base text-cyan-400">
                       {hoveredSystem.name || `System ${hoveredSystem.region}:${hoveredSystem.system}`}
@@ -840,8 +849,17 @@ export function GalaxyMap() {
                 transform: 'translateX(-50%)',
               }}
             >
-              <div className="panel-glass border border-cyan-500/30 rounded-none px-4 py-3 shadow-2xl shadow-cyan-500/10 min-w-[200px]">
-                <div className="space-y-1.5">
+              <div className="panel-glass border border-cyan-500/30 rounded-none px-4 py-3 shadow-2xl shadow-cyan-500/10 min-w-[200px] relative">
+                {/* Glowing Cyan Stripe at Top */}
+                <div 
+                  className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
+                  style={{
+                    height: '2px',
+                    background: 'linear-gradient(to right, transparent 0%, #00FFFF 20%, #00FFFF 80%, transparent 100%)',
+                    boxShadow: '0 0 10px rgba(0, 255, 255, 0.9), 0 0 5px rgba(0, 255, 255, 0.7), 0 0 2px rgba(0, 255, 255, 0.5)',
+                  }}
+                />
+                <div className="space-y-1.5" style={{ paddingTop: 'calc(0.25rem + 2px)' }}>
                   <div className="flex items-center justify-between gap-3">
                     <h4 className="font-semibold text-base text-cyan-400">
                       {hoveredRegion.name || `Region ${hoveredRegion.region}`}
