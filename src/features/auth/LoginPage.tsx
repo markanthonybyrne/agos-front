@@ -20,6 +20,7 @@ import splashImage2 from '../../../assets/images/backgrounds/splash_image_2.jpg'
 import splashImage3 from '../../../assets/images/backgrounds/splash_image_3.jpg'
 import splashImage4 from '../../../assets/images/backgrounds/splash_image_4.jpg'
 import consoleImage from '../../../assets/images/backgrounds/console.jpg'
+import welcomeBackAudio from '../../../assets/audio/welcome_back.mp3'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -96,6 +97,18 @@ export function LoginPage() {
         
         dispatch(setCredentials(credentials))
         toast.success('Welcome back, Commander!')
+        
+        // Play welcome audio
+        try {
+          const audio = new Audio(welcomeBackAudio)
+          audio.volume = 0.7 // Set volume to 70%
+          audio.play().catch((error) => {
+            // Audio play failed (likely due to browser autoplay policy)
+            console.debug('Could not play welcome audio:', error)
+          })
+        } catch (error) {
+          console.debug('Error loading welcome audio:', error)
+        }
         
         // Small delay to allow blur overlay to appear
         setTimeout(() => {

@@ -92,10 +92,11 @@ export function GalaxyMap() {
       return { regions: new Map(), systems: new Map(), systemMap: [] }
     }
     
-    // Build galaxy data with region names from API response
+    // Build galaxy data with region and system names from API response
     const regionNames = mapData?.region_names || {}
-    return buildGalaxyData(planetsToUse, regionNames)
-  }, [planetsToUse, mapData?.region_names])
+    const systemNames = mapData?.system_names || {}
+    return buildGalaxyData(planetsToUse, regionNames, systemNames)
+  }, [planetsToUse, mapData?.region_names, mapData?.system_names])
   
   // Find the user's home system
   const homeSystem = useMemo(() => {
@@ -766,6 +767,94 @@ export function GalaxyMap() {
                         • {hoveredSystem.planets.filter(p => p.owner_empire_id === empire?.id).length} owned
                       </span>
                     )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+      
+      {/* Region Tooltip - Glass style with connecting line */}
+      {hoveredRegion && (() => {
+        const regionCenter = zoomPan.gridToScreen(hoveredRegion.bounds.centerX, hoveredRegion.bounds.centerY)
+        const tooltipY = regionCenter.y - 80
+        const tooltipX = regionCenter.x
+        const tooltipHeight = 80 // Approximate tooltip height
+        const lineStartY = tooltipY + tooltipHeight // Bottom of tooltip
+        const lineEndY = regionCenter.y // Region center
+        const lineLength = lineEndY - lineStartY
+        
+        // Calculate total planets in region
+        const totalPlanets = hoveredRegion.systems.reduce((sum, system) => sum + system.planets.length, 0)
+        const totalSystems = hoveredRegion.systems.length
+        
+        return (
+          <>
+            {/* Connecting line from tooltip to region center with draw animation */}
+            <svg
+              className="fixed z-40 pointer-events-none"
+              style={{
+                left: 0,
+                top: 0,
+                width: '100vw',
+                height: '100vh',
+              }}
+            >
+              <line
+                x1={tooltipX}
+                y1={lineStartY}
+                x2={tooltipX}
+                y2={lineEndY}
+                stroke="#00FFFF"
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                strokeDasharray="8 4"
+                style={{
+                  filter: 'drop-shadow(0 0 3px rgba(0, 255, 255, 0.9)) drop-shadow(0 0 1px rgba(0, 255, 255, 0.5))',
+                  strokeDashoffset: lineLength,
+                  animation: `drawLine-region-${hoveredRegion.region} 0.4s ease-out forwards`,
+                  animationDelay: '0.1s',
+                }}
+              />
+              <style>{`
+                @keyframes drawLine-region-${hoveredRegion.region} {
+                  from {
+                    stroke-dashoffset: ${lineLength};
+                    opacity: 0;
+                  }
+                  to {
+                    stroke-dashoffset: 0;
+                    opacity: 1;
+                  }
+                }
+              `}</style>
+            </svg>
+            
+            {/* Tooltip */}
+            <div
+              className="fixed z-50 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300"
+              style={{
+                left: `${tooltipX}px`,
+                top: `${tooltipY}px`,
+                transform: 'translateX(-50%)',
+              }}
+            >
+              <div className="panel-glass border border-cyan-500/30 rounded-none px-4 py-3 shadow-2xl shadow-cyan-500/10 min-w-[200px]">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="font-semibold text-base text-cyan-400">
+                      {hoveredRegion.name || `Region ${hoveredRegion.region}`}
+                    </h4>
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    Region {hoveredRegion.region}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {totalSystems} {totalSystems === 1 ? 'system' : 'systems'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {totalPlanets} {totalPlanets === 1 ? 'planet' : 'planets'}
                   </div>
                 </div>
               </div>

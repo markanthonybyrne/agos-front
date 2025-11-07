@@ -223,16 +223,31 @@ export function calculateRegionBounds(systems: SystemData[]): { minX: number; ma
 export function createSystemData(
   region: number,
   system: number,
-  planets: Planet[]
+  planets: Planet[],
+  systemNames?: Record<string, string>
 ): SystemData | null {
   const center = calculateSystemCenter(planets)
   const bounds = calculateSystemBounds(planets)
   
   if (!center || !bounds) return null
   
-  // Get system name from first planet
-  const firstPlanet = planets[0]
-  const systemName = firstPlanet?.system_name ?? null
+  // Get system name - prefer from systemNames map, then from planet
+  let systemName: string | null = null
+  
+  // Try systemNames map first (from API response, format: "region:system")
+  if (systemNames) {
+    const key = `${region}:${system}`
+    systemName = systemNames[key] || null
+    if (systemName && typeof systemName === 'string') {
+      systemName = systemName.trim() || null
+    }
+  }
+  
+  // Fallback to first planet's system_name
+  if (!systemName) {
+    const firstPlanet = planets[0]
+    systemName = firstPlanet?.system_name?.trim() ?? null
+  }
   
   return {
     region,
@@ -269,7 +284,8 @@ export function createRegionData(
  */
 export function buildGalaxyData(
   planets: Planet[], 
-  regionNames?: Record<string, string>
+  regionNames?: Record<string, string>,
+  systemNames?: Record<string, string>
 ): {
   regions: Map<number, RegionData>
   systems: Map<string, SystemData>
@@ -283,7 +299,7 @@ export function buildGalaxyData(
   // Create system data
   systemGroups.forEach((systemPlanets, key) => {
     const [region, system] = key.split(':').map(Number)
-    const systemData = createSystemData(region, system, systemPlanets)
+    const systemData = createSystemData(region, system, systemPlanets, systemNames)
     if (systemData) {
       systems.set(key, systemData)
       systemMap.push(systemData)

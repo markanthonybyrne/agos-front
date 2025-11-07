@@ -73,14 +73,14 @@ function SystemMarkersLayerComponent({
       const isHovered = hoveredSystem?.region === system.region && 
                        hoveredSystem?.system === system.system
       
-      // Use cyan color for all system markers (game branding color)
-      const systemColor = '#00FFFF'
-      const cyanGlowColor = 'rgba(0, 255, 255, 0.2)'
-      
       // Check if this is the user's home system
       const isHomeSystem = homeSystem && 
                           system.region === homeSystem.region && 
                           system.system === homeSystem.system
+      
+      // Home system uses green dot, all others use cyan (game branding color)
+      const systemColor = isHomeSystem ? '#00FF00' : '#00FFFF'
+      const cyanGlowColor = 'rgba(0, 255, 255, 0.2)'
       
       // Check if this is a key system (has a name or contains a homeworld)
       const isKeySystem = system.name !== null || 
@@ -151,7 +151,7 @@ function SystemMarkersLayerComponent({
             }}
           />
           
-          {/* System marker dot - all systems use cyan color */}
+          {/* System marker dot - home system uses green, others use cyan */}
           <circle
             cx={system.center.x}
             cy={system.center.y}
@@ -162,7 +162,7 @@ function SystemMarkersLayerComponent({
             className="system-dot"
             style={{
               filter: isHomeSystem
-                ? `drop-shadow(0 0 4px #00FFFF) drop-shadow(0 0 2px rgba(0, 255, 255, 0.3))`
+                ? `drop-shadow(0 0 4px #00FF00) drop-shadow(0 0 2px rgba(0, 255, 0, 0.3))`
                 : (isHovered 
                   ? `drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 1px rgba(255, 255, 255, 0.3))`
                   : `drop-shadow(0 0 1.5px #00FFFF)`),
