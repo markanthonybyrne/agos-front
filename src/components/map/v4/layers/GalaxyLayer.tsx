@@ -3,7 +3,7 @@
  */
 
 import * as PIXI from 'pixi.js'
-import { useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useMemo } from 'react'
 import { SystemData } from '@/lib/systemUtils'
 import { getLayerOpacity } from '@/lib/zoomLevels'
 import { createSystemDot, SystemDotData } from '../entities/SystemDot'
@@ -19,7 +19,7 @@ interface GalaxyLayerProps {
   onSystemClick?: (system: SystemData) => void
 }
 
-export function GalaxyLayer({
+export const GalaxyLayer = React.memo(function GalaxyLayer({
   systems,
   container,
   normalizedZoom,
@@ -122,4 +122,4 @@ export function GalaxyLayer({
   }, [visibleSystems, opacity, scale, normalizedZoom, onSystemClick, container])
 
   return null
-}
+})

@@ -71,10 +71,10 @@ export function LoginPage() {
     }
   }, [location.pathname])
 
-  // Redirect to holopad if already authenticated
+  // Redirect to map if already authenticated
   useEffect(() => {
     if (isAuthenticated && token) {
-      navigate('/holopad', { replace: true })
+      navigate('/map', { replace: true })
     }
   }, [isAuthenticated, token, navigate])
 
@@ -99,7 +99,7 @@ export function LoginPage() {
         
         // Small delay to allow blur overlay to appear
         setTimeout(() => {
-          const from = (location.state as any)?.from?.pathname || '/holopad'
+          const from = (location.state as any)?.from?.pathname || '/map'
           navigate(from, { replace: true })
         }, 100)
       } else {
@@ -126,7 +126,7 @@ export function LoginPage() {
         toast.success(`Welcome, ${result.empire.name}!`)
         // Small delay to allow blur overlay to appear
         setTimeout(() => {
-          navigate('/holopad', { replace: true })
+          navigate('/map', { replace: true })
         }, 100)
       } else {
         toast.error('Registration failed - invalid response')
@@ -223,7 +223,7 @@ export function LoginPage() {
             <div className="flex justify-center lg:justify-start">
               <img 
                 src={BRAND.logo} 
-                alt="Astralus" 
+                alt="A Game Of Space" 
                 className="h-64 lg:h-96 w-auto object-contain"
               />
             </div>
@@ -234,11 +234,12 @@ export function LoginPage() {
             <Card 
               className={cn(
                 'w-full max-w-md mx-auto panel-glass surface-gradient card-glow vignette',
-                'border-cyan-500/40 shadow-2xl shadow-cyan-500/20',
-                'relative overflow-hidden'
+                'border-0 shadow-2xl shadow-cyan-500/20',
+                'relative overflow-hidden',
+                'bg-gray-900/95 backdrop-blur-md'
               )}
             >
-              <CardHeader className="space-y-3 pb-6 border-b border-border/50 relative">
+              <CardHeader className="space-y-3 pb-6 border-b border-cyan-500/20 relative">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-2xl font-heading glow-cyan">
                     {authMode === 'login' ? 'Login' : 'Create a New Account'}
@@ -274,10 +275,10 @@ export function LoginPage() {
                             type="email"
                             placeholder="commander@empire.com"
                             className={cn(
-                              'h-12 bg-background/40 border-border/50',
-                              'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20',
+                              'h-12 bg-gray-800/60 border-0',
+                              'focus:ring-2 focus:ring-cyan-500/50 focus:shadow-[0_0_8px_rgba(0,255,255,0.4)]',
                               'transition-all placeholder:text-muted-foreground/60',
-                              'panel-glass'
+                              'backdrop-blur-md'
                             )}
                             {...loginForm.register('email')}
                           />
@@ -299,10 +300,10 @@ export function LoginPage() {
                             type="password"
                             placeholder="••••••••"
                             className={cn(
-                              'h-12 bg-background/40 border-border/50',
-                              'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20',
+                              'h-12 bg-gray-800/60 border-0',
+                              'focus:ring-2 focus:ring-cyan-500/50 focus:shadow-[0_0_8px_rgba(0,255,255,0.4)]',
                               'transition-all placeholder:text-muted-foreground/60',
-                              'panel-glass'
+                              'backdrop-blur-md'
                             )}
                             {...loginForm.register('password')}
                           />
@@ -318,16 +319,16 @@ export function LoginPage() {
                           type="submit" 
                           className={cn(
                             'w-full h-12 text-base font-semibold',
-                            'bg-cyan-600 hover:bg-cyan-700 text-white',
-                            'shadow-lg shadow-cyan-500/30',
-                            'transition-all duration-300 group',
-                            'border border-cyan-400/30 hover:border-cyan-400/50'
+                            'bg-cyan-400 text-gray-900',
+                            'border-0 shadow-[0_0_4px_rgba(0,255,255,0.3)]',
+                            'hover:bg-cyan-300 hover:shadow-[0_0_8px_rgba(0,255,255,0.5)]',
+                            'transition-all duration-300 group'
                           )}
                           disabled={isLoggingIn}
                         >
                           {isLoggingIn ? (
                             <span className="flex items-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <div className="w-4 h-4 border-2 border-gray-900/30 border-t-gray-900 rounded-full animate-spin" />
                               Authenticating...
                             </span>
                           ) : (
@@ -353,9 +354,9 @@ export function LoginPage() {
                           type="button" 
                           variant="outline" 
                           className={cn(
-                            'w-full h-11 border-cyan-500/30 hover:border-cyan-500/50',
-                            'hover:bg-cyan-500/10 transition-all',
-                            'panel-glass'
+                            'w-full h-11 bg-gray-700/90 border-0',
+                            'hover:bg-gray-600/90 hover:shadow-[0_0_4px_rgba(0,255,255,0.2)]',
+                            'transition-all'
                           )}
                           onClick={() => setAuthMode('register')}
                         >
@@ -391,10 +392,10 @@ export function LoginPage() {
                             id="username"
                             placeholder="spacecommander"
                             className={cn(
-                              'h-12 bg-background/40 border-border/50',
-                              'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20',
+                              'h-12 bg-gray-800/60 border-0',
+                              'focus:ring-2 focus:ring-cyan-500/50 focus:shadow-[0_0_8px_rgba(0,255,255,0.4)]',
                               'transition-all placeholder:text-muted-foreground/60',
-                              'panel-glass'
+                              'backdrop-blur-md'
                             )}
                             {...registerForm.register('username')}
                           />
@@ -416,10 +417,10 @@ export function LoginPage() {
                             type="email"
                             placeholder="commander@empire.com"
                             className={cn(
-                              'h-12 bg-background/40 border-border/50',
-                              'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20',
+                              'h-12 bg-gray-800/60 border-0',
+                              'focus:ring-2 focus:ring-cyan-500/50 focus:shadow-[0_0_8px_rgba(0,255,255,0.4)]',
                               'transition-all placeholder:text-muted-foreground/60',
-                              'panel-glass'
+                              'backdrop-blur-md'
                             )}
                             {...registerForm.register('email')}
                           />
@@ -440,10 +441,10 @@ export function LoginPage() {
                             id="empire_name"
                             placeholder="Galactic Empire"
                             className={cn(
-                              'h-12 bg-background/40 border-border/50',
-                              'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20',
+                              'h-12 bg-gray-800/60 border-0',
+                              'focus:ring-2 focus:ring-cyan-500/50 focus:shadow-[0_0_8px_rgba(0,255,255,0.4)]',
                               'transition-all placeholder:text-muted-foreground/60',
-                              'panel-glass'
+                              'backdrop-blur-md'
                             )}
                             {...registerForm.register('empire_name')}
                           />
@@ -465,10 +466,10 @@ export function LoginPage() {
                             type="password"
                             placeholder="••••••••"
                             className={cn(
-                              'h-12 bg-background/40 border-border/50',
-                              'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20',
+                              'h-12 bg-gray-800/60 border-0',
+                              'focus:ring-2 focus:ring-cyan-500/50 focus:shadow-[0_0_8px_rgba(0,255,255,0.4)]',
                               'transition-all placeholder:text-muted-foreground/60',
-                              'panel-glass'
+                              'backdrop-blur-md'
                             )}
                             {...registerForm.register('password')}
                           />
@@ -484,16 +485,16 @@ export function LoginPage() {
                           type="submit" 
                           className={cn(
                             'w-full h-12 text-base font-semibold',
-                            'bg-cyan-600 hover:bg-cyan-700 text-white',
-                            'shadow-lg shadow-cyan-500/30',
-                            'transition-all duration-300 group',
-                            'border border-cyan-400/30 hover:border-cyan-400/50'
+                            'bg-cyan-400 text-gray-900',
+                            'border-0 shadow-[0_0_4px_rgba(0,255,255,0.3)]',
+                            'hover:bg-cyan-300 hover:shadow-[0_0_8px_rgba(0,255,255,0.5)]',
+                            'transition-all duration-300 group'
                           )}
                           disabled={isRegistering}
                         >
                           {isRegistering ? (
                             <span className="flex items-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <div className="w-4 h-4 border-2 border-gray-900/30 border-t-gray-900 rounded-full animate-spin" />
                               Creating Empire...
                             </span>
                           ) : (
@@ -519,9 +520,9 @@ export function LoginPage() {
                           type="button"
                           variant="outline"
                           className={cn(
-                            'w-full h-11 border-cyan-500/30 hover:border-cyan-500/50',
-                            'hover:bg-cyan-500/10 transition-all',
-                            'panel-glass'
+                            'w-full h-11 bg-gray-700/90 border-0',
+                            'hover:bg-gray-600/90 hover:shadow-[0_0_4px_rgba(0,255,255,0.2)]',
+                            'transition-all'
                           )}
                           onClick={() => setAuthMode('login')}
                         >

@@ -47,10 +47,10 @@ export function RegisterPage() {
     resolver: zodResolver(registerSchema),
   })
 
-  // Redirect to holopad if already authenticated
+  // Redirect to map if already authenticated
   useEffect(() => {
     if (isAuthenticated && token) {
-      navigate('/holopad', { replace: true })
+      navigate('/map', { replace: true })
     }
   }, [isAuthenticated, token, navigate])
 
@@ -69,7 +69,7 @@ export function RegisterPage() {
           token: result.token
         }))
         toast.success(`Welcome, ${result.empire.name}!`)
-        navigate('/holopad', { replace: true })
+        navigate('/map', { replace: true })
       } else {
         toast.error('Registration failed - invalid response')
       }

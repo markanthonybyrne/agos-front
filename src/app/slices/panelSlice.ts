@@ -1,4 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import {
+  getDefaultWindowDimensions,
+  getDefaultWindowPosition,
+  getWindowPositionFromStorage,
+  getWindowDimensionsFromStorage,
+} from '@/lib/windowUtils'
 
 export enum PanelType {
   TECH_TREE_FACILITIES = 'TECH_TREE_FACILITIES',
@@ -52,6 +58,11 @@ export interface Panel {
   state: PanelState
   data?: any // Panel-specific data
   zIndex: number
+  position?: { x: number; y: number } // Window position for desktop mode
+  dimensions?: { width: number; height: number } // Window dimensions
+  isMaximized?: boolean // Whether window is maximized
+  savedPosition?: { x: number; y: number } // Saved position before maximize
+  savedDimensions?: { width: number; height: number } // Saved dimensions before maximize
 }
 
 interface PanelSliceState {
@@ -73,13 +84,24 @@ const panelSlice = createSlice({
     openPanel: (state, action: PayloadAction<{ type: PanelType; size?: PanelSize; data?: any }>) => {
       const { type, size = PanelSize.MEDIUM, data } = action.payload
       console.log('[panelSlice] openPanel called:', { type, data })
+      
+      const panelId = `${type}-${Date.now()}`
+      const dimensions = getWindowDimensionsFromStorage(panelId) || getDefaultWindowDimensions(size)
+      const position = getWindowPositionFromStorage(panelId) || getDefaultWindowPosition(
+        dimensions,
+        { x: (state.panels.length % 3) * 30, y: (state.panels.length % 3) * 30 }
+      )
+      
       const panel: Panel = {
-        id: `${type}-${Date.now()}`,
+        id: panelId,
         type,
         size,
         state: PanelState.NORMAL,
         data,
         zIndex: state.nextZIndex++,
+        position,
+        dimensions,
+        isMaximized: false,
       }
       console.log('[panelSlice] Created panel:', panel)
       
@@ -115,6 +137,41 @@ const panelSlice = createSlice({
       const panel = state.panels.find(p => p.id === action.payload)
       if (panel) {
         panel.state = PanelState.NORMAL
+        if (panel.isMaximized) {
+          // Restore position and size
+          if (panel.savedPosition) {
+            panel.position = panel.savedPosition
+          }
+          if (panel.savedDimensions) {
+            panel.dimensions = panel.savedDimensions
+          }
+          panel.isMaximized = false
+        } else {
+          // Save current position and size, then maximize
+          if (panel.position) {
+            panel.savedPosition = { ...panel.position }
+          }
+          if (panel.dimensions) {
+            panel.savedDimensions = { ...panel.dimensions }
+          }
+          panel.isMaximized = true
+        }
+      }
+    },
+    
+    updatePanelPosition: (state, action: PayloadAction<{ id: string; position: { x: number; y: number } }>) => {
+      const { id, position } = action.payload
+      const panel = state.panels.find(p => p.id === id)
+      if (panel && !panel.isMaximized) {
+        panel.position = position
+      }
+    },
+    
+    updatePanelDimensions: (state, action: PayloadAction<{ id: string; dimensions: { width: number; height: number } }>) => {
+      const { id, dimensions } = action.payload
+      const panel = state.panels.find(p => p.id === id)
+      if (panel && !panel.isMaximized) {
+        panel.dimensions = dimensions
       }
     },
     
@@ -145,6 +202,8 @@ export const {
   maximizePanel,
   updatePanelData,
   bringToFront,
+  updatePanelPosition,
+  updatePanelDimensions,
 } = panelSlice.actions
 
 export default panelSlice.reducer

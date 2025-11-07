@@ -35,16 +35,19 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
   const hasLoadedThisSession = useRef(sessionStorage.getItem(SESSION_LOADED_KEY) === 'true')
 
   useEffect(() => {
-    // Only handle loading if authenticated
+    // If not authenticated, complete immediately so login page can render
     if (!isAuthenticated || !token) {
-      if (hasCompleted) {
-        setHasCompleted(false)
-        hasLoadedOnceRef.current = false
+      if (!hasCompleted) {
+        setHasCompleted(true)
+        setTimeout(() => onComplete(), 100)
+      }
+      if (showLoader) {
         setShowLoader(false)
         loaderStartTimeRef.current = null
-        hasLoadedThisSession.current = false
-        sessionStorage.removeItem(SESSION_LOADED_KEY)
       }
+      hasLoadedOnceRef.current = false
+      hasLoadedThisSession.current = false
+      sessionStorage.removeItem(SESSION_LOADED_KEY)
       return
     }
 
@@ -433,8 +436,13 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
     }
   }, [token, allPlanets.length, isLoading, isLoaded, isAuthenticated, hasCompleted, dispatch, onComplete, lastLoadedAt, showLoader])
 
-  // Show loader if authenticated and (loading or showing loader) and not completed
-  if (!isAuthenticated || !token || (!showLoader && !isLoading) || hasCompleted) {
+  // Show loader only if authenticated, loading, and not completed
+  // For unauthenticated users, return null immediately (don't block rendering)
+  if (!isAuthenticated || !token) {
+    return null
+  }
+  
+  if ((!showLoader && !isLoading) || hasCompleted) {
     return null
   }
 

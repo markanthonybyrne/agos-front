@@ -4,7 +4,7 @@
 
 import * as PIXI from 'pixi.js'
 import { ColorMatrixFilter } from 'pixi.js'
-import { useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useMemo, useCallback } from 'react'
 import { Planet, DiscoveryStatus } from '@/types/api.types'
 import { getLayerOpacity } from '@/lib/zoomLevels'
 // Grid coordinates are used directly - container transform handles conversion
@@ -18,15 +18,17 @@ interface PlanetLayerProps {
   viewportBounds: { minX: number; minY: number; maxX: number; maxY: number }
   onPlanetClick?: (planet: Planet) => void
   onPlanetHover?: (planet: Planet | null) => void
+  onPlanetRightClick?: (planet: Planet, event: PIXI.FederatedPointerEvent) => void
 }
 
-export function PlanetLayer({
+export const PlanetLayer = React.memo(function PlanetLayer({
   planets,
   container,
   normalizedZoom,
   viewportBounds,
   onPlanetClick,
   onPlanetHover,
+  onPlanetRightClick,
 }: PlanetLayerProps) {
   const opacity = useMemo(() => getLayerOpacity('planetary', normalizedZoom), [normalizedZoom])
   const planetDotsRef = useRef<Map<number, PlanetDotData>>(new Map())
@@ -97,7 +99,8 @@ export function PlanetLayer({
           planet,
           normalizedZoom,
           onPlanetClick,
-          onPlanetHover
+          onPlanetHover,
+          onPlanetRightClick
         )
         dotData.container.alpha = planetOpacity
         
@@ -157,8 +160,8 @@ export function PlanetLayer({
       })
       planetDotsRef.current.clear()
     }
-  }, [visiblePlanets, opacity, normalizedZoom, onPlanetClick, onPlanetHover, container])
+  }, [visiblePlanets, opacity, normalizedZoom, onPlanetClick, onPlanetHover, onPlanetRightClick, container])
 
   return null
-}
+})
 

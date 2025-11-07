@@ -44,6 +44,11 @@
     @apply bg-background text-foreground font-sans;
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
+  /* Remove glow and backgrounds from headings */
+  h1, h2, h3, h4, h5, h6 {
+    text-shadow: none;
+    background: transparent;
+  }
 }
 
 /* Custom Scrollbar Styling */
@@ -158,11 +163,13 @@
   }
   
   .glow-cyan {
-    text-shadow: 0 0 10px theme('colors.space.cyan'), 0 0 20px theme('colors.space.cyan');
+    /* Glow removed - text-shadow disabled */
+    text-shadow: none;
   }
   
   .glow-blue {
-    text-shadow: 0 0 10px theme('colors.space.blue'), 0 0 20px theme('colors.space.blue');
+    /* Glow removed - text-shadow disabled */
+    text-shadow: none;
   }
   
   .panel-glass {
@@ -170,34 +177,37 @@
     background: linear-gradient(180deg, hsl(var(--card) / 0.75) 0%, hsl(var(--card) / 0.6) 100%);
   }
 
-  /* Hard angled corners for sci-fi aesthetic */
-  .angled-corners {
-    clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%);
+  /* Cut corner aesthetic - rectangular cut on bottom-right corner */
+  /* Creates a square cutout (10px x 10px) on bottom-right corner */
+  .cut-corners {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
   }
 
-  /* Premium subtle gradient accents */
+  /* Cut corners on both sides angling in (for logo background) */
+  /* Creates 12px angled cuts on both left and right sides */
+  .cut-corners-both-sides {
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 100%, 0 100%);
+  }
+
+  /* Premium subtle gradient accents - DISABLED */
   .surface-gradient {
-    background: radial-gradient(1200px 600px at -10% -10%, hsl(var(--primary) / 0.08), transparent 60%),
-                radial-gradient(800px 400px at 110% -20%, hsl(var(--ring) / 0.06), transparent 55%),
-                linear-gradient(180deg, hsl(var(--card) / 0.7), hsl(var(--card) / 0.6));
+    /* Background gradient removed */
+    background: none;
   }
 
-  /* Subtle edge vignette for depth */
+  /* Subtle edge vignette for depth - DISABLED */
   .vignette:before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(120% 120% at 50% 0%, transparent 0%, transparent 60%, rgba(0,0,0,0.15) 100%);
+    /* Vignette effect removed */
+    display: none;
   }
 
-  /* Card glow on hover */
+  /* Card glow on hover - DISABLED */
   .card-glow {
-    transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+    transition: none;
   }
   .card-glow:hover {
-    box-shadow: 0 0 0 1px hsl(var(--ring) / 0.4) inset, 0 0 30px hsl(var(--ring) / 0.1);
-    transform: translateY(-1px);
+    box-shadow: none;
+    transform: none;
   }
 
   /* Smooth fade-in animations */
@@ -301,11 +311,12 @@
     box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2) inset, 
                 0 8px 32px rgba(0, 0, 0, 0.4),
                 0 0 20px hsl(var(--primary) / 0.05);
-    border-radius: var(--radius);
+    border-radius: 0;
     padding: 0.875rem 1rem;
     min-width: 300px;
     max-width: 400px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
   }
 
   .toast-glass-base:hover {
@@ -321,7 +332,7 @@
     inset: 0;
     pointer-events: none;
     background: radial-gradient(120% 120% at 50% 0%, transparent 0%, transparent 60%, rgba(0,0,0,0.1) 100%);
-    border-radius: var(--radius);
+    border-radius: 0;
   }
 
   .toast-title {
@@ -711,7 +722,7 @@
     background: linear-gradient(180deg, hsl(var(--card) / 0.95) 0%, hsl(var(--card) / 0.9) 100%);
     backdrop-filter: blur(16px);
     border: 1px solid hsl(var(--border) / 0.5);
-    border-radius: var(--radius);
+    border-radius: 0;
     padding: 1rem;
     min-width: 280px;
     box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2) inset,
@@ -885,6 +896,39 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Desktop window styles */
+  .desktop-window {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+
+  /* Resize handles */
+  .resize-handle {
+    position: absolute;
+    z-index: 10;
+  }
+
+  .resize-handle-n,
+  .resize-handle-s {
+    cursor: ns-resize;
+  }
+
+  .resize-handle-e,
+  .resize-handle-w {
+    cursor: ew-resize;
+  }
+
+  .resize-handle-ne,
+  .resize-handle-sw {
+    cursor: nesw-resize;
+  }
+
+  .resize-handle-nw,
+  .resize-handle-se {
+    cursor: nwse-resize;
+  }
+
   .sliding-panel-backdrop {
     transform: translateZ(0);
     will-change: opacity;
@@ -962,7 +1006,8 @@
   }
   
   .glow-purple {
-    text-shadow: 0 0 10px hsl(270 70% 60% / 0.8), 0 0 20px hsl(270 70% 60% / 0.6);
+    /* Glow removed - text-shadow disabled */
+    text-shadow: none;
   }
   
   .glow-yellow {
@@ -1351,13 +1396,59 @@
     position: absolute;
     inset: -8px;
     border: 2px solid hsl(var(--primary));
-    border-radius: 8px;
+    border-radius: 0;
     box-shadow: 
       0 0 20px hsl(var(--primary) / 0.6),
       0 0 40px hsl(var(--primary) / 0.3),
       inset 0 0 20px hsl(var(--primary) / 0.2);
     animation: tutorial-pulse 2s ease-in-out infinite;
     pointer-events: none;
+  }
+
+  /* List/Table Item Styling */
+  .list-item {
+    @apply px-3 py-2 rounded-none text-sm cursor-pointer transition-all duration-200;
+    @apply bg-gray-800/90 text-white;
+    @apply hover:bg-gray-700/50 hover:text-cyan-300;
+  }
+
+  .list-item-selected {
+    @apply bg-gray-600/50 text-cyan-400;
+  }
+
+  /* Icon Button Styling */
+  .icon-button {
+    @apply w-10 h-10 rounded-none border border-gray-600/40 bg-gray-900/90;
+    @apply flex items-center justify-center;
+    @apply hover:bg-gray-800/90 hover:border-gray-500/60;
+    @apply transition-all duration-200;
+    @apply shadow-lg shadow-black/30 backdrop-blur-sm;
+  }
+
+  .icon-button-active {
+    @apply border-cyan-400 bg-gray-800/50;
+    @apply shadow-[0_0_8px_rgba(0,255,255,0.4)];
+  }
+
+  .icon-button-icon {
+    @apply w-6 h-6 rounded-full;
+  }
+
+  /* Cyan Glow Utilities */
+  .glow-cyan {
+    box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+  }
+
+  .glow-cyan-strong {
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.6), 0 0 6px rgba(0, 255, 255, 0.4);
+  }
+
+  .glow-red {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  }
+
+  .glow-orange {
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
   }
   
   @keyframes tutorial-pulse {
@@ -1370,3 +1461,16 @@
       transform: scale(1.02);
     }
   }
+
+  /* EVE Online-style line draw animation for system tooltips */
+  @keyframes drawLine {
+    from {
+      stroke-dashoffset: var(--line-length, 100px);
+      opacity: 0;
+    }
+    to {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+  }
+

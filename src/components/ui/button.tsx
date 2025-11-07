@@ -4,20 +4,24 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 angled-corners',
+  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 rounded-none cut-corners',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground hover:bg-primary/90 glow-cyan',
+          'bg-gray-800/90 text-white border border-cyan-400 shadow-[0_0_4px_rgba(0,255,255,0.3)] hover:bg-gray-700/90 hover:border-cyan-300 hover:shadow-[0_0_8px_rgba(0,255,255,0.5)]',
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+          'bg-red-900/90 text-white border border-red-500 shadow-[0_0_4px_rgba(239,68,68,0.3)] hover:bg-red-800/90 hover:border-red-400 hover:shadow-[0_0_8px_rgba(239,68,68,0.5)]',
         outline:
-          'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+          'bg-gray-700/90 text-white border border-gray-500 hover:bg-gray-600/90 hover:border-gray-400',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
+          'bg-gray-700/90 text-white border border-gray-500 hover:bg-gray-600/90 hover:border-gray-400',
+        ghost: 'border-transparent hover:bg-gray-800/50 hover:text-foreground',
+        link: 'text-cyan-400 underline-offset-4 hover:underline hover:text-cyan-300 border-transparent',
+        warning:
+          'bg-orange-900/90 text-white border border-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.3)] hover:bg-orange-800/90 hover:border-orange-400 hover:shadow-[0_0_8px_rgba(249,115,22,0.5)]',
+        inactive:
+          'bg-gray-400/30 text-gray-400 border border-gray-500/30 cursor-not-allowed',
       },
       size: {
         default: 'h-10 px-4 py-2',

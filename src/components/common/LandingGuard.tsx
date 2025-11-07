@@ -10,9 +10,9 @@ export function LandingGuard({ children }: LandingGuardProps) {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
   const token = useAppSelector((state) => state.auth.token)
 
-  // If authenticated, redirect to holopad
+  // If authenticated, redirect to map (home screen)
   if (token && isAuthenticated) {
-    return <Navigate to="/holopad" replace />
+    return <Navigate to="/map" replace />
   }
 
   // If not authenticated, show landing page

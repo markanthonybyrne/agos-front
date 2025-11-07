@@ -5,6 +5,7 @@ import { getRegionSystemColor } from '@/lib/regionColors'
 interface SystemMarkersLayerProps {
   systems: SystemData[]
   onSystemClick?: (system: SystemData) => void
+  onSystemRightClick?: (system: SystemData, event: React.MouseEvent) => void
   hoveredSystem?: SystemData | null
   onSystemHover?: (system: SystemData | null) => void
   scale?: number // Current zoom scale for adjusting marker size
@@ -16,13 +17,14 @@ interface SystemMarkersLayerProps {
  * SystemMarkersLayer - Renders system markers (dots) and labels
  * 
  * Displays systems with:
- * - Colored glowing dots matching region colors
- * - Rectangular name boxes with region-colored backgrounds
+ * - Cyan colored glowing dots (game branding color)
+ * - Rectangular name boxes with cyan backgrounds
  * - Enhanced visibility when zoomed in
  */
 function SystemMarkersLayerComponent({ 
   systems, 
   onSystemClick,
+  onSystemRightClick,
   hoveredSystem,
   onSystemHover,
   scale = 1,
@@ -60,14 +62,9 @@ function SystemMarkersLayerComponent({
       const isHovered = hoveredSystem?.region === system.region && 
                        hoveredSystem?.system === system.system
       
-      // Get region color for this system
-      const regionColor = getRegionSystemColor(system.region)
-      
-      // Extract RGB for glow effect
-      const rgbMatch = regionColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
-      const glowColor = rgbMatch 
-        ? `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, 0.6)`
-        : 'rgba(255, 255, 255, 0.4)'
+      // Use cyan color for all system markers (game branding color)
+      const systemColor = '#00FFFF'
+      const cyanGlowColor = 'rgba(0, 255, 255, 0.2)'
       
       // Check if this is the user's home system
       const isHomeSystem = homeSystem && 
@@ -89,8 +86,8 @@ function SystemMarkersLayerComponent({
       const glowRadius = markerSize * 2.5
       
       // System name - always show for home system, otherwise only after zooming into region
-      // Always show on hover, but otherwise only if showNames is true
-      const showName = isHomeSystem || showNames || isHovered
+      // Don't show label on hover - we use the new glass tooltip instead
+      const showName = isHomeSystem || showNames
       const systemLabel = isHomeSystem 
         ? 'Home System' 
         : (system.name || `System ${system.region}:${system.system}`)
@@ -99,7 +96,17 @@ function SystemMarkersLayerComponent({
         <g
           key={`system-${system.region}-${system.system}`}
           className="system-marker"
-          onClick={() => onSystemClick?.(system)}
+          onClick={(e) => {
+            // Only handle left clicks
+            if (e.button === 0 || e.type === 'click') {
+              onSystemClick?.(system)
+            }
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onSystemRightClick?.(system, e)
+          }}
           onMouseEnter={() => onSystemHover?.(system)}
           onMouseLeave={() => onSystemHover?.(null)}
           style={{ cursor: 'pointer' }}
@@ -109,31 +116,31 @@ function SystemMarkersLayerComponent({
             cx={system.center.x}
             cy={system.center.y}
             r={isHomeSystem ? glowRadius * 1.5 : glowRadius}
-            fill={isHomeSystem ? 'rgba(0, 255, 255, 0.8)' : glowColor}
-            opacity={isHomeSystem ? 1.0 : (isHovered ? 0.8 : 0.5)}
+            fill={isHomeSystem ? 'rgba(0, 255, 255, 0.4)' : cyanGlowColor}
+            opacity={isHomeSystem ? 0.6 : (isHovered ? 0.3 : 0.15)}
             className="system-glow"
             style={{
-              filter: isHomeSystem ? 'blur(3px)' : 'blur(2px)',
+              filter: isHomeSystem ? 'blur(1.5px)' : 'blur(1px)',
               transition: 'all 0.2s ease-in-out',
               animation: isHomeSystem ? 'pulse 2s ease-in-out infinite' : 'none'
             }}
           />
           
-          {/* System marker dot - special styling for home system */}
+          {/* System marker dot - all systems use cyan color */}
           <circle
             cx={system.center.x}
             cy={system.center.y}
             r={markerSize}
-            fill={isHomeSystem ? '#00FFFF' : regionColor}
-            stroke={isHomeSystem ? '#FFFFFF' : (isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)')}
-            strokeWidth={isHomeSystem ? 3 : (isHovered ? 2 : 1.5)}
+            fill={systemColor}
+            stroke="none"
+            strokeWidth={0}
             className="system-dot"
             style={{
               filter: isHomeSystem
-                ? `drop-shadow(0 0 10px #00FFFF) drop-shadow(0 0 5px rgba(0, 255, 255, 0.8))`
+                ? `drop-shadow(0 0 4px #00FFFF) drop-shadow(0 0 2px rgba(0, 255, 255, 0.3))`
                 : (isHovered 
-                  ? `drop-shadow(0 0 6px ${regionColor}) drop-shadow(0 0 3px rgba(255, 255, 255, 0.8))`
-                  : `drop-shadow(0 0 3px ${regionColor})`),
+                  ? `drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 1px rgba(255, 255, 255, 0.3))`
+                  : `drop-shadow(0 0 1.5px #00FFFF)`),
               transition: 'all 0.2s ease-in-out'
             }}
           />
@@ -156,26 +163,38 @@ function SystemMarkersLayerComponent({
             />
           )}
           
-          {/* System name label in colored rectangular box */}
+          {/* System name label with glass effect */}
           {showName && (
             <g className="system-label">
-              {/* Background rectangle - calculate width based on text length */}
+              {/* Background rectangle with glass effect - calculate width based on text length */}
               <rect
                 x={system.center.x - (systemLabel.length * 3.2 + 4)}
                 y={system.center.y + markerSize + 4}
                 width={(systemLabel.length * 6.4) + 8}
                 height={14}
-                fill={isHomeSystem ? '#00FFFF' : regionColor}
-                opacity={isHomeSystem ? 1.0 : 0.95}
-                stroke={isHomeSystem ? '#FFFFFF' : (isHovered ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)')}
-                strokeWidth={isHomeSystem ? 2 : (isHovered ? 1.5 : 1)}
-                rx={2}
+                fill="rgba(28, 32, 36, 0.75)"
+                opacity={0.9}
+                stroke={isHomeSystem ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.3)'}
+                strokeWidth={isHomeSystem ? 1.5 : 1}
+                rx={0}
                 className="system-label-bg"
                 style={{
-                  filter: isHomeSystem 
-                    ? `drop-shadow(0 0 6px #00FFFF) drop-shadow(0 0 3px rgba(0, 255, 255, 0.8))`
-                    : (isHovered ? `drop-shadow(0 0 4px ${regionColor})` : `drop-shadow(0 0 2px rgba(0, 0, 0, 0.5))`),
+                  filter: 'blur(0.5px)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
                   transition: 'all 0.2s ease-in-out'
+                }}
+              />
+              {/* Glass overlay for depth */}
+              <rect
+                x={system.center.x - (systemLabel.length * 3.2 + 4)}
+                y={system.center.y + markerSize + 4}
+                width={(systemLabel.length * 6.4) + 8}
+                height={7}
+                fill="rgba(255, 255, 255, 0.08)"
+                rx={0}
+                style={{
+                  pointerEvents: 'none'
                 }}
               />
               {/* Text */}
@@ -188,7 +207,7 @@ function SystemMarkersLayerComponent({
                 style={{
                   fontSize: isKeySystem ? '10px' : '9px',
                   fontWeight: isKeySystem ? '600' : '500',
-                  textShadow: '0 0 2px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.7)',
+                  textShadow: '0 0 3px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.8)',
                   pointerEvents: 'none',
                   opacity: 1
                 }}
@@ -200,7 +219,7 @@ function SystemMarkersLayerComponent({
         </g>
       )
     })
-  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemHover, scale, homeSystem])
+  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemRightClick, onSystemHover, scale, homeSystem])
   
   return (
     <g className="system-markers-layer">

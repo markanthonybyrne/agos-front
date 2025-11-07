@@ -19,7 +19,8 @@ export function createPlanetDot(
   planet: Planet,
   normalizedZoom: number,
   onClick?: (planet: Planet) => void,
-  onHover?: (planet: Planet | null) => void
+  onHover?: (planet: Planet | null) => void,
+  onRightClick?: (planet: Planet, event: PIXI.FederatedPointerEvent) => void
 ): PlanetDotData {
   // Determine dot size based on zoom level
   const size = normalizedZoom < 0.8 ? 1 : 2
@@ -43,8 +44,32 @@ export function createPlanetDot(
   container.cursor = 'pointer'
 
   if (onClick) {
-    container.on('click', () => onClick(planet))
-    container.on('pointerdown', () => onClick(planet))
+    container.on('click', (e) => {
+      // Only handle left clicks
+      if (e.button === 0) {
+        onClick(planet)
+      }
+    })
+    container.on('pointerdown', (e) => {
+      // Only handle left clicks
+      if (e.button === 0) {
+        onClick(planet)
+      }
+    })
+  }
+
+  if (onRightClick) {
+    container.on('rightclick', (e) => {
+      e.stopPropagation()
+      onRightClick(planet, e)
+    })
+    container.on('pointerdown', (e) => {
+      // Handle right mouse button
+      if (e.button === 2) {
+        e.stopPropagation()
+        onRightClick(planet, e)
+      }
+    })
   }
 
   if (onHover) {

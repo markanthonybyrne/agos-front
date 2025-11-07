@@ -85,7 +85,7 @@ function AppContent() {
             <AuthGuard>
               <MainLayout>
                 <Routes>
-                  <Route path="/holopad" element={<Holopad />} />
+                  <Route path="/holopad" element={<Navigate to="/map" replace />} />
                   <Route path="/map" element={<GalaxyMap />} />
                   <Route path="/map/system/:region/:system" element={<SystemViewScreen />} />
                   <Route path="/planets" element={<PlanetsList />} />
@@ -128,6 +128,8 @@ function AppContent() {
                       </AdminGuard>
                     }
                   />
+                  {/* Default route - redirect to map */}
+                  <Route path="/" element={<Navigate to="/map" replace />} />
                 </Routes>
               </MainLayout>
             </AuthGuard>

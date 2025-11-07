@@ -10,7 +10,7 @@ import {
 } from '@/app/slices/panelSlice'
 import { PanelSize, PanelType, PanelState, Panel } from '@/app/slices/panelSlice'
 import { SlidingPanel } from './SlidingPanel'
-import { useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { X } from 'lucide-react'
 // Old tech tree components replaced with new full-screen route
 // import { FacilityTechTree } from '@/components/tech-tree/FacilityTechTree'
@@ -45,7 +45,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useState, useEffect } from 'react'
-import * as React from 'react'
 import { AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -207,8 +206,14 @@ function PlanetViewWithAnimation({
   )
 }
 
-// Render panel content based on type
-function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
+// Render panel content based on type - Memoized for performance
+export const PanelContent = React.memo(function PanelContent({ 
+  panel, 
+  onClose 
+}: { 
+  panel: any
+  onClose: () => void 
+}) {
   // Get planet ID from route params if available, otherwise use first planet or fallback
   const params = useParams()
   const navigate = useNavigate()
@@ -368,7 +373,7 @@ function PanelContent({ panel, onClose }: { panel: any; onClose: () => void }) {
     default:
       return <div>Panel content not implemented yet</div>
   }
-}
+})
 
 export function PanelManager() {
   const dispatch = useAppDispatch()
@@ -436,7 +441,7 @@ export function PanelManager() {
             >
               <button
                 onClick={() => handleMaximize(panel.id)}
-                className="panel-glass border-t border-l border-r px-4 py-2 text-sm font-semibold transition-all hover:bg-muted/20 hover:border-cyan/50 whitespace-nowrap rounded-t-lg"
+                className="panel-glass border-t border-l border-r px-4 py-2 text-sm font-semibold transition-all hover:bg-muted/20 hover:border-cyan/50 whitespace-nowrap rounded-none"
               >
                 {getPanelTitle(panel)}
               </button>

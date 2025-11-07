@@ -1,7 +1,7 @@
 import { ReactNode } from 'react'
 import { PersistentHUD } from './PersistentHUD'
-import { QuickAccessSidebar } from './QuickAccessSidebar'
-import { PanelManager } from '@/components/common/PanelManager'
+import { HubSidebar } from './HubSidebar'
+import { WindowManager } from '@/components/common/WindowManager'
 import { useAppSelector } from '@/app/hooks'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useWebSocketNotifications } from '@/hooks/useWebSocketNotifications'
@@ -56,14 +56,14 @@ export function ImmersiveLayout({ children }: ImmersiveLayoutProps) {
       
       {/* Main content area - immersive */}
       <div className="relative min-h-screen">
-        {/* Quick Access Sidebar on left */}
-        <QuickAccessSidebar />
+        {/* Hub Sidebar on left */}
+        <HubSidebar />
         
         {/* Persistent HUD at top */}
         <PersistentHUD />
         
-        {/* Panel Manager for sliding panels */}
-        <PanelManager />
+        {/* Window Manager for desktop windows */}
+        <WindowManager />
         
         {/* Main content in center - planets, map, etc */}
         {/* Padding adjusts based on sidebar state (sidebar component handles its own state) */}

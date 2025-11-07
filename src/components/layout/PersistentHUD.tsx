@@ -1,95 +1,18 @@
 import { useEffect } from 'react'
 import { 
-  Map, 
   Bell,
   X,
-  Building2,
-  Rocket,
-  Shield,
-  Scan,
-  Sword,
   Trophy,
-  Coins,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { useAppSelector } from '@/app/hooks'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetQuantumCreditsQuery } from '@/api/endpoints/premiumApi'
 import { BRAND } from '@/lib/brandImages'
 import { getQuantumCreditsImage } from '@/lib/quantumCreditsImages'
-
-interface HUDButton {
-  id: string
-  icon: typeof Building2
-  label: string
-  panelType?: PanelType
-  panelSize?: PanelSize
-  route?: string // For navigation to actual pages
-  badge?: number
-  color?: string
-}
-
-const HUD_BUTTONS: HUDButton[] = [
-  {
-    id: 'planets',
-    icon: Building2,
-    label: 'Planets',
-    route: '/planets',
-    color: 'text-orange-400',
-  },
-  {
-    id: 'map',
-    icon: Map,
-    label: 'Map',
-    route: '/map',
-    color: 'text-space-blue',
-  },
-  {
-    id: 'fleets',
-    icon: Rocket,
-    label: 'Fleets',
-    panelType: PanelType.FLEET_COMMAND,
-    panelSize: PanelSize.XLARGE,
-    color: 'text-blue-400',
-  },
-  {
-    id: 'signals',
-    icon: Scan,
-    label: 'Signals',
-    panelType: PanelType.SIGNALS,
-    panelSize: PanelSize.XLARGE,
-    color: 'text-cyan-400',
-  },
-  {
-    id: 'combat',
-    icon: Sword,
-    label: 'Battle Reports',
-    panelType: PanelType.COMBAT_LOGS,
-    panelSize: PanelSize.XLARGE,
-    color: 'text-red-400',
-  },
-        {
-          id: 'politics',
-          icon: Shield,
-          label: 'Politics',
-          panelType: PanelType.POLITICS,
-          panelSize: PanelSize.XLARGE,
-          color: 'text-purple-400',
-        },
-        {
-          id: 'market',
-          icon: Coins,
-          label: 'Market',
-          panelType: PanelType.MARKET,
-          panelSize: PanelSize.XLARGE,
-          color: 'text-yellow-400',
-        },
-      ]
 
 interface PersistentHUDProps {
   className?: string
@@ -98,8 +21,6 @@ interface PersistentHUDProps {
 
 export function PersistentHUD({ className, showClose = false }: PersistentHUDProps) {
   const { openPanel, backdropVisible, closeAllPanels } = usePanel()
-  const navigate = useNavigate()
-  const location = useLocation()
   const notificationsCount = useAppSelector(state => 
     state.notifications.notifications.filter(n => !n.isRead).length
   )
@@ -135,63 +56,23 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
   // Get rank directly from the empire object (from /auth/me endpoint)
   const rank = displayEmpire?.rank ?? null
 
-  const handleButtonClick = (button: HUDButton) => {
-    if (button.route) {
-      navigate(button.route)
-    } else if (button.panelType && button.panelSize) {
-      openPanel(button.panelType, button.panelSize)
-    }
-  }
-
   return (
     <div className="fixed top-0 left-0 sm:left-16 right-0 z-30">
-      <div className="w-full px-2 sm:px-4 py-2 flex items-center justify-between gap-2">
-        {/* Logo */}
-        <div className="flex-shrink-0 hidden sm:block">
+      <div className="w-full px-2 sm:px-4 py-2 flex items-center justify-between gap-2 relative">
+        {/* Left spacer for balance */}
+        <div className="flex-shrink-0 hidden sm:block w-0 sm:w-auto" />
+
+        {/* Logo - Absolutely centered */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <img 
             src={BRAND.logo} 
-            alt="War For Galaxy" 
+            alt="A Game Of Space" 
             className="h-10 sm:h-12 w-auto object-contain"
           />
         </div>
 
-        {/* HUD Buttons - Tab style with glass background */}
-        <div 
-          className="panel-glass surface-gradient card-glow vignette border border-border/50 flex-1 min-w-0"
-          style={{
-            clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
-          }}
-        >
-          <div className="flex items-end gap-0 overflow-x-auto scrollbar-hide">
-            {HUD_BUTTONS.map((button) => {
-              const Icon = button.icon
-              const isActive = button.route ? location.pathname === button.route : false
-              return (
-                <button
-                  key={button.id}
-                  data-tutorial={`${button.id}-button`}
-                  onClick={() => handleButtonClick(button)}
-                  className={cn(
-                    "relative flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 transition-all duration-200 flex-shrink-0",
-                    "uppercase text-xs font-semibold tracking-wide",
-                    isActive
-                      ? "bg-background text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
-                  )}
-                  style={isActive ? {
-                    clipPath: 'polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
-                  } : {}}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="hidden sm:inline">{button.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         {/* Right side actions */}
-        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-auto">
           {/* User Score and Rank */}
           {displayEmpire && (
             <div 

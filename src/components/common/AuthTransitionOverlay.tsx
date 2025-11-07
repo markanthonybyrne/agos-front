@@ -12,7 +12,7 @@ export function AuthTransitionOverlay() {
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const blurIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasStartedBlurReductionRef = useRef(false)
-  const isDashboardRoute = location.pathname === '/holopad' || location.pathname === '/'
+  const isDashboardRoute = location.pathname === '/map' || location.pathname === '/'
 
   useEffect(() => {
     // Only trigger transition when authenticated, on dashboard route, AND we have a fresh login flag
@@ -35,9 +35,9 @@ export function AuthTransitionOverlay() {
       checkIntervalRef.current = setInterval(() => {
         const elapsed = Date.now() - (transitionStartTime.current || 0)
         
-        // Check if dashboard has loaded by looking for holopad content
-        const holopadContent = document.querySelector('.holopad-enter')
-        const hasContent = holopadContent !== null
+        // Check if dashboard has loaded by looking for map content
+        const mapContent = document.querySelector('.galaxy-map') || document.querySelector('[data-map]')
+        const hasContent = mapContent !== null
         
         // Start blur reduction if content is loaded OR if max time has passed
         if (!hasStartedBlurReductionRef.current && (hasContent || elapsed >= maxWaitTime)) {

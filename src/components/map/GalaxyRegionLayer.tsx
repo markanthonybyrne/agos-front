@@ -100,7 +100,7 @@ function GalaxyRegionLayerComponent({
             fill={color}
             className="region-overlay"
             style={{
-              opacity: isHovered ? 0.25 : 0.15,
+              opacity: isHovered ? 0.75 : 0.15,
               transition: 'opacity 0.2s ease-in-out'
             }}
           />

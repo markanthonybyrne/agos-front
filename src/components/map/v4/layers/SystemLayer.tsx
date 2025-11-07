@@ -3,7 +3,7 @@
  */
 
 import * as PIXI from 'pixi.js'
-import { useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useMemo } from 'react'
 import { SystemData, calculateOrbitRadius } from '@/lib/systemUtils'
 import { getLayerOpacity, getOrbitLineOpacity, getOrbitLineWidth } from '@/lib/zoomLevels'
 import { createCircle, createDashedCircle, createText } from '@/lib/v4/pixiUtils'
@@ -30,7 +30,7 @@ interface SystemRenderData {
   nameText?: PIXI.Text
 }
 
-export function SystemLayer({
+export const SystemLayer = React.memo(function SystemLayer({
   systems,
   container,
   normalizedZoom,
@@ -207,5 +207,5 @@ export function SystemLayer({
   }, [visibleSystems, opacity, orbitOpacity, orbitWidth, scale, normalizedZoom, onPlanetClick, onPlanetHover, container])
 
   return null
-}
+})
 

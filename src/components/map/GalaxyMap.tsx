@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/universeApi'
 import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useNavigate } from 'react-router-dom'
@@ -6,6 +6,11 @@ import { buildGalaxyData, SystemData, RegionData } from '@/lib/galaxyUtils'
 import { useZoomPan } from '@/hooks/useZoomPan'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppSelector } from '@/app/hooks'
+import { useWindow } from '@/components/common/WindowManager'
+import { ContextMenu, ContextMenuItem } from '@/components/common/ContextMenu'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
+import { Eye, Ship, Globe, MapPin, Search, Target, Users, FileText, Navigation } from 'lucide-react'
+import { EVEStyleMapControls } from './EVEStyleMapControls'
 import { GalaxyRegionLayer } from './GalaxyRegionLayer'
 import { HyperspaceRoutesLayer } from './HyperspaceRoutesLayer'
 import { SystemMarkersLayer } from './SystemMarkersLayer'
@@ -19,8 +24,6 @@ import { IncidentLayer } from '@/components/incidents/IncidentLayer'
 import { IncidentDetailPanel } from '@/components/incidents/IncidentDetailPanel'
 import { Incident } from '@/types/api.types'
 import { Loader } from '@/components/ui/loader'
-import { Button } from '@/components/ui/button'
-import { ZoomIn, ZoomOut, RotateCcw, Home, Eye, GitBranch } from 'lucide-react'
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { getPlanetXY } from '@/lib/coordinates'
 
@@ -42,13 +45,16 @@ const DEFAULT_GRID_HEIGHT = 2000
 export function GalaxyMap() {
   const navigate = useNavigate()
   const { empire } = useAuth()
+  const { openPanel } = useWindow()
   const [hoveredSystem, setHoveredSystem] = useState<SystemData | null>(null)
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null)
   const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
   const [zoomedIntoRegion, setZoomedIntoRegion] = useState(false)
   const [showRoutes, setShowRoutes] = useState(false) // Toggle for hyperspace routes
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [hoveredIncident, setHoveredIncident] = useState<Incident | null>(null)
+  const [contextMenuSystem, setContextMenuSystem] = useState<SystemData | null>(null)
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
+  const [showContextMenu, setShowContextMenu] = useState(false)
   
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
@@ -142,9 +148,12 @@ export function GalaxyMap() {
     return Math.min(scaleX, scaleY) * 0.70
   }, [gridWidth, gridHeight, viewportSize.width, viewportSize.height])
   
+  const minZoomScale = initialScale * 0.5  // Can zoom out a bit more
+  const maxZoomScale = initialScale * 8    // Can zoom in 8x
+  
   const zoomPan = useZoomPan({
-    minScale: initialScale * 0.5,  // Can zoom out a bit more
-    maxScale: initialScale * 8,    // Can zoom in 8x
+    minScale: minZoomScale,
+    maxScale: maxZoomScale,
     initialScale: initialScale,
     initialPanX: 0,  // Start centered (0,0 centers on grid center)
     initialPanY: 0,
@@ -187,6 +196,185 @@ export function GalaxyMap() {
       zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 500)
     }
   }, [navigate, initialScale, zoomPan, gridWidth, gridHeight])
+
+  // Handle system right-click
+  const handleSystemRightClick = useCallback((system: SystemData, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setContextMenuSystem(system)
+    setContextMenuPosition({ x: event.clientX, y: event.clientY })
+    setShowContextMenu(true)
+  }, [])
+
+  // Handle map background right-click
+  const handleMapContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenuSystem(null)
+    setContextMenuPosition({ x: e.clientX, y: e.clientY })
+    setShowContextMenu(true)
+  }, [])
+
+  // Close context menu
+  const closeContextMenu = useCallback(() => {
+    setShowContextMenu(false)
+    setContextMenuSystem(null)
+  }, [])
+
+  // Track when menu was opened to prevent immediate closure
+  const menuOpenedAtRef = useRef<number>(0)
+  
+  // Update opened time when menu opens
+  useEffect(() => {
+    if (showContextMenu) {
+      menuOpenedAtRef.current = Date.now()
+    }
+  }, [showContextMenu])
+
+  // Close context menu when clicking on map (with delay to prevent immediate closure)
+  useEffect(() => {
+    if (!showContextMenu) return
+
+    const handleMapClick = () => {
+      // Prevent immediate closure from the right-click that opened the menu
+      const timeSinceOpen = Date.now() - menuOpenedAtRef.current
+      if (timeSinceOpen < 200) {
+        return
+      }
+      
+      // Close menu on any click outside (the ContextMenu component will handle checking if click is inside)
+      closeContextMenu()
+    }
+
+    // Use capture phase to catch events before they bubble
+    // Add delay to prevent immediate closure from the right-click that opened the menu
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleMapClick, true)
+    }, 250)
+
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('click', handleMapClick, true)
+    }
+  }, [showContextMenu, closeContextMenu])
+
+  // Get context menu items
+  const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
+    if (contextMenuSystem) {
+      // Check if system has any planets owned by the player
+      const hasOwnedPlanets = contextMenuSystem.planets.some(
+        p => p.owner_empire_id === empire?.id
+      )
+      const hasAnyOwner = contextMenuSystem.planets.some(p => p.owner_empire_id)
+
+      return [
+        {
+          label: 'View System',
+          icon: Eye,
+          onClick: () => {
+            closeContextMenu()
+            navigate(`/map/system/${contextMenuSystem.region}/${contextMenuSystem.system}`)
+          },
+        },
+        {
+          label: 'Zoom to System',
+          icon: Navigation,
+          onClick: () => {
+            closeContextMenu()
+            const systemViewThreshold = initialScale * 5
+            const targetPanX = (gridWidth / 2 - contextMenuSystem.center.x) * systemViewThreshold
+            const targetPanY = (gridHeight / 2 - contextMenuSystem.center.y) * systemViewThreshold
+            zoomPan.smoothSetZoomAndPan(systemViewThreshold, targetPanX, targetPanY, 500)
+          },
+        },
+        { label: '', icon: undefined, onClick: () => {}, separator: true },
+        ...(!hasAnyOwner
+          ? [
+              {
+                label: 'Explore System',
+                icon: Search,
+                onClick: () => {
+                  closeContextMenu()
+                  // TODO: Implement explore action
+                  console.log('Explore system:', contextMenuSystem)
+                },
+              },
+            ]
+          : []),
+        {
+          label: 'Send Fleet',
+          icon: Ship,
+          onClick: () => {
+            closeContextMenu()
+            // Use first planet in system as destination, or allow user to choose
+            const firstPlanet = contextMenuSystem.planets[0]
+            if (firstPlanet) {
+              openPanel(PanelType.FLEET_COMMAND, PanelSize.MEDIUM, {
+                destinationPlanet: firstPlanet.id,
+              })
+            }
+          },
+        },
+        ...(hasOwnedPlanets
+          ? [
+              { label: '', icon: undefined, onClick: () => {}, separator: true },
+              {
+                label: 'My Planets in System',
+                icon: Target,
+                onClick: () => {
+                  closeContextMenu()
+                  navigate(`/map/system/${contextMenuSystem.region}/${contextMenuSystem.system}`)
+                },
+              },
+            ]
+          : []),
+      ]
+    } else {
+      // Map background context menu
+      return [
+        {
+          label: 'View Galaxy Map',
+          icon: Globe,
+          onClick: () => {
+            closeContextMenu()
+            navigate('/map')
+          },
+        },
+        {
+          label: 'My Planets',
+          icon: MapPin,
+          onClick: () => {
+            closeContextMenu()
+            navigate('/planets')
+          },
+        },
+        { label: '', icon: undefined, onClick: () => {}, separator: true },
+        {
+          label: 'Fleet Management',
+          icon: Ship,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.FLEETS, PanelSize.LARGE)
+          },
+        },
+        {
+          label: 'Alliances',
+          icon: Users,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.POLITICS, PanelSize.LARGE)
+          },
+        },
+        {
+          label: 'Messages',
+          icon: FileText,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.MESSAGING, PanelSize.LARGE)
+          },
+        },
+      ]
+    }
+  }, [contextMenuSystem, empire?.id, openPanel, navigate, closeContextMenu, initialScale, zoomPan, gridWidth, gridHeight])
   
   // Handle region click - zoom to region (spiral-aware positioning)
   const handleRegionClick = useCallback((region: RegionData, event: React.MouseEvent) => {
@@ -362,17 +550,12 @@ export function GalaxyMap() {
   return (
     <div 
       ref={zoomPan.containerRef}
-      className="fixed inset-0 overflow-hidden z-0 cursor-grab active:cursor-grabbing"
+      className="fixed inset-0 overflow-hidden z-0"
       style={{ 
         backgroundColor: 'transparent',
       }}
-      onMouseDown={zoomPan.onMouseDown}
-      onMouseMove={zoomPan.onMouseMove}
-      onMouseUp={zoomPan.onMouseUp}
       onWheel={zoomPan.onWheel}
-      onTouchStart={zoomPan.onTouchStart}
-      onTouchMove={zoomPan.onTouchMove}
-      onTouchEnd={zoomPan.onTouchEnd}
+      onContextMenu={handleMapContextMenu}
     >
       {/* SVG map */}
       <svg
@@ -457,6 +640,7 @@ export function GalaxyMap() {
         <SystemMarkersLayer
           systems={galaxyData.systemMap}
           onSystemClick={handleSystemClick}
+          onSystemRightClick={handleSystemRightClick}
           hoveredSystem={hoveredSystem}
           onSystemHover={setHoveredSystem}
           scale={zoomPan.scale}
@@ -472,7 +656,7 @@ export function GalaxyMap() {
             scale={zoomPan.scale}
             viewportBounds={viewportBounds}
             onIncidentClick={setSelectedIncident}
-            onIncidentHover={setHoveredIncident}
+            onIncidentHover={() => {}} // Not using hover state for incidents
           />
         )}
         
@@ -497,67 +681,131 @@ export function GalaxyMap() {
         </div>
       )}
       
+      {/* System hover tooltip with connecting line */}
+      {hoveredSystem && (() => {
+        const systemScreenPos = zoomPan.gridToScreen(hoveredSystem.center.x, hoveredSystem.center.y)
+        const tooltipY = systemScreenPos.y - 70
+        const tooltipX = systemScreenPos.x
+        const tooltipHeight = 60 // Approximate tooltip height
+        const lineStartY = tooltipY + tooltipHeight // Bottom of tooltip
+        const lineEndY = systemScreenPos.y // System center
+        const lineLength = lineEndY - lineStartY
+        
+        return (
+          <>
+            {/* Connecting line from tooltip to system with draw animation */}
+            <svg
+              className="fixed z-40 pointer-events-none"
+              style={{
+                left: 0,
+                top: 0,
+                width: '100vw',
+                height: '100vh',
+              }}
+            >
+              <line
+                x1={tooltipX}
+                y1={lineStartY}
+                x2={tooltipX}
+                y2={lineEndY}
+                stroke="#00FFFF"
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                strokeDasharray="8 4"
+                style={{
+                  filter: 'drop-shadow(0 0 3px rgba(0, 255, 255, 0.9)) drop-shadow(0 0 1px rgba(0, 255, 255, 0.5))',
+                  strokeDashoffset: lineLength,
+                  animation: `drawLine-${hoveredSystem.region}-${hoveredSystem.system} 0.4s ease-out forwards`,
+                  animationDelay: '0.1s',
+                }}
+              />
+              <style>{`
+                @keyframes drawLine-${hoveredSystem.region}-${hoveredSystem.system} {
+                  from {
+                    stroke-dashoffset: ${lineLength};
+                    opacity: 0;
+                  }
+                  to {
+                    stroke-dashoffset: 0;
+                    opacity: 1;
+                  }
+                }
+              `}</style>
+            </svg>
+            
+            {/* Tooltip */}
+            <div
+              className="fixed z-50 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300"
+              style={{
+                left: `${tooltipX}px`,
+                top: `${tooltipY}px`,
+                transform: 'translateX(-50%)',
+              }}
+            >
+              <div className="panel-glass border border-cyan-500/30 rounded-none px-4 py-3 shadow-2xl shadow-cyan-500/10 min-w-[200px]">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="font-semibold text-base text-cyan-400">
+                      {hoveredSystem.name || `System ${hoveredSystem.region}:${hoveredSystem.system}`}
+                    </h4>
+                    {homeSystem?.region === hoveredSystem.region && 
+                     homeSystem?.system === hoveredSystem.system && (
+                      <span className="text-xs px-2 py-0.5 bg-cyan-500/20 border border-cyan-500/30 rounded text-cyan-300">
+                        Home
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    Region {hoveredSystem.region} • System {hoveredSystem.system}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {hoveredSystem.planets.length} {hoveredSystem.planets.length === 1 ? 'planet' : 'planets'}
+                    {hoveredSystem.planets.some(p => p.owner_empire_id === empire?.id) && (
+                      <span className="ml-2 text-cyan-400">
+                        • {hoveredSystem.planets.filter(p => p.owner_empire_id === empire?.id).length} owned
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+      
       {/* UI Overlay: Legend */}
       <GalaxyMapLegend regions={galaxyData.regions} />
       
-      {/* Navigation Controls */}
-      <div className="absolute top-20 right-4 z-10 flex flex-col gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleNavigateToCore}
-          className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
-          title="Navigate to Galactic Core"
-        >
-          <Home className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowSpiralGuidelines(!showSpiralGuidelines)}
-          className={`bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90 ${showSpiralGuidelines ? 'bg-blue-900/50' : ''}`}
-          title="Toggle Spiral Arm Guidelines"
-        >
-          <Eye className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowRoutes(!showRoutes)}
-          className={`bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90 ${showRoutes ? 'bg-blue-900/50' : ''}`}
-          title="Toggle Hyperspace Routes"
-        >
-          <GitBranch className="w-4 h-4" />
-        </Button>
-        <div className="h-px bg-white/20 my-1" />
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={zoomPan.zoomIn}
-          className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
-          title="Zoom In"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={zoomPan.zoomOut}
-          className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
-          title="Zoom Out"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleReset}
-          className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
-          title="Reset View"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </Button>
-      </div>
+      {/* EVE-Style Navigation Controls */}
+      <EVEStyleMapControls
+        onNavigateToCore={handleNavigateToCore}
+        onToggleSpiralGuidelines={(show) => setShowSpiralGuidelines(show)}
+        showSpiralGuidelines={showSpiralGuidelines}
+        onToggleRoutes={(show) => setShowRoutes(show)}
+        showRoutes={showRoutes}
+        onZoomIn={zoomPan.zoomIn}
+        onZoomOut={zoomPan.zoomOut}
+        onReset={handleReset}
+        zoomLevel={zoomPan.scale}
+        onOpenPanel={openPanel}
+        onPan={(deltaX, deltaY) => {
+          const currentPanX = zoomPan.panX
+          const currentPanY = zoomPan.panY
+          zoomPan.setPan(currentPanX + deltaX, currentPanY + deltaY)
+        }}
+        panStep={100 / zoomPan.scale} // Adjust pan step based on zoom level
+        minZoom={minZoomScale}
+        maxZoom={maxZoomScale}
+      />
+
+      {/* Context Menu */}
+      {showContextMenu && (
+        <ContextMenu
+          items={contextMenuItems}
+          position={contextMenuPosition}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   )
 }

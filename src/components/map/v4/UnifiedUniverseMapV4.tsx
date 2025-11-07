@@ -14,7 +14,10 @@ import { useGetUniverseConfigQuery, useGetMapQuery } from '@/api/endpoints/unive
 import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useAuth } from '@/hooks/useAuth'
 import { useZoomPan } from '@/hooks/useZoomPan'
-import { usePanel } from '@/components/common/PanelManager'
+import { useWindow } from '@/components/common/WindowManager'
+import { ContextMenu, ContextMenuItem } from '@/components/common/ContextMenu'
+import { Eye, Ship, Globe, MapPin, Search, Target, Users, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { useAppSelector } from '@/app/hooks'
 import { 
@@ -46,11 +49,15 @@ const DEFAULT_GRID_HEIGHT = 2000
 
 export function UnifiedUniverseMapV4() {
   const { empire } = useAuth()
-  const { openPanel } = usePanel()
+  const { openPanel } = useWindow()
+  const navigate = useNavigate()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [hoveredIncident, setHoveredIncident] = useState<Incident | null>(null)
   const [showSpiralGuidelines, setShowSpiralGuidelines] = useState(false)
+  const [contextMenuPlanet, setContextMenuPlanet] = useState<Planet | null>(null)
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
+  const [showContextMenu, setShowContextMenu] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const appRef = useRef<PIXI.Application | null>(null)
   const rootContainerRef = useRef<PIXI.Container | null>(null)
@@ -252,6 +259,185 @@ export function UnifiedUniverseMapV4() {
     })
   }, [openPanel])
 
+  // Handle planet right-click
+  const handlePlanetRightClick = useCallback((planet: Planet, event: PIXI.FederatedPointerEvent) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // Convert PixiJS coordinates to screen coordinates
+    // The event.originalEvent should have the native browser event
+    const nativeEvent = event.originalEvent as unknown as PointerEvent | MouseEvent
+    if (nativeEvent && 'clientX' in nativeEvent && 'clientY' in nativeEvent) {
+      setContextMenuPlanet(planet)
+      setContextMenuPosition({
+        x: nativeEvent.clientX,
+        y: nativeEvent.clientY,
+      })
+      setShowContextMenu(true)
+    } else {
+      // Fallback: use PixiJS global coordinates (less accurate)
+      const rect = canvas.getBoundingClientRect()
+      setContextMenuPlanet(planet)
+      setContextMenuPosition({
+        x: rect.left + event.global.x,
+        y: rect.top + event.global.y,
+      })
+      setShowContextMenu(true)
+    }
+  }, [])
+
+  // Handle map background right-click
+  const handleMapContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenuPlanet(null)
+    setContextMenuPosition({ x: e.clientX, y: e.clientY })
+    setShowContextMenu(true)
+  }, [])
+
+  // Close context menu
+  const closeContextMenu = useCallback(() => {
+    setShowContextMenu(false)
+    setContextMenuPlanet(null)
+  }, [])
+
+  // Close context menu when clicking on map
+  useEffect(() => {
+    if (!showContextMenu) return
+
+    const handleMapClick = () => {
+      closeContextMenu()
+    }
+
+    // Use capture phase to catch events before they bubble
+    document.addEventListener('click', handleMapClick, true)
+
+    return () => {
+      document.removeEventListener('click', handleMapClick, true)
+    }
+  }, [showContextMenu, closeContextMenu])
+
+  // Get context menu items
+  const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
+    if (contextMenuPlanet) {
+      const isOwned = contextMenuPlanet.owner_empire_id === empire?.id
+      const hasOwner = !!contextMenuPlanet.owner_empire_id
+
+      return [
+        {
+          label: 'View Details',
+          icon: Eye,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.PLANET_VIEW, PanelSize.MEDIUM, {
+              planetId: contextMenuPlanet.id,
+              showDetailView: true,
+            })
+          },
+        },
+        {
+          label: 'View on Map',
+          icon: MapPin,
+          onClick: () => {
+            closeContextMenu()
+            navigate(`/map`)
+          },
+        },
+        { label: '', icon: undefined, onClick: () => {}, separator: true },
+        ...(!hasOwner
+          ? [
+              {
+                label: 'Colonize',
+                icon: Globe,
+                onClick: () => {
+                  closeContextMenu()
+                  openPanel(PanelType.PLANET_INTERACTION, PanelSize.MEDIUM, {
+                    planet: contextMenuPlanet,
+                  })
+                },
+              },
+            ]
+          : []),
+        {
+          label: 'Send Fleet',
+          icon: Ship,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.FLEET_COMMAND, PanelSize.MEDIUM, {
+              destinationPlanet: contextMenuPlanet.id,
+            })
+          },
+        },
+        {
+          label: 'Scan Planet',
+          icon: Search,
+          onClick: () => {
+            closeContextMenu()
+            // TODO: Implement scan action
+            console.log('Scan planet:', contextMenuPlanet.id)
+          },
+        },
+        ...(isOwned
+          ? [
+              { label: '', icon: undefined, onClick: () => {}, separator: true },
+              {
+                label: 'Manage Planet',
+                icon: Target,
+                onClick: () => {
+                  closeContextMenu()
+                  navigate(`/planets/${contextMenuPlanet.id}`)
+                },
+              },
+            ]
+          : []),
+      ]
+    } else {
+      // Map background context menu
+      return [
+        {
+          label: 'View Galaxy Map',
+          icon: Globe,
+          onClick: () => {
+            closeContextMenu()
+            navigate('/map')
+          },
+        },
+        {
+          label: 'My Planets',
+          icon: MapPin,
+          onClick: () => {
+            closeContextMenu()
+            navigate('/planets')
+          },
+        },
+        { label: '', icon: undefined, onClick: () => {}, separator: true },
+        {
+          label: 'Fleet Management',
+          icon: Ship,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.FLEETS, PanelSize.LARGE)
+          },
+        },
+        {
+          label: 'Alliances',
+          icon: Users,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.POLITICS, PanelSize.LARGE)
+          },
+        },
+        {
+          label: 'Messages',
+          icon: FileText,
+          onClick: () => {
+            closeContextMenu()
+            openPanel(PanelType.MESSAGING, PanelSize.LARGE)
+          },
+        },
+      ]
+    }
+  }, [contextMenuPlanet, empire?.id, openPanel, navigate, closeContextMenu])
+
   // Handle system click
   const handleSystemClick = useCallback((system: SystemData) => {
     // Zoom to system level
@@ -308,6 +494,7 @@ export function UnifiedUniverseMapV4() {
         onTouchStart={zoomPan.onTouchStart}
         onTouchMove={zoomPan.onTouchMove}
         onTouchEnd={zoomPan.onTouchEnd}
+        onContextMenu={handleMapContextMenu}
         style={{ 
           width: '100%',
           height: '100%',
@@ -353,6 +540,7 @@ export function UnifiedUniverseMapV4() {
               viewportBounds={viewportBounds}
               onPlanetClick={handlePlanetClick}
               onPlanetHover={setHoveredPlanet}
+              onPlanetRightClick={handlePlanetRightClick}
             />
           </>
         )}
@@ -556,6 +744,15 @@ export function UnifiedUniverseMapV4() {
               onClose={() => setSelectedIncident(null)}
             />
           </div>
+        )}
+
+        {/* Context Menu */}
+        {showContextMenu && (
+          <ContextMenu
+            items={contextMenuItems}
+            position={contextMenuPosition}
+            onClose={closeContextMenu}
+          />
         )}
       </div>
     </div>

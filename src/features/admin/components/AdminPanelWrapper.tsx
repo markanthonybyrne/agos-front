@@ -23,8 +23,8 @@ export function AdminPanelWrapper({ children }: { children: React.ReactNode }) {
 
   const handleClose = () => {
     setIsOpen(false)
-    // Navigate back to holopad when closing
-    navigate('/holopad')
+    // Navigate back to map when closing
+    navigate('/map')
   }
 
   return (

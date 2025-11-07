@@ -22,7 +22,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
   if (!isAdmin) {
     return (
       <Navigate
-        to="/holopad"
+        to="/map"
         state={{
           from: location,
           error: 'You do not have permission to access the admin portal',
