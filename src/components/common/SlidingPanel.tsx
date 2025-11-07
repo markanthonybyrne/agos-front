@@ -22,11 +22,11 @@ interface SlidingPanelProps {
 }
 
 const SIZE_MAP: Record<PanelSize, string> = {
-  [PanelSize.SMALL]: 'max-w-md',
-  [PanelSize.MEDIUM]: 'max-w-2xl',
-  [PanelSize.LARGE]: 'max-w-4xl',
-  [PanelSize.XLARGE]: 'max-w-6xl',
-  [PanelSize.FULL_HEIGHT]: 'max-w-full',
+  [PanelSize.SMALL]: 'w-full sm:max-w-md',
+  [PanelSize.MEDIUM]: 'w-full sm:max-w-2xl',
+  [PanelSize.LARGE]: 'w-full sm:max-w-4xl',
+  [PanelSize.XLARGE]: 'w-full sm:max-w-6xl',
+  [PanelSize.FULL_HEIGHT]: 'w-full',
 }
 
 // Custom width override for admin panel (70% viewport width)
@@ -141,8 +141,8 @@ export function SlidingPanel({
       <div
         ref={panelRef}
         className={cn(
-          'sliding-panel-container fixed right-0 top-0 h-full bg-card border-l border-border shadow-2xl',
-          'overflow-hidden',
+          'sliding-panel-container fixed right-0 top-0 flex h-full max-h-screen bg-card border-l border-border shadow-2xl',
+          'overflow-hidden flex-col',
           className?.includes(CUSTOM_WIDTH_CLASS) ? '' : SIZE_MAP[size],
           className
         )}
@@ -154,25 +154,25 @@ export function SlidingPanel({
           opacity: isAnimating ? 1 : 0,
         }}
       >
-        <Card className="h-full rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
+        <Card className="flex h-full min-h-0 flex-col rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
           {/* Sleek header with minimize/maximize */}
-          <CardHeader 
+          <CardHeader
             className={cn(
-              "sliding-panel-content sticky top-0 bg-muted/20 backdrop-blur-sm z-10 border-b border-border/50",
-              "p-3 transition-opacity duration-200",
+              "sliding-panel-content sticky top-0 z-10 border-b border-brand-cyan/30 bg-[rgba(8,14,23,0.88)] backdrop-blur-md",
+              "p-3 transition-opacity duration-200 flex-shrink-0 shadow-[0_10px_25px_rgba(0,0,0,0.35)]",
               isAnimating ? "opacity-100" : "opacity-0"
             )}
           >
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <CardTitle className={cn(
-                  "truncate text-base font-semibold",
+                  "truncate text-base font-semibold text-brand-cyan",
                   typeof title !== 'string' && "flex items-center gap-2"
                 )}>
                   {title}
                 </CardTitle>
                 {description && (
-                  <CardDescription className="mt-0.5 text-xs">{description}</CardDescription>
+                  <CardDescription className="mt-0.5 text-xs text-muted-foreground/80">{description}</CardDescription>
                 )}
               </div>
               <div className="flex items-center gap-1 ml-4">
@@ -181,7 +181,7 @@ export function SlidingPanel({
                     variant="ghost"
                     size="icon"
                     onClick={onMinimize}
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    className="h-6 w-6 text-muted-foreground hover:text-brand-cyan hover:bg-[rgba(50,142,119,0.08)]"
                   >
                     <Minimize2 className="w-3 h-3" />
                   </Button>
@@ -190,7 +190,7 @@ export function SlidingPanel({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="h-6 w-6 text-muted-foreground hover:text-red-400 hover:bg-red-500/20"
+                  className="h-6 w-6 text-muted-foreground hover:text-red-400 hover:bg-red-500/15"
                 >
                   <X className="w-3 h-3" />
                 </Button>
@@ -201,7 +201,7 @@ export function SlidingPanel({
           {/* Content */}
           <CardContent 
             className={cn(
-              "sliding-panel-content p-6 overflow-y-auto h-[calc(100%-56px)] transition-opacity duration-200",
+              "sliding-panel-content flex-1 overflow-y-auto p-4 md:p-6 transition-opacity duration-200 min-h-0",
               isAnimating ? "opacity-100" : "opacity-0"
             )}
           >

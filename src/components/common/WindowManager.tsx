@@ -63,6 +63,7 @@ function getPanelTitle(panel: Panel): string {
     [PanelType.MARKET]: 'Market',
     [PanelType.FLEETS]: 'Fleet Command',
     [PanelType.PLANET_INTERACTION]: 'Planet Actions',
+    [PanelType.HOLOPAD]: 'Holopad',
   }
 
   return titles[panel.type] || 'Panel'

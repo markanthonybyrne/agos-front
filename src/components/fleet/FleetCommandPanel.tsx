@@ -149,8 +149,8 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
   return (
     <div className="space-y-6">
       {/* Progress indicator */}
-      <div className="flex items-center justify-between p-4 bg-muted/20 rounded-lg">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg bg-muted/20 p-4 sm:justify-between">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               step === 'origin' || step === 'ships' || step === 'destination' || step === 'confirm'
@@ -160,7 +160,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
           >
             1
           </div>
-          <div className="w-12 h-0.5 bg-border" />
+          <div className="hidden h-0.5 w-12 bg-border sm:block" />
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               step === 'ships' || step === 'destination' || step === 'confirm'
@@ -170,7 +170,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
           >
             2
           </div>
-          <div className="w-12 h-0.5 bg-border" />
+          <div className="hidden h-0.5 w-12 bg-border sm:block" />
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               step === 'destination' || step === 'confirm'
@@ -180,7 +180,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
           >
             3
           </div>
-          <div className="w-12 h-0.5 bg-border" />
+          <div className="hidden h-0.5 w-12 bg-border sm:block" />
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               step === 'confirm'
@@ -232,7 +232,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
             selectedShips={selectedShips}
             onChange={setSelectedShips}
           />
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setStep('origin')}
@@ -257,7 +257,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
             onSelect={setSelectedDestination}
             currentCoordinate={selectedDestination || undefined}
           />
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setStep('ships')}
@@ -357,7 +357,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Button
                   variant={orderType === 'attack' ? 'default' : 'outline'}
                   onClick={() => setOrderType('attack')}
@@ -460,7 +460,7 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
           </Card>
 
           {/* Launch button */}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setStep('destination')}

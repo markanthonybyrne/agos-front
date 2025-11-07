@@ -140,7 +140,7 @@ export function PlanetConsolePanel({ planetId }: PlanetConsolePanelProps) {
               <Button
                 key={action.id}
                 variant="outline"
-                className="h-auto p-6 flex flex-col items-start gap-3 panel-glass border-cyan/20 hover:border-cyan/50 hover:bg-cyan/5 transition-all group"
+                className="group flex h-auto flex-col items-start gap-3 rounded-xl border-cyan/20 p-4 transition-all panel-glass hover:border-cyan/50 hover:bg-cyan/5 md:p-6"
                 onClick={() => handleActionClick(action)}
               >
                 <div className="flex items-center gap-3 w-full">

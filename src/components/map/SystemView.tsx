@@ -6,6 +6,8 @@ import { getPlanetImage, getRandomSolImageForSystem, getRandomAsteroidImageForPl
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
 import { getOrbitLineOpacity, getOrbitLineWidth } from '@/lib/zoomLevels'
+import { isPlanetVisible } from '@/lib/visibilityUtils'
+import { VisibilityResponse } from '@/types/api.types'
 
 type DetailLevel = 'minimal' | 'standard' | 'full'
 
@@ -19,6 +21,7 @@ interface SystemViewProps {
   hoveredPlanet?: Planet | null
   className?: string
   systemName?: string | null
+  visibilityData?: VisibilityResponse // Visibility data for fog of war
 }
 
 /**
@@ -39,7 +42,8 @@ function SystemView({
   onPlanetHover,
   hoveredPlanet,
   className = '',
-  systemName
+  systemName,
+  visibilityData
 }: SystemViewProps) {
   // Use normalized zoom if provided, otherwise calculate from scale
   const effectiveNormalizedZoom = normalizedZoom ?? (() => {
@@ -48,33 +52,11 @@ function SystemView({
     return Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
   })()
   
-  // Check if we should animate planets (at max zoom)
-  const shouldAnimateOrbits = scale >= 1.4 && scale <= 1.554
+  // Disable orbiting animation - planets stay static on orbit rings
+  const shouldAnimateOrbits = false
   
-  // Animation time for orbital motion
-  const [animationTime, setAnimationTime] = useState(0)
-  
-  useEffect(() => {
-    if (!shouldAnimateOrbits) return
-    
-    let animationFrameId: number
-    let startTime = performance.now()
-    
-    const animate = (currentTime: number) => {
-      // Calculate elapsed time in seconds (for smooth, slow orbital motion)
-      const elapsed = (currentTime - startTime) / 1000
-      setAnimationTime(elapsed)
-      animationFrameId = requestAnimationFrame(animate)
-    }
-    
-    animationFrameId = requestAnimationFrame(animate)
-    
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId)
-      }
-    }
-  }, [shouldAnimateOrbits])
+  // Animation time for orbital motion (not used anymore)
+  const [animationTime] = useState(0)
   
   // Calculate orbit information for each planet
   const planetOrbits = useMemo(() => {
@@ -259,26 +241,12 @@ function SystemView({
       {/* Performance optimization: render different detail levels based on zoom */}
       {planetOrbits.map(({ planet, planetXY, radius, angle }) => {
         const isHovered = hoveredPlanet?.id === planet.id
+        // Check if planet is visible for interaction
+        const isPlanetVisibleForInteraction = isPlanetVisible(planet, visibilityData)
         
-        // Calculate animated position at high zoom (450%-500%)
-        // Use slow orbital speed - larger orbits move slower (Kepler's laws)
-        let currentPlanetX = planetXY.x
-        let currentPlanetY = planetXY.y
-        
-        if (shouldAnimateOrbits && radius > 0) {
-          // Orbital speed: larger radius = slower orbit (realistic physics)
-          // Base speed: 1 full rotation per 300 seconds (5 minutes) for a planet at radius 100
-          // Speed scales inversely with radius
-          const baseOrbitPeriod = 300 // seconds for radius 100
-          const orbitalSpeed = (2 * Math.PI) / (baseOrbitPeriod * (radius / 100))
-          
-          // Calculate current angle based on time
-          const currentAngle = angle + (animationTime * orbitalSpeed)
-          
-          // Calculate position along orbit circle
-          currentPlanetX = system.center.x + (radius * Math.cos(currentAngle))
-          currentPlanetY = system.center.y + (radius * Math.sin(currentAngle))
-        }
+        // Planets stay static on their orbit rings (no animation)
+        const currentPlanetX = planetXY.x
+        const currentPlanetY = planetXY.y
         
         // Minimal detail: just a colored dot (fast rendering)
         if (detailLevel === 'minimal') {
@@ -290,10 +258,22 @@ function SystemView({
               r={Math.max(2, basePlanetSize * 0.3)}
               fill={planet.owner_empire_id ? 'rgba(34, 211, 238, 0.8)' : 'rgba(255, 255, 255, 0.6)'}
               className={cn('planet-dot', isHovered && 'planet-hovered')}
-              onClick={() => onPlanetClick?.(planet)}
-              onMouseEnter={() => onPlanetHover?.(planet)}
+              onClick={() => {
+                if (isPlanetVisibleForInteraction) {
+                  onPlanetClick?.(planet)
+                }
+              }}
+              onMouseEnter={() => {
+                if (isPlanetVisibleForInteraction) {
+                  onPlanetHover?.(planet)
+                }
+              }}
               onMouseLeave={() => onPlanetHover?.(null)}
-              style={{ cursor: 'pointer' }}
+              style={{ 
+                cursor: isPlanetVisibleForInteraction ? 'pointer' : 'not-allowed',
+                opacity: isPlanetVisibleForInteraction ? 1 : 0.3,
+                filter: isPlanetVisibleForInteraction ? 'none' : 'brightness(0.3)'
+              }}
             />
           )
         }
@@ -325,10 +305,22 @@ function SystemView({
               isHovered && 'planet-hovered',
               planet.owner_empire_id && 'planet-colonized'
             )}
-            onClick={() => onPlanetClick?.(planet)}
-            onMouseEnter={() => onPlanetHover?.(planet)}
+            onClick={() => {
+              if (isPlanetVisibleForInteraction) {
+                onPlanetClick?.(planet)
+              }
+            }}
+            onMouseEnter={() => {
+              if (isPlanetVisibleForInteraction) {
+                onPlanetHover?.(planet)
+              }
+            }}
             onMouseLeave={() => onPlanetHover?.(null)}
-            style={{ cursor: 'pointer' }}
+            style={{ 
+              cursor: isPlanetVisibleForInteraction ? 'pointer' : 'not-allowed',
+              opacity: isPlanetVisibleForInteraction ? 1 : 0.3,
+              filter: isPlanetVisibleForInteraction ? 'none' : 'brightness(0.3)'
+            }}
           >
             {planetImage && (
               <>
@@ -351,7 +343,7 @@ function SystemView({
                   className="planet-image"
                   style={{ 
                     filter: isHovered ? 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.6))' : 'none',
-                    transition: shouldAnimateOrbits ? 'none' : 'filter 0.2s ease-in-out'
+                    transition: 'filter 0.2s ease-in-out'
                   }}
                 />
               </>
@@ -451,7 +443,8 @@ export const SystemViewMemo = memo(SystemView, (prevProps, nextProps) => {
     prevProps.hoveredPlanet?.id === nextProps.hoveredPlanet?.id &&
     prevProps.system.planets.length === nextProps.system.planets.length && // Check if planets changed
     prevProps.systemName === nextProps.systemName && // Check if system name changed
-    (prevProps.detailLevel ?? 'full') === (nextProps.detailLevel ?? 'full') // Check if detail level changed
+    (prevProps.detailLevel ?? 'full') === (nextProps.detailLevel ?? 'full') && // Check if detail level changed
+    prevProps.visibilityData === nextProps.visibilityData // Check if visibility data changed
   )
 })
 

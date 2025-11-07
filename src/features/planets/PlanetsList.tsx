@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,29 +8,159 @@ import { formatCoordinate } from '@/lib/coordinates'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Map } from 'lucide-react'
 import { getPlanetImage } from '@/lib/planetImages'
-import { usePanel } from '@/components/common/PanelManager'
-import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { formatResource } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Planet } from '@/types/api.types'
 import { useAuth } from '@/hooks/useAuth'
 import { parseCoordinate } from '@/lib/coordinates'
+import { PlanetTechProgressGauge } from '@/components/planets/PlanetTechProgressGauge'
+import { PlanetDetailPanel } from '@/components/planets/PlanetDetailPanel'
+import { Badge } from '@/components/ui/badge'
+import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 export function PlanetsList() {
   const navigate = useNavigate()
-  const { openPanel } = usePanel()
   const { empire } = useAuth()
-  const [clickedPlanetId, setClickedPlanetId] = useState<number | null>(null)
+  const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null)
+  const [isPanelOpen, setIsPanelOpen] = useState(false)
   const { data, isLoading, error } = useGetPlanetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
 
+  // All hooks must be called before any early returns
+  const planetsRaw = Array.isArray(data?.planets) ? data.planets : []
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [showScrollIndicators, setShowScrollIndicators] = useState(true)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const [hasScrolled, setHasScrolled] = useState(false)
+
+  // Sort planets to put homeworld in the center
+  const sortedPlanets = useMemo(() => {
+    if (planetsRaw.length === 0) return []
+    
+    const homeworldId = empire?.homeworld_planet_id
+    const homeworld = planetsRaw.find(p => p.id === homeworldId || p.state === 'homeworld')
+    const otherPlanets = planetsRaw.filter(p => p.id !== homeworldId && p.state !== 'homeworld')
+    
+    if (!homeworld) {
+      // No homeworld found, return planets as-is
+      return planetsRaw
+    }
+    
+    // Place homeworld in the center
+    const centerIndex = Math.floor(planetsRaw.length / 2)
+    const before = otherPlanets.slice(0, centerIndex)
+    const after = otherPlanets.slice(centerIndex)
+    
+    return [...before, homeworld, ...after]
+  }, [planetsRaw, empire?.homeworld_planet_id])
+
+  // Check if scrolling is needed and update scroll indicators
+  useEffect(() => {
+    if (isLoading || error) return // Skip if loading or error
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const checkScrollability = () => {
+      const canScroll = container.scrollWidth > container.clientWidth
+      const scrollLeft = container.scrollLeft
+      const maxScroll = container.scrollWidth - container.clientWidth
+      
+      // Check if user can scroll in either direction
+      setCanScrollLeft(scrollLeft > 10) // 10px threshold for smooth UX
+      setCanScrollRight(scrollLeft < maxScroll - 10)
+      
+      // Only show indicators if scrolling is needed
+      if (!canScroll) {
+        setShowScrollIndicators(false)
+      } else if (!hasScrolled) {
+        // On initial load, show indicators on both sides if scrolling is possible
+        // This helps users know they can scroll even if homeworld is centered
+        setCanScrollLeft(true)
+        setCanScrollRight(true)
+      }
+    }
+
+    // Delay check to allow layout to settle (after homeworld centering)
+    const timeoutId = setTimeout(() => {
+      checkScrollability()
+    }, 600) // Wait for homeworld scroll animation to complete
+    
+    // Check on scroll
+    const handleScroll = () => {
+      if (!hasScrolled) {
+        setHasScrolled(true)
+      }
+      checkScrollability()
+    }
+    
+    container.addEventListener('scroll', handleScroll)
+    window.addEventListener('resize', checkScrollability)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      container.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', checkScrollability)
+    }
+  }, [sortedPlanets, hasScrolled, isLoading, error])
+
+  // Scroll to center homeworld on mount
+  useEffect(() => {
+    if (isLoading || error || sortedPlanets.length === 0 || !scrollContainerRef.current) return
+    
+    const homeworldId = empire?.homeworld_planet_id
+    const homeworldIndex = sortedPlanets.findIndex(p => p.id === homeworldId || p.state === 'homeworld')
+    
+    if (homeworldIndex >= 0) {
+      // Calculate scroll position to center the homeworld
+      const container = scrollContainerRef.current
+      const planetWidth = 280 // width of each planet container
+      const gap = 64 // gap between planets (gap-16 = 4rem = 64px)
+      const planetWithGap = planetWidth + gap
+      
+      // Calculate the position of the homeworld
+      const homeworldPosition = homeworldIndex * planetWithGap
+      
+      // Center it in the viewport
+      const scrollPosition = homeworldPosition - (container.clientWidth / 2) + (planetWidth / 2)
+      
+      // Scroll to center
+      container.scrollTo({
+        left: Math.max(0, scrollPosition),
+        behavior: 'smooth',
+      })
+    }
+  }, [sortedPlanets, empire?.homeworld_planet_id, isLoading, error])
+
+  // Hide scroll indicators after user starts scrolling or after 5 seconds
+  useEffect(() => {
+    if (isLoading || error || !showScrollIndicators) return
+
+    // Auto-hide after 5 seconds
+    const timer = setTimeout(() => {
+      setShowScrollIndicators(false)
+    }, 5000)
+
+    // Hide immediately if user has scrolled
+    if (hasScrolled) {
+      setShowScrollIndicators(false)
+    }
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [showScrollIndicators, hasScrolled, isLoading, error])
+
+  // Early returns after all hooks
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-96 w-full" />
-        ))}
+      <div className="relative w-full h-screen overflow-hidden flex items-center justify-center">
+        <div className="flex gap-8">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-96 w-64" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -44,34 +175,33 @@ export function PlanetsList() {
     )
   }
 
-        const planets = Array.isArray(data?.planets) ? data.planets : []
-
-  if (planets.length === 0) {
+  if (sortedPlanets.length === 0) {
     return (
-      <Card className="panel-glass border-cyan/20">
-        <CardContent className="pt-6 text-center">
-          <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground mb-4">No planets owned</p>
-          <Button onClick={() => navigate('/map')}>Explore Universe</Button>
-        </CardContent>
-      </Card>
+      <div className="relative w-full h-screen overflow-hidden flex items-center justify-center">
+        <Card className="panel-glass border-cyan/20">
+          <CardContent className="pt-6 text-center">
+            <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">No planets owned</p>
+            <Button onClick={() => navigate('/map')}>Explore Universe</Button>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   const handlePlanetClick = (planet: Planet) => {
-    // Trigger click animation
-    setClickedPlanetId(planet.id)
-    
-    // Open planet console panel after animation starts
-    setTimeout(() => {
-      openPanel(PanelType.PLANET_VIEW, PanelSize.FULL_HEIGHT, { planetId: planet.id })
-      setClickedPlanetId(null)
-    }, 300)
+    setSelectedPlanet(planet)
+    setIsPanelOpen(true)
+  }
+
+  const handleClosePanel = () => {
+    setIsPanelOpen(false)
+    setSelectedPlanet(null)
   }
 
   const handleGalaxyMapClick = () => {
     // Find homeworld planet
-    const homeworld = planets.find(p => p.id === empire?.homeworld_planet_id)
+    const homeworld = sortedPlanets.find(p => p.id === empire?.homeworld_planet_id || p.state === 'homeworld')
     
     if (homeworld) {
       const coord = parseCoordinate(homeworld.coordinate)
@@ -85,27 +215,6 @@ export function PlanetsList() {
     // Fallback to default map view
     navigate('/map')
   }
-
-  // Generate random asteroid clusters
-  const generateAsteroids = (count: number) => {
-    return Array.from({ length: count }, (_, i) => {
-      // Random positions across the viewable area
-      const clusterX = Math.random() * 200 - 100 // -100% to 100% (centered at 0)
-      const clusterY = Math.random() * 200 - 100
-      const clusterSize = 3 + Math.random() * 3 // 3-6 asteroids per cluster
-      
-      return {
-        id: `asteroid-${i}`,
-        x: clusterX,
-        y: clusterY,
-        count: Math.floor(clusterSize),
-        offsetX: (Math.random() - 0.5) * 5, // Spread within cluster
-        offsetY: (Math.random() - 0.5) * 5,
-      }
-    })
-  }
-  
-  const asteroids = generateAsteroids(8) // 8 clusters of asteroids
 
   const getPlanetGlowColor = (slug?: string) => {
     switch (slug) {
@@ -126,11 +235,10 @@ export function PlanetsList() {
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      {/* Header */}
-      <div className="absolute top-8 left-8 right-8 z-10 flex justify-between items-start">
-        <div className="panel-glass surface-gradient border-border/20 px-6 py-4 backdrop-blur-md rounded-lg">
-          <h1 className="text-2xl font-heading glow-cyan mb-2">Planet Command</h1>
-          <p className="text-lg text-muted-foreground">Select a planet to access its console</p>
+      {/* Top Header Bar */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-4">
+        <div className="panel-glass surface-gradient border-border/20 px-6 py-3 backdrop-blur-md">
+          <h1 className="text-xl font-heading glow-cyan">Planet Command</h1>
         </div>
         <Button onClick={handleGalaxyMapClick} variant="outline" size="lg">
           <Map className="w-5 h-5 mr-2" />
@@ -138,143 +246,222 @@ export function PlanetsList() {
         </Button>
       </div>
 
-      {/* System View with Orbits */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <svg 
-          className="absolute w-[250%] h-[250%]" 
-          style={{ 
-            left: '-75%',
-            top: '-75%',
-            overflow: 'visible',
-            animation: 'planet-orbit 300s linear infinite',
-          }}
-        >
-          {/* Draw orbital rings */}
-          {planets.map((_, index) => {
-            const radius = 300 + (index * 150)
-            return (
-              <circle
-                key={`orbit-${index}`}
-                cx="50%"
-                cy="50%"
-                r={radius}
-                fill="none"
-                stroke="rgba(6, 182, 212, 0.2)"
-                strokeWidth="2"
-                strokeDasharray="8,8"
-              />
-            )
-          })}
-        </svg>
+      {/* Main Content Area - Horizontal Planet Display */}
+      <div className="absolute inset-0 flex items-center justify-center pt-20 pb-20">
+        {/* Scroll Indicators - Show if scrolling is possible */}
+        {showScrollIndicators && (canScrollLeft || canScrollRight) && (
+          <>
+            {/* Left Scroll Indicator */}
+            {canScrollLeft && (
+              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none transition-opacity duration-500">
+                <div className="flex flex-col items-center gap-2 animate-pulse">
+                  <ChevronLeft className="w-8 h-8 text-green-400 drop-shadow-lg" style={{
+                    filter: 'drop-shadow(0 0 8px rgba(34, 197, 94, 0.8))',
+                  }} />
+                  <div className="text-xs text-green-400 glow-green font-semibold uppercase tracking-wider">
+                    Scroll
+                  </div>
+                </div>
+              </div>
+            )}
 
-        {/* Planets positioned on orbits */}
-        <div className="absolute inset-0">
-          {planets.map((planet, index) => {
-            // Calculate position on orbit
-            const radius = 300 + (index * 150)
-            const angle = (index * 137.5) * (Math.PI / 180) // Golden angle for even distribution
-            const centerX = 50 // 50% of parent width
-            const centerY = 50 // 50% of parent height
-            const x = centerX + (radius * Math.cos(angle)) / 25 // Scale down for percentage
-            const y = centerY + (radius * Math.sin(angle)) / 25
+            {/* Right Scroll Indicator */}
+            {canScrollRight && (
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none transition-opacity duration-500">
+                <div className="flex flex-col items-center gap-2 animate-pulse">
+                  <ChevronRight className="w-8 h-8 text-green-400 drop-shadow-lg" style={{
+                    filter: 'drop-shadow(0 0 8px rgba(34, 197, 94, 0.8))',
+                  }} />
+                  <div className="text-xs text-green-400 glow-green font-semibold uppercase tracking-wider">
+                    Scroll
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <div 
+          ref={scrollContainerRef}
+          className="flex items-center justify-center gap-16 px-8 overflow-x-auto w-full h-full scroll-smooth"
+        >
+          {sortedPlanets.map((planet) => {
+            const isHomeworld = planet.id === empire?.homeworld_planet_id || planet.state === 'homeworld'
             
             return (
               <div
-            key={planet.id}
-                className="absolute group cursor-pointer"
+                key={planet.id}
+                className="group flex-shrink-0 transition-all duration-300 relative"
                 style={{
-                  left: `${x}%`,
-                  top: `${y}%`,
-                  transform: 'translate(-50%, -50%)',
+                  width: '280px',
                 }}
-                onClick={() => handlePlanetClick(planet)}
-          >
-                {/* Planet image */}
-                <div className="relative">
-                <img
-                  src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
-                    alt={planet?.type?.name || 'Planet'}
-                    className={cn(
-                      "w-56 h-56 object-contain filter drop-shadow-2xl transition-all duration-300",
-                      "group-hover:scale-125",
-                      getPlanetGlowColor(planet?.type?.slug),
-                      "group-hover:brightness-125",
-                      clickedPlanetId === planet.id && "planet-click-animate"
-                    )}
-                    style={{ imageRendering: 'auto' }}
-                    onError={() => {
-                      console.error('Planet image failed to load:', planet?.type?.slug)
-                    }}
-                  />
-                  
-                  {/* Planet name */}
-                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 w-full text-center mt-2">
+              >
+                {/* Homeworld Indicator - Techy Green Pointer */}
+                {isHomeworld && (
+                  <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-20">
+                    <div className="relative flex flex-col items-center">
+                      {/* "Homeworld" Label */}
+                      <div className="mb-2">
+                        <span className="text-xs font-semibold text-green-400 glow-green uppercase tracking-wider">
+                          Homeworld
+                        </span>
+                      </div>
+                      
+                      {/* Pointer Arrow */}
+                      <div className="relative">
+                        <svg
+                          width="32"
+                          height="32"
+                          viewBox="0 0 32 32"
+                          className="drop-shadow-lg"
+                          style={{
+                            filter: 'drop-shadow(0 0 8px rgba(34, 197, 94, 0.8))',
+                          }}
+                        >
+                          <defs>
+                            <linearGradient id={`homeworld-gradient-${planet.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor="rgba(34, 197, 94, 0.95)" />
+                              <stop offset="50%" stopColor="rgba(34, 197, 94, 0.8)" />
+                              <stop offset="100%" stopColor="rgba(22, 163, 74, 0.95)" />
+                            </linearGradient>
+                            <filter id={`homeworld-glow-${planet.id}`}>
+                              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                              <feMerge>
+                                <feMergeNode in="coloredBlur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                              </feMerge>
+                            </filter>
+                          </defs>
+                          {/* Arrow pointing down - techy style */}
+                          <path
+                            d="M 16 4 L 24 20 L 20 20 L 20 28 L 12 28 L 12 20 L 8 20 Z"
+                            fill={`url(#homeworld-gradient-${planet.id})`}
+                            stroke="rgba(34, 197, 94, 1)"
+                            strokeWidth="1.5"
+                            filter={`url(#homeworld-glow-${planet.id})`}
+                          />
+                        </svg>
+                        
+                        {/* Pulsing glow effect */}
+                        <div 
+                          className="absolute inset-0 -z-10 flex items-center justify-center"
+                          style={{
+                            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                          }}
+                        >
+                          <div className="w-8 h-8 bg-green-500/40 rounded-full blur-sm" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Panel Above Planet */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-8 w-full z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="panel-glass surface-gradient border border-border/30 backdrop-blur-md p-4 card-glow">
+                    <div className="space-y-2">
+                      <div className="text-center">
+                        <h3 className="text-lg font-heading glow-cyan truncate mb-1">
+                          {planet.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {formatCoordinate(planet.coordinate)}
+                        </p>
+                      </div>
+                      
+                      {planet.type && (
+                        <div className="flex items-center justify-center gap-2">
+                          <Badge variant="secondary" className="capitalize text-xs">
+                            {planet.type.name}
+                          </Badge>
+                          {planet.state && (
+                            <Badge variant="outline" className="capitalize text-xs">
+                              {planet.state}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <img
+                            src={getTelleriumImage()}
+                            alt="Tellerium"
+                            className="w-3 h-3 object-contain"
+                            style={{ imageRendering: 'auto' }}
+                          />
+                          <span className="text-xs font-mono text-tellerium">
+                            {formatResource(planet.tellerium_balance || 0)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <img
+                            src={getKryptonImage()}
+                            alt="Krypton"
+                            className="w-3 h-3 object-contain"
+                            style={{ imageRendering: 'auto' }}
+                          />
+                          <span className="text-xs font-mono text-krypton">
+                            {formatResource(planet.krypton_balance || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Planet Container with Tech Progress Gauge */}
+                <div
+                  className="relative cursor-pointer transition-all duration-300 group-hover:scale-105"
+                  onClick={() => handlePlanetClick(planet)}
+                >
+                  {/* Tech Progress Gauge - Positioned above planet */}
+                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <PlanetTechProgressGauge
+                      planetId={planet.id}
+                      size={280}
+                    />
+                  </div>
+
+                  {/* Planet Image Container */}
+                  <div className="relative z-10 flex items-center justify-center">
+                    <div className="relative">
+                      <img
+                        src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+                        alt={planet?.type?.name || 'Planet'}
+                        className={cn(
+                          "w-64 h-64 object-contain filter drop-shadow-2xl transition-all duration-300",
+                          "group-hover:scale-110 group-hover:brightness-125",
+                          getPlanetGlowColor(planet?.type?.slug),
+                        )}
+                        style={{ imageRendering: 'auto' }}
+                        onError={() => {
+                          console.error('Planet image failed to load:', planet?.type?.slug)
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Planet Name Below */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 w-full text-center">
                     <h3 className="text-base font-heading glow-cyan truncate">{planet.name}</h3>
                     <p className="text-xs text-muted-foreground font-mono mt-1">
                       {formatCoordinate(planet.coordinate)}
                     </p>
                   </div>
                 </div>
-
-                {/* Hover stats parallelogram box */}
-                <div className="absolute -top-40 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-72">
-                  <div className="parallelogram-box bg-background/95 backdrop-blur-sm border border-cyan-500/30 p-4 shadow-xl">
-                    <div className="space-y-1 max-w-[180px] mr-[30px] ml-auto">
-                      <div className="text-xs font-semibold text-foreground mb-1">
-                        {planet.name}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">T:</span>
-                        <span className="text-xs font-mono text-tellerium">{formatResource(planet.tellerium_balance)}</span>
-                  </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">K:</span>
-                        <span className="text-xs font-mono text-krypton">{formatResource(planet.krypton_balance)}</span>
-                </div>
-                      <div className="pt-1 border-t border-border/50">
-                        <span className="text-xs text-muted-foreground capitalize">{planet.type?.name || planet.type?.slug}</span>
-                        {planet.type?.description && (
-                          <p className="mt-1 text-xs text-muted-foreground/80 line-clamp-1">{planet.type.description}</p>
-                        )}
-                  </div>
-                </div>
-                  </div>
-                </div>
               </div>
             )
           })}
-          
-          {/* Asteroid clusters */}
-          {asteroids.map((cluster) => (
-            <div
-              key={cluster.id}
-              className="absolute pointer-events-none"
-              style={{
-                left: '50%',
-                top: '50%',
-                transform: `translate(calc(-50% + ${cluster.x}%), calc(-50% + ${cluster.y}%))`,
-              }}
-            >
-              {Array.from({ length: cluster.count }).map((_, i) => (
-                <img
-                  key={`${cluster.id}-${i}`}
-                  src="/assets/images/planets/asteroid.png"
-                  alt="Asteroid"
-                  className="absolute opacity-60"
-                  style={{
-                    width: `${8 + Math.random() * 4}px`,
-                    height: `${8 + Math.random() * 4}px`,
-                    left: `${i * cluster.offsetX}px`,
-                    top: `${i * cluster.offsetY}px`,
-                    transform: `rotate(${Math.random() * 360}deg)`,
-                  }}
-                />
-              ))}
-            </div>
-          ))}
         </div>
       </div>
+
+      {/* Planet Detail Panel */}
+      <PlanetDetailPanel
+        isOpen={isPanelOpen}
+        onClose={handleClosePanel}
+        planet={selectedPlanet}
+      />
     </div>
   )
 }
-

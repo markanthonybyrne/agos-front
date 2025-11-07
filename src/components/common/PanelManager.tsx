@@ -41,6 +41,7 @@ import { CombatLogsPage } from '@/features/combat/CombatLogsPage'
 import { ComposeMailPanel } from '@/components/messaging/ComposeMailPanel'
 import { ChatPanel } from '@/features/chat/ChatPanel'
 import { MarketPanel } from '@/features/market/MarketPanel'
+import { Holopad } from '@/features/holopad/Holopad'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
@@ -85,6 +86,7 @@ function getPanelTitle(panel: Panel): string {
     [PanelType.MARKET]: 'Market',
     [PanelType.FLEETS]: 'Fleet Command',
     [PanelType.PLANET_INTERACTION]: 'Planet Actions',
+    [PanelType.HOLOPAD]: 'Holopad',
   }
   
   return titles[panel.type] || 'Panel'
@@ -153,11 +155,11 @@ function PlanetViewWithAnimation({
       
       <div
         className={cn(
-          "sliding-panel-content fixed left-0 top-0 h-full w-[50%] flex items-center justify-center pointer-events-none transition-all ease-out",
-          isClosing 
-            ? "opacity-0 scale-95" 
-            : isOpening 
-            ? "opacity-0 scale-95" 
+          "sliding-panel-content fixed left-0 top-0 hidden h-full pointer-events-none transition-all ease-out xl:flex xl:w-1/2 xl:items-center xl:justify-center",
+          isClosing
+            ? "opacity-0 scale-95"
+            : isOpening
+            ? "opacity-0 scale-95"
             : "opacity-100 scale-100"
         )}
         style={{
@@ -173,7 +175,7 @@ function PlanetViewWithAnimation({
       </div>
       <div 
         className={cn(
-          "sliding-panel-container fixed right-0 top-0 h-full w-[50%] pointer-events-none transition-all ease-out",
+          "sliding-panel-container fixed right-0 top-0 h-full w-full pointer-events-none transition-all ease-out xl:w-1/2",
           isClosing 
             ? "opacity-0" 
             : isOpening 
@@ -317,6 +319,9 @@ export const PanelContent = React.memo(function PanelContent({
     
     case PanelType.QUANTUM_CREDITS:
       return <QuantumCreditsPanel />
+    
+    case PanelType.HOLOPAD:
+      return <Holopad />
     
     case PanelType.BOOSTERS:
       return <BoostersPanel />

@@ -81,29 +81,29 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto panel-glass surface-gradient card-glow vignette border-muted/20">
+      <DialogContent className="w-full max-w-2xl max-h-[90vh] overflow-y-auto panel-glass surface-gradient card-glow vignette border-muted/20 p-4 sm:p-6">
         <DialogHeader>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <img
               src={getPlanetTypeImage() || getPlanetImage('arid')}
               alt={displayPlanet.type?.name || 'Planet'}
-              className="w-16 h-16 object-contain flex-shrink-0"
+              className="h-14 w-14 flex-shrink-0 object-contain sm:h-16 sm:w-16"
               style={{ imageRendering: 'auto', display: 'block' }}
               onError={(e) => {
                 console.error('Planet image failed to load in action panel:', displayPlanet.type?.slug)
               }}
             />
-            <div>
-              <DialogTitle className="flex items-center gap-2">
+            <div className="space-y-2">
+              <DialogTitle className="flex flex-wrap items-center gap-2 text-lg text-brand-cyan sm:text-xl">
                 {displayPlanet.name || `Planet ${formatCoordinate(displayPlanet.coordinate)}`}
                 {displayPlanet.state === 'homeworld' && (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="border-green-500/30 bg-green-500/20 text-green-400">
                     <Home className="w-3 h-3 mr-1" />
                     Homeworld
                   </Badge>
                 )}
               </DialogTitle>
-              <DialogDescription className="font-mono">
+              <DialogDescription className="font-mono text-sm text-muted-foreground">
                 {formatCoordinate(displayPlanet.coordinate)}
               </DialogDescription>
             </div>
@@ -112,8 +112,8 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
 
         <div className="space-y-4">
           {/* Planet Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
               <label className="text-sm text-muted-foreground">State</label>
               <div className="mt-1">
                 <Badge variant={isUnsettled ? 'outline' : 'default'}>
@@ -122,18 +122,18 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
               </div>
             </div>
             {displayPlanet.type && (
-              <div>
+              <div className="space-y-1">
                 <label className="text-sm text-muted-foreground">Type</label>
-                <div className="mt-1 font-semibold">{displayPlanet.type.name}</div>
+                <div className="mt-1 font-semibold text-sm sm:text-base">{displayPlanet.type.name}</div>
                 {displayPlanet.type.description && (
-                  <p className="mt-1 text-xs text-muted-foreground">{displayPlanet.type.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{displayPlanet.type.description}</p>
                 )}
               </div>
             )}
             {displayPlanet.owner_empire_id && (
-              <div>
+              <div className="space-y-1">
                 <label className="text-sm text-muted-foreground">Owner</label>
-                <div className="mt-1 font-semibold">
+                <div className="mt-1 text-sm font-semibold sm:text-base">
                   {isOwned ? 'You' : `Empire #${displayPlanet.owner_empire_id}`}
                 </div>
               </div>
@@ -144,41 +144,41 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
           {isOwned && (
             <>
               <div className="border-t border-border/50 my-4" />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="mb-1 flex items-center gap-1.5">
                     <img
                       src={getTelleriumImage()}
                       alt="T"
-                      className="w-4 h-4 object-contain"
+                      className="h-4 w-4 object-contain"
                       style={{ imageRendering: 'auto' }}
                     />
                     <label className="text-sm text-muted-foreground">Tellerium</label>
                   </div>
-                  <div className="mt-1 font-mono font-semibold text-cyan-400">
+                  <div className="mt-1 font-mono text-sm font-semibold text-cyan-400 sm:text-base">
                     {formatResource(displayPlanet.tellerium_balance)}
                   </div>
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="mb-1 flex items-center gap-1.5">
                     <img
                       src={getKryptonImage()}
                       alt="K"
-                      className="w-4 h-4 object-contain"
+                      className="h-4 w-4 object-contain"
                       style={{ imageRendering: 'auto' }}
                     />
                     <label className="text-sm text-muted-foreground">Krypton</label>
                   </div>
-                  <div className="mt-1 font-mono font-semibold text-blue-400">
+                  <div className="mt-1 font-mono text-sm font-semibold text-blue-400 sm:text-base">
                     {formatResource(displayPlanet.krypton_balance)}
                   </div>
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="mb-1 flex items-center gap-1.5">
                     <img
                       src={getMineImage()}
                       alt="Mine"
-                      className="w-4 h-4 object-contain"
+                      className="h-4 w-4 object-contain"
                       style={{ imageRendering: 'auto' }}
                     />
                     <label className="text-sm text-muted-foreground">Mines</label>
@@ -186,11 +186,11 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
                   <div className="mt-1 font-semibold">{displayPlanet.mines}</div>
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="mb-1 flex items-center gap-1.5">
                     <img
                       src={getProbeImage()}
                       alt="Probe"
-                      className="w-4 h-4 object-contain"
+                      className="h-4 w-4 object-contain"
                       style={{ imageRendering: 'auto' }}
                     />
                     <label className="text-sm text-muted-foreground">Probes</label>
@@ -206,7 +206,7 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
           {/* Actions */}
           <div className="space-y-2">
             <h3 className="font-semibold text-sm">Actions</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <Button
                 variant="outline"
                 onClick={handleViewDetails}

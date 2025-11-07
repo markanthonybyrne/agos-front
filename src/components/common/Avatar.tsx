@@ -36,7 +36,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        'relative inline-flex items-center justify-center rounded-full bg-[#17191D]/80 backdrop-blur-sm border-0 overflow-hidden',
+        'relative inline-flex items-center justify-center rounded-full bg-[rgb(9_14_23/95%)] backdrop-blur-sm border-0 overflow-hidden',
         sizeClass,
         className
       )}
@@ -51,7 +51,7 @@ export function Avatar({
       ) : (
         <div
           className={cn(
-            'absolute inset-0 flex items-center justify-center font-semibold text-white bg-[#17191D]/80',
+            'absolute inset-0 flex items-center justify-center font-semibold text-white bg-[rgb(9_14_23/95%)]',
             'flex'
           )}
         >

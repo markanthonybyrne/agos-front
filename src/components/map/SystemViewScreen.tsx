@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from 'react-router-dom'
-import { useGetMapQuery } from '@/api/endpoints/universeApi'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useGetMapQuery, useGetVisibilityQuery } from '@/api/endpoints/universeApi'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 // import { Loader } from '@/components/ui/loader' // Replaced with blurred glass overlay
 import { WarpTransition } from './WarpTransition'
+import { PlanetZoomView } from './PlanetZoomView'
+import { PlanetHexGridView } from './PlanetHexGridView'
+import { useAuth } from '@/hooks/useAuth'
 
 /**
  * SystemViewScreen - Detailed system view screen
@@ -26,12 +29,18 @@ import { WarpTransition } from './WarpTransition'
  */
 export function SystemViewScreen() {
   const { region, system } = useParams<{ region: string; system: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { openPanel } = usePanel()
+  const { empire } = useAuth()
   const [hoveredPlanet, setHoveredPlanet] = useState<Planet | null>(null)
   const [showWarp, setShowWarp] = useState(true)
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
   const [isFadingOut, setIsFadingOut] = useState(false)
+  const [zoomedPlanet, setZoomedPlanet] = useState<Planet | null>(null)
+  
+  // Fetch visibility data for fog of war
+  const { data: visibilityData } = useGetVisibilityQuery()
   
   const regionNum = region ? parseInt(region, 10) : null
   const systemNum = system ? parseInt(system, 10) : null
@@ -66,6 +75,17 @@ export function SystemViewScreen() {
       const { region: pRegion, system: pSystem } = getPlanetRegionAndSystem(planet)
       return pRegion === regionNum && pSystem === systemNum
     })
+    
+    // Log planet data structure to debug missing fields
+    if (systemPlanets.length > 0) {
+      console.log('[SystemViewScreen] Sample planet from map query:', {
+        firstPlanet: systemPlanets[0],
+        hasId: !!systemPlanets[0].id,
+        hasOwnerId: systemPlanets[0].owner_empire_id !== undefined,
+        allKeys: Object.keys(systemPlanets[0]),
+        state: systemPlanets[0].state
+      })
+    }
     
     console.debug('[SystemViewScreen] Planet filtering:', {
       totalPlanetsFetched: mapData.planets.length,
@@ -155,11 +175,59 @@ export function SystemViewScreen() {
     return systemData
   }, [mapData, regionNum, systemNum])
   
-  // Handle planet click
+  // Handle planet click - show hex grid for owned planets, zoom view for others
   const handlePlanetClick = (planet: Planet) => {
-    openPanel(PanelType.PLANET_INTERACTION, PanelSize.MEDIUM, {
-      planet: planet
+    console.log('[SystemViewScreen] Planet clicked - full planet object:', planet)
+    console.log('[SystemViewScreen] Planet clicked:', {
+      planetId: planet.id,
+      planetName: planet.name,
+      ownerId: planet.owner_empire_id,
+      empireId: empire?.id,
+      state: planet.state,
+      isOwned: planet.owner_empire_id === empire?.id,
+      isHomeworldOrColony: planet.state === 'homeworld' || planet.state === 'colony',
+      allKeys: Object.keys(planet),
+      coordinate: planet.coordinate,
+      coordinateType: typeof planet.coordinate
     })
+    setZoomedPlanet(planet)
+  }
+  
+  // Handle closing zoom/hex grid view
+  const handleCloseZoom = () => {
+    setZoomedPlanet(null)
+  }
+  
+  // Check if planet is owned by player (homeworld or colony)
+  // Note: If owner_empire_id is missing from map data, we can infer ownership from state
+  const isPlanetOwned = (planet: Planet) => {
+    // If we have owner_empire_id, use it
+    if (planet.owner_empire_id !== undefined) {
+      const owned = planet.owner_empire_id === empire?.id && 
+             (planet.state === 'homeworld' || planet.state === 'colony')
+      console.log('[SystemViewScreen] isPlanetOwned check (with owner_empire_id):', {
+        planetId: planet.id,
+        ownerId: planet.owner_empire_id,
+        empireId: empire?.id,
+        state: planet.state,
+        owned
+      })
+      return owned
+    }
+    
+    // Fallback: if state is homeworld or colony, assume it might be owned
+    // We'll need to fetch full planet data to be sure
+    const mightBeOwned = planet.state === 'homeworld' || planet.state === 'colony'
+    console.log('[SystemViewScreen] isPlanetOwned check (fallback - no owner_empire_id):', {
+      planetId: planet.id,
+      state: planet.state,
+      mightBeOwned,
+      note: 'Will need to fetch full planet data to confirm ownership'
+    })
+    
+    // For now, if it's homeworld or colony, show hex grid
+    // The PlanetHexGridView will handle fetching full planet data
+    return mightBeOwned
   }
   
   // Handle loading overlay fade-out
@@ -179,6 +247,25 @@ export function SystemViewScreen() {
       setShowLoadingOverlay(true)
     }
   }, [isLoading, showLoadingOverlay])
+
+  // Auto-open planet view if planet ID is in query params
+  useEffect(() => {
+    const planetIdParam = searchParams.get('planet')
+    if (planetIdParam && systemViewData?.planets && !zoomedPlanet) {
+      const planetId = parseInt(planetIdParam, 10)
+      const planet = systemViewData.planets.find(p => p.id === planetId)
+      if (planet) {
+        // Small delay to allow system view to render first
+        setTimeout(() => {
+          setZoomedPlanet(planet)
+          // Remove query param from URL
+          const newSearchParams = new URLSearchParams(searchParams)
+          newSearchParams.delete('planet')
+          navigate(`/map/system/${region}/${system}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ''}`, { replace: true })
+        }, 500)
+      }
+    }
+  }, [searchParams, systemViewData, zoomedPlanet, navigate, region, system])
   
   if (!systemViewData) {
     return (
@@ -285,10 +372,26 @@ export function SystemViewScreen() {
               onPlanetHover={setHoveredPlanet}
               hoveredPlanet={hoveredPlanet}
               systemName={systemViewData.system_name}
+              visibilityData={visibilityData}
             />
           </g>
         </svg>
       </div>
+      
+      {/* Planet view - hex grid for owned planets, zoom view for others */}
+      {zoomedPlanet && (
+        isPlanetOwned(zoomedPlanet) ? (
+          <PlanetHexGridView
+            planet={zoomedPlanet}
+            onClose={handleCloseZoom}
+          />
+        ) : (
+          <PlanetZoomView
+            planet={zoomedPlanet}
+            onClose={handleCloseZoom}
+          />
+        )
+      )}
       
       {/* CSS animations */}
       <style>{`

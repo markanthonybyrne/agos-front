@@ -36,6 +36,7 @@ export enum PanelType {
   MARKET = 'MARKET',
   FLEETS = 'FLEETS',
   PLANET_INTERACTION = 'PLANET_INTERACTION',
+  HOLOPAD = 'HOLOPAD',
 }
 
 export enum PanelSize {

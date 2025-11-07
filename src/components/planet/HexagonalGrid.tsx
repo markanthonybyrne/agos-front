@@ -297,17 +297,17 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
 
   return (
     <div 
-      className="absolute z-20"
+      className="relative"
       style={{ 
         width: sizeMapping.containerSize, 
         height: sizeMapping.containerSize,
-        left: 0,
-        top: '280px', // Move grid down to align with planet
+        pointerEvents: 'auto'
       }}
     >
       <svg
         width={sizeMapping.containerSize}
         height={sizeMapping.containerSize}
+        style={{ pointerEvents: 'auto' }}
       >
         {/* Render hexagons */}
         {hexagonPositions.map((hex) => {
@@ -315,16 +315,17 @@ export function HexagonalGrid({ planetId, size = 'xxlarge' }: HexagonalGridProps
           
           return (
             <g key={hex.id}>
-              {/* Empty hexagon - highly blurred */}
+              {/* Empty hexagon - visible but subtle */}
               {!isOccupied && (
                 <path
                   d={hexPath}
                   transform={`translate(${hex.x}, ${hex.y})`}
-                  stroke="rgba(255, 255, 255, 0.2)"
-                  strokeWidth={2}
-                  fill="rgba(0, 0, 0, 0.1)"
+                  stroke="rgba(255, 255, 255, 0.3)"
+                  strokeWidth={1.5}
+                  fill="rgba(0, 0, 0, 0.05)"
                   style={{
-                    filter: 'blur(4px)',
+                    filter: 'blur(2px)',
+                    pointerEvents: 'none'
                   }}
                 />
               )}

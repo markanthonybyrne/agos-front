@@ -1,36 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Funnel+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 220 15% 9%; /* #17191D */
-    --foreground: 210 40% 98%;
+    --brand-cyan: 193 51% 37%; /* #2E798D */
+    --brand-green: 165 48% 38%; /* #328E77 */
 
-    --card: 220 15% 11%; /* #1C2024 */
-    --card-foreground: 210 40% 98%;
+    --background: 216 49% 6%; /* #080E17 */
+    --foreground: 210 40% 96%;
 
-    --popover: 220 15% 11%;
-    --popover-foreground: 210 40% 98%;
+    --card: 221 39% 11%; /* #111827 */
+    --card-foreground: 210 40% 96%;
 
-    --primary: 195 100% 50%; /* #19EAFD */
-    --primary-foreground: 220 15% 9%;
+    --popover: 221 39% 11%;
+    --popover-foreground: 210 40% 96%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 210 40% 98%;
+    --primary: var(--brand-cyan);
+    --primary-foreground: 216 49% 6%;
 
-    --muted: 220 15% 20%;
-    --muted-foreground: 210 40% 65%;
+    --secondary: var(--brand-green);
+    --secondary-foreground: 216 49% 6%;
 
-    --accent: 220 15% 15%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 221 32% 16%;
+    --muted-foreground: 210 26% 72%;
+
+    --accent: 221 32% 18%;
+    --accent-foreground: 210 40% 96%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 210 40% 96%;
 
-    --border: 220 15% 23%; /* #3A3A3D */
-    --input: 220 15% 23%;
-    --ring: 195 100% 50%;
+    --border: 216 34% 18%;
+    --input: 216 34% 18%;
+    --ring: var(--brand-cyan);
 
     --radius: 0.5rem;
   }
@@ -43,11 +48,17 @@
   body {
     @apply bg-background text-foreground font-sans;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    background-image:
+      radial-gradient(120% 140% at 20% -10%, hsl(var(--brand-cyan) / 0.12), transparent),
+      radial-gradient(100% 160% at 80% -20%, hsl(var(--brand-green) / 0.08), transparent),
+      linear-gradient(180deg, hsla(216 49% 6% / 0.95) 0%, hsla(221 39% 11% / 0.95) 100%);
+    font-family: 'Funnel Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
   /* Remove glow and backgrounds from headings */
   h1, h2, h3, h4, h5, h6 {
     text-shadow: none;
     background: transparent;
+    font-family: 'Funnel Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
 
@@ -163,18 +174,22 @@
   }
   
   .glow-cyan {
-    /* Glow removed - text-shadow disabled */
-    text-shadow: none;
+    color: hsl(var(--primary));
+    text-shadow: 0 0 18px hsl(var(--primary) / 0.35);
   }
   
   .glow-blue {
-    /* Glow removed - text-shadow disabled */
-    text-shadow: none;
+    color: hsl(var(--secondary));
+    text-shadow: 0 0 18px hsl(var(--secondary) / 0.35);
   }
   
   .panel-glass {
     @apply backdrop-blur-sm border border-border/50 relative overflow-hidden;
-    background: linear-gradient(180deg, hsl(var(--card) / 0.75) 0%, hsl(var(--card) / 0.6) 100%);
+    background: linear-gradient(160deg, hsl(221 39% 12% / 0.95) 0%, hsl(216 49% 6% / 0.98) 100%);
+    box-shadow:
+      0 0 0 1px hsl(var(--brand-cyan) / 0.25),
+      0 24px 42px rgba(0, 0, 0, 0.55),
+      inset 0 0 28px hsl(var(--brand-green) / 0.18);
   }
 
   /* Cut corner aesthetic - rectangular cut on bottom-right corner */
@@ -740,6 +755,17 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  @keyframes tooltipLineDraw {
+    from {
+      height: 0;
+      opacity: 0;
+    }
+    to {
+      height: 100%;
+      opacity: 1;
     }
   }
 

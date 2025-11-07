@@ -286,17 +286,22 @@ export function FogOfWarLayer({
 
   // Calculate fog bounds - cover entire viewport with generous padding
   // This ensures the fog always covers the full screen, even when panning/zooming
+  // Use viewport bounds instead of grid bounds to ensure full coverage
   const fogBounds = useMemo(() => {
-    // Cover the entire grid plus large padding to ensure full viewport coverage
-    // This prevents the fog from appearing as a smaller rectangle
-    const padding = Math.max(gridWidth, gridHeight) * 2 // Very large padding to cover any viewport
+    // Use viewport bounds and extend well beyond to cover any pan/zoom
+    // This ensures the fog covers the entire visible area plus padding
+    const padding = Math.max(
+      viewportBounds.maxX - viewportBounds.minX,
+      viewportBounds.maxY - viewportBounds.minY
+    ) * 2 // Large padding based on viewport size
+    
     return {
-      x: -padding,
-      y: -padding,
-      width: gridWidth + padding * 2,
-      height: gridHeight + padding * 2,
+      x: viewportBounds.minX - padding,
+      y: viewportBounds.minY - padding,
+      width: (viewportBounds.maxX - viewportBounds.minX) + padding * 2,
+      height: (viewportBounds.maxY - viewportBounds.minY) + padding * 2,
     }
-  }, [gridWidth, gridHeight])
+  }, [viewportBounds])
 
   // If user has full visibility, don't render fog at all
   if (hasFullVisibility) {

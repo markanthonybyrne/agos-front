@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
+import galacticCenterImage from '../../../assets/images/universe/galactic-center.png'
 
 interface GalacticCoreLayerProps {
   scale: number
@@ -56,7 +57,7 @@ export function GalacticCoreLayer({
         y={corePosition.y - coreSize / 2}
         width={coreSize}
         height={coreSize}
-        href="/assets/images/universe/galactic-center.png"
+        href={galacticCenterImage}
         className="galactic-core-image"
         preserveAspectRatio="xMidYMid"
         style={{

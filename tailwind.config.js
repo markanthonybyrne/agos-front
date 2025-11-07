@@ -20,6 +20,10 @@ export default {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        brand: {
+          cyan: '#2E798D',
+          green: '#328E77',
+        },
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
@@ -67,8 +71,8 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        heading: ['Orbitron', 'Rajdhani', 'sans-serif'],
+        sans: ['"Funnel Sans"', 'Inter', 'system-ui', 'sans-serif'],
+        heading: ['"Funnel Sans"', 'Orbitron', 'Rajdhani', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       keyframes: {

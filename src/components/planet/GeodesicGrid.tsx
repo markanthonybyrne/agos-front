@@ -65,7 +65,6 @@ function generateGeodesicSphere() {
   
   // Generate cells using rings
   const rings = 8 // Number of latitude rings
-  const radius = 1.0
   
   for (let ring = 0; ring < rings; ring++) {
     const theta = (Math.PI * ring) / (rings - 1) // 0 to PI
@@ -264,35 +263,48 @@ export function GeodesicGrid({ planetId, planetSize }: GeodesicGridProps) {
     return cells
   }, [planetData, facilitiesData, defencesData, facilityDefinitionsMap])
   
-  // Project cells to 2D
+  // Project cells to 2D and sort by distance from center for wave effect
   const projectedCells = useMemo(() => {
     const viewportSize = planetSize
+    const centerX = planetSize / 2
+    const centerY = planetSize / 2
+    
     return gridCells
       .map(cell => {
         const projected = cell.vertices.map(v => project3D(v, planetSize, viewportSize))
         const projectedCenter = project3D(cell.center, planetSize, viewportSize)
         
+        // Calculate distance from center for wave animation
+        const dx = projectedCenter.x - centerX
+        const dy = projectedCenter.y - centerY
+        const distanceFromCenter = Math.sqrt(dx * dx + dy * dy)
+        
         return {
           ...cell,
           projected,
-          projectedCenter
+          projectedCenter,
+          distanceFromCenter
         }
       })
       .filter(cell => {
         // Show front hemisphere
         return cell.center.z > -0.3
       })
+      .sort((a, b) => a.distanceFromCenter - b.distanceFromCenter) // Sort by distance for wave effect
   }, [gridCells, planetSize])
   
   return (
     <div 
-      className="absolute inset-0 z-20 pointer-events-none"
+      className="absolute inset-0 z-20"
       style={{
         width: planetSize,
         height: planetSize,
         left: '50%',
         top: '50%',
-        transform: 'translate(calc(-50% + 60px), -50%)', // Move to the right
+        transform: 'translate(-50%, -50%)', // Centered
+        pointerEvents: 'auto',
+        opacity: 0,
+        animation: 'hexGridAppear 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) 0.8s forwards',
       }}
     >
       <svg
@@ -387,13 +399,14 @@ export function GeodesicGrid({ planetId, planetSize }: GeodesicGridProps) {
                 stroke="rgba(255, 255, 255, 0.7)"
                 strokeWidth={1.5}
                 className={cn(
-                  "transition-all duration-200 cursor-pointer",
+                  "transition-all duration-200 cursor-pointer hex-grid-line",
                   isOccupied && "stroke-cyan-400"
                 )}
                 style={{
                   filter: isOccupied 
                     ? 'drop-shadow(0 0 4px rgba(34, 211, 238, 0.8))' 
                     : 'none',
+                  animationDelay: `${0.8 + (cell.distanceFromCenter / 50) * 0.1}s`,
                 }}
                 onMouseEnter={() => setHoveredCellId(cell.id)}
                 onMouseLeave={() => setHoveredCellId(null)}

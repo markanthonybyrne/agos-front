@@ -32,6 +32,8 @@ import {
   Search,
   Bell,
   Settings,
+  Radio,
+  Globe,
 } from 'lucide-react'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 
@@ -43,6 +45,8 @@ export interface SubMenuItem {
   panelData?: any
   subMenuItems?: SubMenuItem[] // Support nested submenus
   onClick?: () => void
+  navigateTo?: string // Navigation path
+  isDynamic?: boolean // If true, this item will be populated dynamically
 }
 
 export interface MainMenuItem {
@@ -66,105 +70,57 @@ export interface HubCategory {
 
 export const hubMenuConfig: HubCategory[] = [
   {
-    id: 'activities',
-    label: 'Activities',
-    icon: Gem,
+    id: 'management',
+    label: 'Management',
+    icon: Menu,
     mainMenuItems: [
       {
-        id: 'map',
-        label: 'Map',
-        icon: Map,
-        navigateTo: '/map', // Navigate to /map instead of opening as panel
+        id: 'holopad',
+        label: 'Holopad',
+        icon: Radio,
+        panelType: PanelType.HOLOPAD,
+        panelSize: PanelSize.XLARGE,
       },
       {
-        id: 'journal',
-        label: 'Journal',
-        icon: BookOpen,
+        id: 'planets',
+        label: 'Planets',
+        icon: Building2,
+        navigateTo: '/planets',
         subMenuItems: [
           {
-            id: 'activity-log',
-            label: 'Activity Log',
-            // Provide nested submenu to demonstrate third-level panel
-            subMenuItems: [
-              {
-                id: 'recent-combat',
-                label: 'Recent Combat',
-                panelType: PanelType.COMBAT_LOGS,
-                panelSize: PanelSize.MEDIUM,
-                panelData: { filter: 'recent' },
-              },
-              {
-                id: 'filters',
-                label: 'Filters',
-                subMenuItems: [
-                  {
-                    id: 'filter-combat',
-                    label: 'Combat Only',
-                    panelType: PanelType.COMBAT_LOGS,
-                    panelSize: PanelSize.MEDIUM,
-                    panelData: { filter: 'combat' },
-                  },
-                  {
-                    id: 'filter-diplomacy',
-                    label: 'Diplomacy',
-                    panelType: PanelType.COMBAT_LOGS,
-                    panelSize: PanelSize.MEDIUM,
-                    panelData: { filter: 'diplomacy' },
-                  },
-                ],
-              },
-            ],
+            id: 'planets-list',
+            label: 'List of Planets',
+            isDynamic: true, // This will be populated dynamically with actual planets
           },
           {
-            id: 'combat-history',
-            label: 'Combat History',
-            subMenuItems: [
-              {
-                id: 'by-date',
-                label: 'By Date',
-                panelType: PanelType.COMBAT_LOGS,
-                panelSize: PanelSize.MEDIUM,
-                panelData: { view: 'history-date' },
-              },
-              {
-                id: 'by-participant',
-                label: 'By Participant',
-                panelType: PanelType.COMBAT_LOGS,
-                panelSize: PanelSize.MEDIUM,
-                panelData: { view: 'history-participant' },
-              },
-            ],
+            id: 'research',
+            label: 'Research',
+            panelType: PanelType.TECH_TREE_RESEARCH,
+            panelSize: PanelSize.XLARGE,
           },
         ],
       },
       {
-        id: 'signals',
-        label: 'Signals',
-        icon: Scan,
-        panelType: PanelType.SIGNALS,
+        id: 'politics',
+        label: 'Politics',
+        icon: Shield,
+        panelType: PanelType.POLITICS,
         panelSize: PanelSize.XLARGE,
       },
       {
-        id: 'combat-logs',
-        label: 'Combat Logs',
-        icon: Sword,
-        panelType: PanelType.COMBAT_LOGS,
-        panelSize: PanelSize.LARGE,
+        id: 'social',
+        label: 'Social',
+        icon: MessageSquare,
+        panelType: PanelType.CHAT,
+        panelSize: PanelSize.XLARGE,
       },
       {
-        id: 'achievements',
-        label: 'Achievements',
-        icon: Award,
-        panelType: PanelType.ACHIEVEMENTS,
-        panelSize: PanelSize.MEDIUM,
+        id: 'mail',
+        label: 'Interstellar Mail',
+        icon: Mail,
+        panelType: PanelType.MESSAGING,
+        panelSize: PanelSize.XLARGE,
       },
-    ],
-  },
-  {
-    id: 'finance',
-    label: 'Finance',
-    icon: TrendingUp,
-    mainMenuItems: [
       {
         id: 'market',
         label: 'Market',
@@ -173,96 +129,11 @@ export const hubMenuConfig: HubCategory[] = [
         panelSize: PanelSize.XLARGE,
       },
       {
-        id: 'quantum-credits',
-        label: 'Quantum Credits',
-        icon: Wallet,
-        panelType: PanelType.QUANTUM_CREDITS,
-        panelSize: PanelSize.MEDIUM,
-      },
-      {
-        id: 'transactions',
-        label: 'Transactions',
-        icon: FileText,
-        subMenuItems: [
-          {
-            id: 'view-all',
-            label: 'View All',
-            subMenuItems: [
-              {
-                id: 'recent-transactions',
-                label: 'Recent',
-                panelType: PanelType.MARKET,
-                panelSize: PanelSize.MEDIUM,
-                panelData: { view: 'transactions', filter: 'recent' },
-              },
-              {
-                id: 'high-value',
-                label: 'High Value',
-                panelType: PanelType.MARKET,
-                panelSize: PanelSize.MEDIUM,
-                panelData: { view: 'transactions', filter: 'high-value' },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'industry',
-    label: 'Industry',
-    icon: Factory,
-    mainMenuItems: [
-      {
-        id: 'construction-queue',
-        label: 'Construction Queue',
-        icon: ListChecks,
-        panelType: PanelType.CONSTRUCTION_QUEUE,
-        panelSize: PanelSize.MEDIUM,
-      },
-      {
-        id: 'tech-trees',
-        label: 'Tech Trees',
-        icon: GitBranch,
-        subMenuItems: [
-          {
-            id: 'facilities',
-            label: 'Facilities',
-            panelType: PanelType.TECH_TREE_FACILITIES,
-            panelSize: PanelSize.XLARGE,
-          },
-          {
-            id: 'ships',
-            label: 'Ships',
-            panelType: PanelType.TECH_TREE_SHIPS,
-            panelSize: PanelSize.XLARGE,
-          },
-          {
-            id: 'defenses',
-            label: 'Defenses',
-            panelType: PanelType.TECH_TREE_DEFENSES,
-            panelSize: PanelSize.XLARGE,
-          },
-          {
-            id: 'research-tree',
-            label: 'Research Tree',
-            panelType: PanelType.TECH_TREE_RESEARCH,
-            panelSize: PanelSize.XLARGE,
-          },
-        ],
-      },
-      {
-        id: 'research',
-        label: 'Research',
-        icon: FlaskConical,
-        subMenuItems: [
-          {
-            id: 'active-research',
-            label: 'Active Research',
-            panelType: PanelType.RESEARCH_DETAIL,
-            panelSize: PanelSize.LARGE,
-          },
-        ],
+        id: 'rankings',
+        label: 'Rankings',
+        icon: Trophy,
+        panelType: PanelType.RANKINGS,
+        panelSize: PanelSize.XLARGE,
       },
     ],
   },
@@ -272,24 +143,38 @@ export const hubMenuConfig: HubCategory[] = [
     icon: Box,
     mainMenuItems: [
       {
-        id: 'planets',
-        label: 'Planets',
-        icon: Building2,
-        subMenuItems: [
-          {
-            id: 'my-planets',
-            label: 'My Planets',
-            panelType: PanelType.PLANET_VIEW,
-            panelSize: PanelSize.LARGE,
-          },
-        ],
+        id: 'facilities',
+        label: 'Facilities',
+        icon: Factory,
+        panelType: PanelType.TECH_TREE_FACILITIES,
+        panelSize: PanelSize.XLARGE,
       },
       {
-        id: 'fleet-assets',
-        label: 'Fleet Assets',
-        icon: Package,
-        panelType: PanelType.FLEETS,
+        id: 'defenses',
+        label: 'Defenses',
+        icon: Shield,
+        panelType: PanelType.TECH_TREE_DEFENSES,
         panelSize: PanelSize.XLARGE,
+      },
+      {
+        id: 'ships',
+        label: 'Ships',
+        icon: Ship,
+        panelType: PanelType.TECH_TREE_SHIPS,
+        panelSize: PanelSize.XLARGE,
+      },
+    ],
+  },
+  {
+    id: 'fleets',
+    label: 'Fleets',
+    icon: Rocket,
+    mainMenuItems: [
+      {
+        id: 'fleet-command',
+        label: 'Fleet Command',
+        icon: Send,
+        navigateTo: '/fleets',
       },
     ],
   },
@@ -298,13 +183,6 @@ export const hubMenuConfig: HubCategory[] = [
     label: 'Personal',
     icon: User,
     mainMenuItems: [
-      {
-        id: 'settings',
-        label: 'Settings',
-        icon: Settings,
-        panelType: PanelType.SETTINGS,
-        panelSize: PanelSize.LARGE,
-      },
       {
         id: 'achievements',
         label: 'Achievements',
@@ -319,113 +197,12 @@ export const hubMenuConfig: HubCategory[] = [
         panelType: PanelType.BOOSTERS,
         panelSize: PanelSize.MEDIUM,
       },
-    ],
-  },
-  {
-    id: 'ship',
-    label: 'Ship',
-    icon: Ship,
-    mainMenuItems: [
       {
-        id: 'fleet-command',
-        label: 'Fleet Command',
-        icon: Send,
-        panelType: PanelType.FLEET_COMMAND,
-        panelSize: PanelSize.XLARGE,
-      },
-      {
-        id: 'active-fleets',
-        label: 'Active Fleets',
-        icon: Rocket,
-        panelType: PanelType.FLEETS,
-        panelSize: PanelSize.XLARGE,
-      },
-      {
-        id: 'ship-management',
-        label: 'Ship Management',
-        icon: Ship,
-        subMenuItems: [
-          {
-            id: 'build-ships',
-            label: 'Build Ships',
-            panelType: PanelType.TECH_TREE_SHIPS,
-            panelSize: PanelSize.XLARGE,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'social',
-    label: 'Social',
-    icon: Users,
-    mainMenuItems: [
-      {
-        id: 'politics',
-        label: 'Politics & Alliances',
-        icon: Shield,
-        panelType: PanelType.POLITICS,
-        panelSize: PanelSize.XLARGE,
-      },
-      {
-        id: 'chat',
-        label: 'Chat',
-        icon: MessageSquare,
-        panelType: PanelType.CHAT,
-        panelSize: PanelSize.XLARGE,
-      },
-      {
-        id: 'mail',
-        label: 'Mail',
-        icon: Mail,
-        panelType: PanelType.MESSAGING,
-        panelSize: PanelSize.XLARGE,
-      },
-      {
-        id: 'rankings',
-        label: 'Rankings',
-        icon: Trophy,
-        panelType: PanelType.RANKINGS,
-        panelSize: PanelSize.XLARGE,
-      },
-    ],
-  },
-  {
-    id: 'utilities',
-    label: 'Utilities',
-    icon: Wrench,
-    mainMenuItems: [
-      {
-        id: 'help',
-        label: 'Help ergergh',
-        icon: HelpCircle,
-        subMenuItems: [
-          {
-            id: 'documentation',
-            label: 'Documentation',
-            subMenuItems: [
-              {
-                id: 'player-guide',
-                label: 'Player Guide sdhstrjd',
-                panelType: PanelType.SETTINGS,
-                panelSize: PanelSize.LARGE,
-              },
-              {
-                id: 'api-docs',
-                label: 'API Documentation',
-                panelType: PanelType.NOTIFICATIONS,
-                panelSize: PanelSize.LARGE,
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'notifications',
-        label: 'Notifications',
-        icon: Bell,
-        panelType: PanelType.NOTIFICATIONS,
-        panelSize: PanelSize.MEDIUM,
+        id: 'settings',
+        label: 'Settings',
+        icon: Settings,
+        panelType: PanelType.SETTINGS,
+        panelSize: PanelSize.LARGE,
       },
     ],
   },

@@ -12,6 +12,9 @@ import { useAppDispatch } from '@/app/hooks'
 import { logout } from '@/app/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadMailCount } from '@/hooks/useUnreadMailCount'
+import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
+import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
+import { Planet } from '@/types/api.types'
 
 interface HubSidebarProps {
   constructionCount?: number
@@ -39,6 +42,9 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
     refetchOnMountOrArgChange: true,
   })
   const { unreadCount } = useUnreadMailCount()
+  const { data: planetsData } = useGetPlanetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  })
   
   const sidebarRef = useRef<HTMLDivElement>(null)
   const mainMenuRef = useRef<HTMLDivElement>(null)
@@ -117,7 +123,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
     [openPanel, navigate]
   )
 
-  // Handle submenu item click - always opens panels/windows
+  // Handle submenu item click - opens panels/windows or navigates
   const handleSubMenuItemClick = useCallback(
     (item: SubMenuItem, e?: React.MouseEvent) => {
       if (e) {
@@ -125,8 +131,12 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
         e.stopPropagation()
       }
       
-      // Submenu items always open panels/windows (no nested submenus)
-      if (item.panelType) {
+      // Submenu items can navigate or open panels/windows
+      if (item.navigateTo) {
+        navigate(item.navigateTo)
+        setIsCollapsed(true)
+        setExpandedMainMenuItem(null)
+      } else if (item.panelType) {
         openPanel(item.panelType, item.panelSize || PanelSize.MEDIUM, item.panelData)
         setIsCollapsed(true)
         setExpandedMainMenuItem(null)
@@ -136,7 +146,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
         setExpandedMainMenuItem(null)
       }
     },
-    [openPanel]
+    [openPanel, navigate]
   )
 
   // Handle category icon click
@@ -264,7 +274,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
         <div
           className={cn(
             'w-full h-full flex flex-col items-center pb-3 gap-2',
-            'bg-gray-900/95 backdrop-blur-md border-r border-cyan-500/20',
+            'bg-gray-900/95 backdrop-blur-md',
             'pointer-events-auto'
           )}
         >
@@ -280,7 +290,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
               src={getUserAvatarUrl(meData?.user)}
               name={meData?.user?.username || 'User'}
               size="sm"
-              className="border-0 w-[48px] h-[48px] rounded-none [&>div]:w-full [&>div]:h-full [&>div]:rounded-none [&>div]:bg-[#17191D]/80 [&>div]:backdrop-blur-sm [&>div>div]:bg-[#17191D]/80 [&>div>div]:text-white [&>div>span]:text-white"
+              className="border-0 w-[48px] h-[48px] rounded-none [&>div]:w-full [&>div]:h-full [&>div]:rounded-none [&>div]:bg-[rgb(9_14_23/95%)] [&>div]:backdrop-blur-sm [&>div>div]:bg-[rgb(9_14_23/95%)] [&>div>div]:text-white [&>div>span]:text-white"
             />
           </button>
 
@@ -357,7 +367,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
           ref={mainMenuRef}
           className={cn(
             'fixed left-[48px] top-0 bottom-0 z-30 w-64',
-            'bg-gray-900/95 backdrop-blur-md border-r border-cyan-500/20',
+            'bg-gray-900/95 backdrop-blur-md',
             'transition-all duration-300 ease-out',
             'pointer-events-auto',
             'animate-in slide-in-from-left duration-300'
@@ -458,7 +468,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
             ref={subMenuRef}
             className={cn(
               'fixed top-0 bottom-0 z-40 w-64',
-              'bg-gray-900/95 backdrop-blur-md border-r border-cyan-500/20',
+              'bg-gray-900/95 backdrop-blur-md',
               'transition-all duration-300 ease-out',
               'pointer-events-auto',
               'animate-in slide-in-from-left duration-300'
@@ -492,9 +502,64 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
               </div>
 
               {/* Submenu Items - Full height container */}
-              {/* All submenu items open panels/windows */}
+              {/* All submenu items open panels/windows or navigate */}
               <div className="flex-1 overflow-y-auto py-2 min-h-0">
                 {expandedItem.subMenuItems!.map((subItem) => {
+                  // Handle dynamic planet list
+                  if (subItem.isDynamic && subItem.id === 'planets-list') {
+                    const planets = Array.isArray(planetsData?.planets) ? planetsData.planets : []
+                    
+                    if (planets.length === 0) {
+                      return (
+                        <div
+                          key={subItem.id}
+                          className={cn(
+                            'w-full px-4 py-3 flex items-center',
+                            'text-left',
+                            'text-gray-500 border-b border-gray-800/50',
+                          )}
+                        >
+                          <span className="text-sm font-medium">No planets owned</span>
+                        </div>
+                      )
+                    }
+                    
+                    return (
+                      <React.Fragment key={subItem.id}>
+                        {planets.map((planet: Planet) => {
+                          const { region, system } = getPlanetRegionAndSystem(planet)
+                          if (!region || !system || !planet.id) return null
+                          
+                          const planetName = planet.name || `Planet ${planet.id}`
+                          const navigatePath = `/map/system/${region}/${system}?planet=${planet.id}`
+                          
+                          return (
+                            <button
+                              key={`planet-${planet.id}`}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                navigate(navigatePath)
+                                setIsCollapsed(true)
+                                setExpandedMainMenuItem(null)
+                              }}
+                              className={cn(
+                                'w-full px-4 py-3 flex items-center',
+                                'text-left transition-all duration-200',
+                                'hover:bg-gray-800/50 hover:text-cyan-300',
+                                'text-white border-b border-gray-800/50',
+                                'cursor-pointer'
+                              )}
+                            >
+                              <span className="text-sm font-medium">{planetName}</span>
+                            </button>
+                          )
+                        })}
+                      </React.Fragment>
+                    )
+                  }
+                  
+                  // Regular submenu item
                   return (
                     <button
                       key={subItem.id}

@@ -126,38 +126,36 @@ export function PlanetDetailPanel({ planetId, onClose }: PlanetDetailPanelProps)
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-4">
-          <img
-            src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
-            alt={planet?.type?.name || planet.type?.slug || 'Planet'}
-            className="w-20 h-20 object-contain flex-shrink-0"
-            style={{ imageRendering: 'auto', display: 'block' }}
-            onError={(e) => {
-              console.error('Planet image failed to load:', planet?.type?.slug)
-            }}
-          />
-          <div>
-            <h1 className="text-xl font-heading glow-cyan">{planet?.name || 'Unknown Planet'}</h1>
-            <p className="text-muted-foreground">
-              {formatCoordinate(planet?.coordinate || '')} • {planet?.state || ''}
-              {planet?.type?.name && (
-                <>
-                  {' '}• <span className="capitalize">{planet?.type?.name}</span>
-                </>
-              )}
-            </p>
-            {planet?.type?.description && (
-              <p className="mt-2 text-sm text-muted-foreground italic">{planet?.type?.description}</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <img
+          src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+          alt={planet?.type?.name || planet.type?.slug || 'Planet'}
+          className="h-16 w-16 flex-shrink-0 object-contain sm:h-20 sm:w-20"
+          style={{ imageRendering: 'auto', display: 'block' }}
+          onError={(e) => {
+            console.error('Planet image failed to load:', planet?.type?.slug)
+          }}
+        />
+        <div className="space-y-2">
+          <h1 className="text-lg font-heading glow-cyan sm:text-xl">{planet?.name || 'Unknown Planet'}</h1>
+          <p className="text-sm text-muted-foreground sm:text-base">
+            {formatCoordinate(planet?.coordinate || '')} • {planet?.state || ''}
+            {planet?.type?.name && (
+              <>
+                {' '}• <span className="capitalize">{planet?.type?.name}</span>
+              </>
             )}
-          </div>
+          </p>
+          {planet?.type?.description && (
+            <p className="text-sm italic text-muted-foreground">{planet?.type?.description}</p>
+          )}
         </div>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="panel-glass border-cyan/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-tellerium">Tellerium</p>
@@ -176,7 +174,7 @@ export function PlanetDetailPanel({ planetId, onClose }: PlanetDetailPanelProps)
         </Card>
 
         <Card className="panel-glass border-blue/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-krypton">Krypton</p>
@@ -195,7 +193,7 @@ export function PlanetDetailPanel({ planetId, onClose }: PlanetDetailPanelProps)
         </Card>
 
         <Card className="panel-glass border-green/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Mines</p>
@@ -214,7 +212,7 @@ export function PlanetDetailPanel({ planetId, onClose }: PlanetDetailPanelProps)
         </Card>
 
         <Card className="panel-glass border-purple/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Probes</p>
@@ -250,7 +248,7 @@ export function PlanetDetailPanel({ planetId, onClose }: PlanetDetailPanelProps)
       {/* Mode Content with Planet Background */}
       <PlanetBackground 
         planetSlug={planet?.type?.slug}
-        className="p-6"
+        className="p-4 md:p-6"
       >
         <div className="min-h-[600px]">
           {renderModeContent()}
