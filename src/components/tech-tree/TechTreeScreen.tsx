@@ -2,23 +2,40 @@ import { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { useGetTechTreeDefinitionsQuery } from '@/api/endpoints/empiresApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, setHighlightedPath, setFilters } from '@/app/slices/techTreeSlice'
-import { TechNodeData, TechNodeType } from '@/types/tech-tree.types'
-import { buildGraph } from '@/lib/graphEngine'
+import {
+  selectNode,
+  setHighlightedPath,
+  setFilters,
+  setHoveredNode,
+  toggleOverlay,
+  setComparisonPlanets,
+  addPlan,
+  removePlan,
+  setActivePlan,
+  updatePlan,
+} from '@/app/slices/techTreeSlice'
+import type { TechTreePlan, TechTreeState } from '@/app/slices/techTreeSlice'
+import { TechNodeData, TechNodeType, SpecializationType } from '@/types/tech-tree.types'
+import { buildGraph, filterBySpecialization, filterByEra, filterByType, findPath } from '@/lib/graphEngine'
 import { calculateHierarchicalLayout } from '@/lib/layoutAlgorithms'
-import { filterBySpecialization, filterByEra, filterByType, findPath } from '@/lib/graphEngine'
 import { TechTreeGraphData } from '@/types/tech-tree.types'
 import { useTechNodeDetails } from '@/hooks/useTechNodeDetails'
 import { useZoomPan } from '@/hooks/useZoomPan'
 import { ConnectionsCanvas } from '@/components/tech-tree/ConnectionsCanvas'
 import { NodesLayer } from '@/components/tech-tree/NodesLayer'
 import { NodeDetailsPanel } from '@/components/tech-tree/NodeDetailsPanel'
-import { TechTreeFilterBar } from '@/components/tech-tree/TechTreeFilterBar'
-import { Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Loader2, Sparkles, Layers, Map as MapIcon, Globe, Plus, Trash2, Filter } from 'lucide-react'
 import { toast } from 'sonner'
 import { useWindow } from '@/components/common/WindowManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { PlanetSelectorDialog } from '@/components/tech-tree/PlanetSelectorDialog'
+import { SlidingPanel } from '@/components/common/SlidingPanel'
+import { cn } from '@/lib/utils'
 
 function mapNodeTypeToBuildType(
   nodeType: TechNodeType
@@ -42,6 +59,7 @@ export function TechTreeScreen() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const { openPanel } = useWindow()
+  const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [pendingQueueNode, setPendingQueueNode] = useState<TechNodeData | null>(null)
   const [isPlanetSelectorOpen, setPlanetSelectorOpen] = useState(false)
   
@@ -59,7 +77,15 @@ export function TechTreeScreen() {
     planet_id: planetId,
   })
   
-  const { selectedNodeId, highlightedPath, activeFilters } = useAppSelector((state) => state.techTree)
+  const {
+    selectedNodeId,
+    highlightedPath,
+    activeFilters,
+    overlays,
+    comparison,
+    savedPlans,
+    activePlanId,
+  } = useAppSelector((state) => state.techTree)
   const { selectedNode, openDetails, closeDetails } = useTechNodeDetails()
   
   // Apply node type filter ONLY when coming from planet detail (has planetId)
@@ -286,6 +312,7 @@ export function TechTreeScreen() {
     (nodeId: string | null) => {
       if (!nodeId || !graphData) {
         dispatch(setHighlightedPath([]))
+        dispatch(setHoveredNode(null))
         return
       }
       
@@ -296,6 +323,7 @@ export function TechTreeScreen() {
       } else {
         dispatch(setHighlightedPath([]))
       }
+      dispatch(setHoveredNode(nodeId))
     },
     [graphData, dispatch]
   )
@@ -343,9 +371,9 @@ export function TechTreeScreen() {
       const viewportCenterX = window.innerWidth / 2
       const viewportCenterY = window.innerHeight / 2
       
-      // Account for the filter bar at the bottom (pb-20 = 80px padding)
-      const filterBarHeight = 80
-      const adjustedViewportCenterY = (window.innerHeight - filterBarHeight) / 2
+      // Account for top status bar and footer chrome
+      const chromeHeight = 180
+      const adjustedViewportCenterY = (window.innerHeight - chromeHeight) / 2
       
       const targetPanX = viewportCenterX - centerX * zoomPan.scale
       const targetPanY = adjustedViewportCenterY - centerY * zoomPan.scale
@@ -359,6 +387,19 @@ export function TechTreeScreen() {
       lastBoundsRef.current = { width: nodeBounds.width, height: nodeBounds.height }
     }
   }, [filteredNodes, nodeBounds, zoomPan])
+
+  const completedNodeSet = useMemo(
+    () => new Set(graphData?.empireState.completed_nodes ?? []),
+    [graphData?.empireState.completed_nodes]
+  )
+  const queuedNodeSet = useMemo(
+    () => new Set(graphData?.empireState.queued_nodes ?? []),
+    [graphData?.empireState.queued_nodes]
+  )
+  const inProgressNodeSet = useMemo(
+    () => new Set(graphData?.empireState.in_progress_nodes ?? []),
+    [graphData?.empireState.in_progress_nodes]
+  )
 
   // Focus on a specific node (for jump to prerequisite) - MUST be before early returns
   const focusOnNode = useCallback((nodeId: string) => {
@@ -381,6 +422,132 @@ export function TechTreeScreen() {
       zoomPan.zoomIn()
     }, 100)
   }, [graphData, zoomPan])
+  
+  const handleToggleNodeType = useCallback(
+    (type: TechNodeType) => {
+      const current = activeFilters.nodeTypes
+      const next = current.includes(type)
+        ? current.filter((t) => t !== type)
+        : [...current, type]
+      dispatch(setFilters({ nodeTypes: next }))
+    },
+    [dispatch, activeFilters.nodeTypes]
+  )
+
+  const handleToggleEra = useCallback(
+    (era: number) => {
+      const current = activeFilters.eras
+      const next = current.includes(era) ? current.filter((e) => e !== era) : [...current, era]
+      dispatch(setFilters({ eras: next }))
+    },
+    [dispatch, activeFilters.eras]
+  )
+
+  const handleToggleSpecialization = useCallback(
+    (spec: SpecializationType) => {
+      const current = activeFilters.specializations
+      const next = current.includes(spec)
+        ? current.filter((s) => s !== spec)
+        : [...current, spec]
+      dispatch(setFilters({ specializations: next }))
+    },
+    [dispatch, activeFilters.specializations]
+  )
+
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      dispatch(setFilters({ searchQuery: value }))
+    },
+    [dispatch]
+  )
+
+  const handleClearSearch = useCallback(() => {
+    dispatch(setFilters({ searchQuery: '' }))
+  }, [dispatch])
+
+  const handleToggleShowLocked = useCallback(() => {
+    dispatch(setFilters({ showLocked: !activeFilters.showLocked }))
+  }, [dispatch, activeFilters.showLocked])
+
+  const handleToggleShowCompleted = useCallback(() => {
+    dispatch(setFilters({ showCompleted: !activeFilters.showCompleted }))
+  }, [dispatch, activeFilters.showCompleted])
+
+  const handleClearAllFilters = useCallback(() => {
+    dispatch(
+      setFilters({
+        nodeTypes: [],
+        eras: [],
+        specializations: [],
+        searchQuery: '',
+        showLocked: true,
+        showCompleted: true,
+      })
+    )
+  }, [dispatch])
+
+  const handleToggleOverlay = useCallback(
+    (overlay: 'dependencyHeatmap' | 'planetComparison' | 'empireProgress' | 'advisorHints') => {
+      dispatch(toggleOverlay({ overlay }))
+    },
+    [dispatch]
+  )
+
+  const handleSetComparisonPlanets = useCallback(
+    (planetIds: number[]) => {
+      dispatch(setComparisonPlanets(planetIds))
+    },
+    [dispatch]
+  )
+
+  const handleCreatePlan = useCallback(() => {
+    const timestamp = new Date().toISOString()
+    const newPlan: TechTreePlan = {
+      id: `plan-${Date.now()}`,
+      name: 'Untitled Plan',
+      nodeIds: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    dispatch(addPlan(newPlan))
+    toast.success('Created new research plan.')
+  }, [dispatch])
+
+  const handleRemovePlan = useCallback(
+    (planId: string) => {
+      dispatch(removePlan(planId))
+      toast.success('Plan removed.')
+    },
+    [dispatch]
+  )
+
+  const handleSetActivePlan = useCallback(
+    (planId: string | null) => {
+      dispatch(setActivePlan(planId))
+    },
+    [dispatch]
+  )
+
+  const handleAddNodeToPlan = useCallback(
+    (nodeId: string) => {
+      if (!activePlanId) {
+        toast.info('Select or create a plan to store this node.')
+        return
+      }
+      const plan = savedPlans.find((p) => p.id === activePlanId)
+      if (!plan) {
+        toast.info('Select a valid plan to continue.')
+        return
+      }
+      if (plan.nodeIds.includes(nodeId)) {
+        toast.info('This node is already present in the active plan.')
+        return
+      }
+      dispatch(updatePlan({ id: activePlanId, nodeIds: [...plan.nodeIds, nodeId] }))
+      toast.success('Node added to active plan.')
+    },
+    [activePlanId, savedPlans, dispatch]
+  )
   
   // Debug: Log filtered nodes count
   useEffect(() => {
@@ -428,20 +595,50 @@ export function TechTreeScreen() {
   }
 
   return (
-    <>
+    <div className="relative flex h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_top,rgba(26,37,63,0.45),rgba(10,14,23,0.95))] text-foreground">
+      <div className="pointer-events-none absolute inset-0 bg-[url('/assets/images/sections/starfield-noise.png')] opacity-20 mix-blend-screen" />
+
+      <StrategySidebar
+        filters={activeFilters}
+        overlays={overlays}
+        savedPlans={savedPlans}
+        activePlanId={activePlanId}
+        comparison={comparison}
+        className="hidden xl:flex"
+        onToggleNodeType={handleToggleNodeType}
+        onToggleEra={handleToggleEra}
+        onToggleSpecialization={handleToggleSpecialization}
+        onSearchChange={handleSearchChange}
+        onClearSearch={handleClearSearch}
+        onToggleShowLocked={handleToggleShowLocked}
+        onToggleShowCompleted={handleToggleShowCompleted}
+        onClearAllFilters={handleClearAllFilters}
+        onToggleOverlay={handleToggleOverlay}
+        onCreatePlan={handleCreatePlan}
+        onRemovePlan={handleRemovePlan}
+        onSelectPlan={handleSetActivePlan}
+        onSetComparisonPlanets={handleSetComparisonPlanets}
+      />
+
+      <main className="relative flex-1 overflow-hidden">
+        <TopStatusBar
+          graphData={graphData}
+          overlays={overlays}
+          comparison={comparison}
+          onToggleOverlay={handleToggleOverlay}
+          onOpenFilters={() => setMobileSidebarOpen(true)}
+        />
+
     <div 
       ref={zoomPan.containerRef}
-      className="fixed inset-0 overflow-hidden pb-20" 
-      style={{ zIndex: 1 }}
+          className="relative h-[calc(100%-92px)] w-full overflow-hidden"
       onMouseDown={zoomPan.onMouseDown}
       onMouseMove={zoomPan.onMouseMove}
       onMouseUp={zoomPan.onMouseUp}
       onWheel={zoomPan.onWheel}
     >
-      {/* Background gradient - Fixed, doesn't move with panning */}
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-purple-600/10" />
       
-      {/* Main Canvas - This moves with panning */}
       <div
         className="relative"
         style={{
@@ -453,8 +650,6 @@ export function TechTreeScreen() {
           transformOrigin: '0 0',
         }}
       >
-        {/* Connections Layer */}
-        {graphData && (
           <ConnectionsCanvas
             nodes={filteredNodes}
             edges={graphData.edges}
@@ -464,10 +659,7 @@ export function TechTreeScreen() {
             panY={zoomPan.panY}
             zoom={zoomPan.scale}
           />
-        )}
         
-        {/* Nodes Layer */}
-        {graphData && (
           <NodesLayer
             nodes={filteredNodes}
             onNodeClick={handleNodeClick}
@@ -477,11 +669,17 @@ export function TechTreeScreen() {
             panY={zoomPan.panY}
             zoom={zoomPan.scale}
             highlightedNodes={highlightedPath}
+            showHeatmap={overlays.dependencyHeatmap}
+            showEmpireProgress={overlays.empireProgress}
+            showComparison={overlays.planetComparison}
+            comparisonPlanetCount={comparison.planetIds.length}
+            completedNodes={completedNodeSet}
+            queuedNodes={queuedNodeSet}
+            inProgressNodes={inProgressNodeSet}
           />
-        )}
       </div>
       
-      {/* Details Panel */}
+          {selectedNode && (
       <NodeDetailsPanel
         node={selectedNode}
         planetId={planetId}
@@ -490,7 +688,7 @@ export function TechTreeScreen() {
           dispatch(selectNode(null))
           closeDetails()
         }}
-        onQueue={handleQueueAction}
+              onQueue={handleQueueAction}
         onViewPath={(nodeId) => {
           if (graphData) {
             const path = findPath(graphData, nodeId)
@@ -501,18 +699,566 @@ export function TechTreeScreen() {
           focusOnNode(nodeId)
           handleNodeClick(nodeId)
         }}
+              onAddToPlan={handleAddNodeToPlan}
       />
-      
-      {/* Filter Bar */}
-      <TechTreeFilterBar />
+          )}
+        </div>
+
+        <TechFooterBar
+          comparison={comparison}
+          overlays={overlays}
+          onToggleOverlay={handleToggleOverlay}
+          onSetComparisonPlanets={handleSetComparisonPlanets}
+        />
+      </main>
+
+      <AdvisorDrawer
+        isOpen={overlays.advisorHints}
+        onToggle={() => handleToggleOverlay('advisorHints')}
+        selectedNode={selectedNode}
+        graphData={graphData}
+      />
+
+      <SlidingPanel
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+        title="Tech Encyclopaedia Filters"
+        size={PanelSize.MEDIUM}
+        className="xl:hidden"
+      >
+        <div className="h-full overflow-y-auto">
+          <StrategySidebar
+            filters={activeFilters}
+            overlays={overlays}
+            savedPlans={savedPlans}
+            activePlanId={activePlanId}
+            comparison={comparison}
+            className="w-full border-none bg-transparent shadow-none"
+            onToggleNodeType={handleToggleNodeType}
+            onToggleEra={handleToggleEra}
+            onToggleSpecialization={handleToggleSpecialization}
+            onSearchChange={handleSearchChange}
+            onClearSearch={handleClearSearch}
+            onToggleShowLocked={handleToggleShowLocked}
+            onToggleShowCompleted={handleToggleShowCompleted}
+            onClearAllFilters={handleClearAllFilters}
+            onToggleOverlay={handleToggleOverlay}
+            onCreatePlan={handleCreatePlan}
+            onRemovePlan={handleRemovePlan}
+            onSelectPlan={handleSetActivePlan}
+            onSetComparisonPlanets={handleSetComparisonPlanets}
+          />
+        </div>
+      </SlidingPanel>
+
+      <PlanetSelectorDialog
+        open={isPlanetSelectorOpen}
+        onClose={handlePlanetDialogClose}
+        onSelect={handlePlanetSelect}
+        requiredType={(pendingQueueNode?.type ?? 'facility') as 'facility' | 'ship' | 'defence' | 'research'}
+        nodeName={pendingQueueNode?.name ?? 'Selected item'}
+      />
     </div>
-    <PlanetSelectorDialog
-      open={isPlanetSelectorOpen}
-      onClose={handlePlanetDialogClose}
-      onSelect={handlePlanetSelect}
-      requiredType={(pendingQueueNode?.type ?? 'facility') as 'facility' | 'ship' | 'defence' | 'research'}
-      nodeName={pendingQueueNode?.name ?? 'Selected item'}
-    />
-    </>
+  )
+}
+
+interface StrategySidebarProps {
+  filters: TechTreeState['activeFilters']
+  overlays: TechTreeState['overlays']
+  comparison: TechTreeState['comparison']
+  savedPlans: TechTreePlan[]
+  activePlanId: string | null
+  className?: string
+  onToggleNodeType: (type: TechNodeType) => void
+  onToggleEra: (era: number) => void
+  onToggleSpecialization: (spec: SpecializationType) => void
+  onSearchChange: (value: string) => void
+  onClearSearch: () => void
+  onToggleShowLocked: () => void
+  onToggleShowCompleted: () => void
+  onClearAllFilters: () => void
+  onToggleOverlay: (overlay: 'dependencyHeatmap' | 'planetComparison' | 'empireProgress' | 'advisorHints') => void
+  onCreatePlan: () => void
+  onRemovePlan: (planId: string) => void
+  onSelectPlan: (planId: string | null) => void
+  onSetComparisonPlanets: (planetIds: number[]) => void
+}
+
+const NODE_TYPE_FILTERS: { value: TechNodeType; label: string }[] = [
+  { value: 'facility', label: 'Facilities' },
+  { value: 'research', label: 'Research' },
+  { value: 'ship', label: 'Ships' },
+  { value: 'defence', label: 'Defences' },
+]
+
+const ERA_FILTERS = [1, 2, 3, 4, 5]
+
+const SPECIALIZATION_FILTERS: { value: SpecializationType; label: string }[] = [
+  { value: 'general', label: 'General' },
+  { value: 'industrial', label: 'Industrial' },
+  { value: 'military', label: 'Military' },
+  { value: 'relic', label: 'Relic' },
+]
+
+function StrategySidebar({
+  filters,
+  overlays,
+  savedPlans,
+  activePlanId,
+  comparison,
+  className,
+  onToggleNodeType,
+  onToggleEra,
+  onToggleSpecialization,
+  onSearchChange,
+  onClearSearch,
+  onToggleShowLocked,
+  onToggleShowCompleted,
+  onClearAllFilters,
+  onToggleOverlay,
+  onCreatePlan,
+  onRemovePlan,
+  onSelectPlan,
+  onSetComparisonPlanets,
+}: StrategySidebarProps) {
+  return (
+    <aside
+      className={cn(
+        'relative z-10 flex h-full w-[320px] flex-col border-r border-white/10 bg-[rgba(6,11,23,0.82)]/90 backdrop-blur-xl shadow-[0_20px_50px_rgba(2,12,34,0.75)]',
+        className
+      )}
+    >
+      <div className="border-b border-white/10 px-6 py-5">
+        <h2 className="text-xs uppercase tracking-[0.5em] text-cyan-300">Tech Encyclopaedia</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Plan your empire’s next breakthrough.</p>
+      </div>
+      <ScrollArea className="flex-1 px-6 py-6">
+        <section className="space-y-4">
+          <header className="flex items-center justify-between">
+            <h3 className="text-xs uppercase tracking-[0.45em] text-muted-foreground">Filters</h3>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onClearAllFilters}>
+              Clear
+            </Button>
+          </header>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <span className="text-[11px] uppercase tracking-[0.4em] text-muted-foreground">Search</span>
+              <div className="relative">
+                <Input
+                  value={filters.searchQuery}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder="Find tech, facilities, ships..."
+                  className="pl-3 pr-10 bg-white/5 border-white/10 focus:border-cyan-400/60"
+                />
+                {filters.searchQuery && (
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={onClearSearch}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <FilterGroup
+              title="Node Type"
+              options={NODE_TYPE_FILTERS}
+              isSelected={(value) => filters.nodeTypes.includes(value)}
+              onToggle={onToggleNodeType}
+            />
+            <FilterGroup
+              title="Era"
+              options={ERA_FILTERS.map((era) => ({ value: era, label: `Era ${era}` }))}
+              isSelected={(value) => filters.eras.includes(value)}
+              onToggle={onToggleEra}
+            />
+            <FilterGroup
+              title="Specialization"
+              options={SPECIALIZATION_FILTERS}
+              isSelected={(value) => filters.specializations.includes(value)}
+              onToggle={onToggleSpecialization}
+            />
+            <div className="flex gap-2">
+              <Button
+                variant={filters.showLocked ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 flex-1 text-xs uppercase tracking-[0.3em]"
+                onClick={onToggleShowLocked}
+              >
+                Locked
+              </Button>
+              <Button
+                variant={filters.showCompleted ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 flex-1 text-xs uppercase tracking-[0.3em]"
+                onClick={onToggleShowCompleted}
+              >
+                Completed
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <Separator className="my-6 border-white/10" />
+
+        <section className="space-y-3">
+          <header className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-cyan-300" />
+            <h3 className="text-xs uppercase tracking-[0.45em] text-muted-foreground">Overlays</h3>
+          </header>
+          <div className="grid gap-2">
+            <OverlayToggle
+              label="Dependency Heatmap"
+              active={overlays.dependencyHeatmap}
+              onToggle={() => onToggleOverlay('dependencyHeatmap')}
+            />
+            <OverlayToggle
+              label="Planet Comparison"
+              active={overlays.planetComparison}
+              badge={comparison.planetIds.length > 0 ? `${comparison.planetIds.length}` : undefined}
+              onToggle={() => onToggleOverlay('planetComparison')}
+            />
+            <OverlayToggle
+              label="Empire Progress"
+              active={overlays.empireProgress}
+              onToggle={() => onToggleOverlay('empireProgress')}
+            />
+            <OverlayToggle
+              label="Advisor Hints"
+              active={overlays.advisorHints}
+              onToggle={() => onToggleOverlay('advisorHints')}
+            />
+          </div>
+        </section>
+
+        <Separator className="my-6 border-white/10" />
+
+        <section className="space-y-4">
+          <header className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-cyan-300" />
+              <h3 className="text-xs uppercase tracking-[0.45em] text-muted-foreground">Saved Plans</h3>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onCreatePlan}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </header>
+          <div className="space-y-2">
+            {savedPlans.length === 0 ? (
+              <p className="text-xs text-muted-foreground/70">
+                Draft research roadmaps and revisit them anytime. Create your first plan to begin.
+              </p>
+            ) : (
+              savedPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    'group flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 transition hover:border-cyan-400/40',
+                    activePlanId === plan.id && 'border-cyan-400/60 bg-cyan-500/10'
+                  )}
+                >
+                  <button
+                    className="flex flex-col text-left"
+                    onClick={() => onSelectPlan(plan.id)}
+                  >
+                    <span className="text-sm font-semibold text-foreground">{plan.name}</span>
+                    <span className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
+                      {plan.nodeIds.length} nodes
+                    </span>
+                  </button>
+                  <button
+                    className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
+                    onClick={() => onRemovePlan(plan.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <Separator className="my-6 border-white/10" />
+
+        <section className="space-y-3">
+          <header className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-cyan-300" />
+            <h3 className="text-xs uppercase tracking-[0.45em] text-muted-foreground">Comparison Scope</h3>
+          </header>
+          <p className="text-xs text-muted-foreground/80">
+            Select planets to compare eligibility. Upcoming overlay will show readiness badges on each tech node.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {comparison.planetIds.length === 0 ? (
+              <Badge variant="outline" className="border-white/20 text-muted-foreground">
+                No planets selected
+              </Badge>
+            ) : (
+              comparison.planetIds.map((id) => (
+                <Badge key={id} variant="secondary" className="bg-cyan-500/10 text-cyan-200">
+                  Planet #{id}
+                </Badge>
+              ))
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full border-white/20 text-xs uppercase tracking-[0.3em]"
+            onClick={() => onSetComparisonPlanets([])}
+          >
+            Reset Selection
+          </Button>
+        </section>
+      </ScrollArea>
+    </aside>
+  )
+}
+
+interface FilterGroupProps<T> {
+  title: string
+  options: { value: T; label: string }[]
+  isSelected: (value: T) => boolean
+  onToggle: (value: T) => void
+}
+
+function FilterGroup<T extends string | number>({
+  title,
+  options,
+  isSelected,
+  onToggle,
+}: FilterGroupProps<T>) {
+  return (
+    <div className="space-y-2">
+      <span className="text-[11px] uppercase tracking-[0.4em] text-muted-foreground">{title}</span>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <Button
+            key={option.label}
+            variant={isSelected(option.value) ? 'default' : 'outline'}
+            size="sm"
+            className={cn(
+              'h-7 rounded-full px-3 text-xs uppercase tracking-[0.25em]',
+              isSelected(option.value)
+                ? 'bg-cyan-500/20 text-cyan-200 hover:bg-cyan-500/30'
+                : 'border-white/15 text-muted-foreground hover:border-cyan-400/40'
+            )}
+            onClick={() => onToggle(option.value)}
+            type="button"
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface OverlayToggleProps {
+  label: string
+  active: boolean
+  badge?: string
+  onToggle: () => void
+}
+
+function OverlayToggle({ label, active, badge, onToggle }: OverlayToggleProps) {
+  return (
+    <button
+      onClick={onToggle}
+      className={cn(
+        'flex items-center justify-between rounded-xl border px-3 py-2 text-left transition',
+        active
+          ? 'border-cyan-400/60 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(8,170,255,0.25)]'
+          : 'border-white/15 bg-white/5 text-muted-foreground hover:border-cyan-400/40 hover:text-cyan-100'
+      )}
+      type="button"
+    >
+      <span className="text-xs uppercase tracking-[0.35em]">{label}</span>
+      {badge && <Badge variant="outline" className="border-cyan-400/40 text-cyan-200">{badge}</Badge>}
+    </button>
+  )
+}
+
+interface TopStatusBarProps {
+  graphData: TechTreeGraphData
+  overlays: TechTreeState['overlays']
+  comparison: TechTreeState['comparison']
+  onToggleOverlay: (overlay: 'dependencyHeatmap' | 'planetComparison' | 'empireProgress' | 'advisorHints') => void
+  onOpenFilters: () => void
+}
+
+function TopStatusBar({ graphData, overlays, comparison, onToggleOverlay, onOpenFilters }: TopStatusBarProps) {
+  const era = graphData.empireState.active_era ?? 1
+  const specializations = graphData.empireState.specializations_unlocked ?? []
+  return (
+    <div className="flex items-center justify-between border-b border-white/10 bg-[rgba(5,12,24,0.85)] px-8 py-4 backdrop-blur-xl">
+      <div className="flex items-center gap-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.45em] text-muted-foreground">Active Era</p>
+          <h2 className="text-lg font-semibold text-cyan-100">Era {era}</h2>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.45em] text-muted-foreground">Specializations</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {specializations.length === 0 ? (
+              <Badge variant="outline" className="border-white/20 text-muted-foreground">
+                None unlocked
+              </Badge>
+            ) : (
+              specializations.map((spec) => (
+                <Badge key={spec} variant="secondary" className="bg-white/10 text-white/80">
+                  {spec}
+                </Badge>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="xl:hidden"
+          onClick={onOpenFilters}
+        >
+          <Filter className="mr-2 h-4 w-4" />
+          Filters
+        </Button>
+        <Button
+          variant={overlays.planetComparison ? 'default' : 'outline'}
+          size="sm"
+          className="flex items-center gap-2"
+          onClick={() => onToggleOverlay('planetComparison')}
+        >
+          <MapIcon className="h-4 w-4" />
+          Compare Planets
+          {comparison.planetIds.length > 0 && (
+            <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-100">
+              {comparison.planetIds.length}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          variant={overlays.dependencyHeatmap ? 'default' : 'outline'}
+          size="sm"
+          className="flex items-center gap-2"
+          onClick={() => onToggleOverlay('dependencyHeatmap')}
+        >
+          <Filter className="h-4 w-4" />
+          Heatmap
+        </Button>
+        {(overlays.dependencyHeatmap || overlays.empireProgress || overlays.planetComparison) && (
+          <div className="flex items-center gap-2">
+            {overlays.dependencyHeatmap && (
+              <Badge variant="outline" className="border-cyan-400/40 bg-cyan-500/10 text-cyan-100">
+                Heatmap
+              </Badge>
+            )}
+            {overlays.empireProgress && (
+              <Badge variant="outline" className="border-emerald-400/40 bg-emerald-500/10 text-emerald-100">
+                Progress
+              </Badge>
+            )}
+            {overlays.planetComparison && (
+              <Badge variant="outline" className="border-purple-400/40 bg-purple-500/10 text-purple-100">
+                Planet Overlay
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface TechFooterBarProps {
+  comparison: TechTreeState['comparison']
+  overlays: TechTreeState['overlays']
+  onToggleOverlay: (overlay: 'dependencyHeatmap' | 'planetComparison' | 'empireProgress' | 'advisorHints') => void
+  onSetComparisonPlanets: (planetIds: number[]) => void
+}
+
+function TechFooterBar({ comparison, overlays, onToggleOverlay, onSetComparisonPlanets }: TechFooterBarProps) {
+  return (
+    <div className="flex items-center justify-between border-t border-white/10 bg-[rgba(6,11,23,0.85)] px-8 py-4 backdrop-blur-xl">
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] uppercase tracking-[0.45em] text-muted-foreground">Comparison Mode</span>
+        {comparison.planetIds.length === 0 ? (
+          <Badge variant="outline" className="border-white/20 text-muted-foreground">
+            Select planets via overlays
+          </Badge>
+        ) : (
+          comparison.planetIds.map((planetId) => (
+            <Badge key={planetId} variant="secondary" className="bg-cyan-500/10 text-cyan-100">
+              Planet #{planetId}
+            </Badge>
+          ))
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <Button
+          variant={overlays.empireProgress ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onToggleOverlay('empireProgress')}
+        >
+          Empire Progress
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => onSetComparisonPlanets([])}>
+          Reset Planets
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+interface AdvisorDrawerProps {
+  isOpen: boolean
+  onToggle: () => void
+  selectedNode: TechNodeData | null
+  graphData: TechTreeGraphData
+}
+
+function AdvisorDrawer({ isOpen, onToggle, selectedNode, graphData }: AdvisorDrawerProps) {
+  return (
+    <aside
+      className={cn(
+        'relative z-20 flex h-full w-[340px] flex-col border-l border-white/10 bg-[rgba(5,12,24,0.88)] backdrop-blur-2xl shadow-[0_20px_45px_rgba(0,0,0,0.55)] transition-transform duration-300',
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.45em] text-muted-foreground">Advisor</p>
+          <h3 className="text-sm font-semibold text-cyan-200">Strategic Guidance</h3>
+        </div>
+        <Button variant="ghost" size="sm" className="h-7 px-3 text-xs" onClick={onToggle}>
+          {isOpen ? 'Hide' : 'Show'}
+        </Button>
+      </div>
+      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+        <section>
+          <h4 className="text-xs uppercase tracking-[0.45em] text-muted-foreground">Current Focus</h4>
+          {selectedNode ? (
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-semibold text-foreground">{selectedNode.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {selectedNode.description || 'Deep-dive analysis coming soon.'}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground/80">
+              Select a node to receive tailored strategic advice and recommended build orders.
+            </p>
+          )}
+        </section>
+        <section>
+          <h4 className="text-xs uppercase tracking-[0.45em] text-muted-foreground">Empire Snapshot</h4>
+          <div className="mt-3 space-y-2 text-xs text-muted-foreground/80">
+            <p>Completed nodes: {graphData.empireState.completed_nodes.length}</p>
+            <p>Queued nodes: {graphData.empireState.queued_nodes.length}</p>
+          </div>
+        </section>
+      </div>
+    </aside>
   )
 }

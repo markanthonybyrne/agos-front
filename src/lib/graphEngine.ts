@@ -348,6 +348,9 @@ export function buildGraph(
     })
   }
   
+  // Enrich graph with derived metadata (columns, dependency summaries, etc.)
+  enrichGraphMetadata(nodes, edges)
+
   // Extract empire state - handle both formats
   let activeEra = 1
   let specializationsUnlocked: string[] = []
@@ -373,6 +376,139 @@ export function buildGraph(
       in_progress_nodes: inProgressNodes,
     },
   }
+}
+
+/**
+ * Enrich nodes with derived metadata for layouts and analytics
+ */
+function enrichGraphMetadata(nodes: TechNodeData[], edges: TechTreeEdge[]) {
+  const nodeMap = new Map<string, TechNodeData>()
+  const prerequisitesMap = new Map<string, Set<string>>()
+  const dependentsMap = new Map<string, Set<string>>()
+
+  nodes.forEach((node) => {
+    nodeMap.set(node.id, node)
+    if (!prerequisitesMap.has(node.id)) {
+      prerequisitesMap.set(node.id, new Set())
+    }
+    if (!dependentsMap.has(node.id)) {
+      dependentsMap.set(node.id, new Set())
+    }
+  })
+
+  edges.forEach(({ from, to }) => {
+    if (!prerequisitesMap.has(to)) {
+      prerequisitesMap.set(to, new Set())
+    }
+    prerequisitesMap.get(to)!.add(from)
+
+    if (!dependentsMap.has(from)) {
+      dependentsMap.set(from, new Set())
+    }
+    dependentsMap.get(from)!.add(to)
+  })
+
+  const levelMemo = new Map<string, number>()
+
+  const computeLevel = (nodeId: string): number => {
+    if (levelMemo.has(nodeId)) {
+      return levelMemo.get(nodeId)!
+    }
+    const prereqs = prerequisitesMap.get(nodeId)
+    if (!prereqs || prereqs.size === 0) {
+      levelMemo.set(nodeId, 0)
+      return 0
+    }
+    let maxLevel = 0
+    prereqs.forEach((prereqId) => {
+      if (!nodeMap.has(prereqId)) return
+      const level = computeLevel(prereqId)
+      if (level + 1 > maxLevel) {
+        maxLevel = level + 1
+      }
+    })
+    levelMemo.set(nodeId, maxLevel)
+    return maxLevel
+  }
+
+  const ancestorMemo = new Map<string, Set<string>>()
+
+  const gatherAncestors = (nodeId: string, visited: Set<string> = new Set()): Set<string> => {
+    if (ancestorMemo.has(nodeId)) {
+      return ancestorMemo.get(nodeId)!
+    }
+    const result = new Set<string>()
+    const prereqs = prerequisitesMap.get(nodeId)
+    if (!prereqs) {
+      ancestorMemo.set(nodeId, result)
+      return result
+    }
+    prereqs.forEach((prereqId) => {
+      if (visited.has(prereqId)) return
+      visited.add(prereqId)
+      result.add(prereqId)
+      gatherAncestors(prereqId, visited).forEach((ancestor) => result.add(ancestor))
+    })
+    ancestorMemo.set(nodeId, result)
+    return result
+  }
+
+  const addCosts = (base: TechNodeCosts = {}, addition?: TechNodeCosts): TechNodeCosts => {
+    if (!addition) return { ...base }
+    return {
+      tellerium: (base.tellerium ?? 0) + (addition.tellerium ?? 0),
+      krypton: (base.krypton ?? 0) + (addition.krypton ?? 0),
+      dark_matter: (base.dark_matter ?? 0) + (addition.dark_matter ?? 0),
+      research_points: (base.research_points ?? 0) + (addition.research_points ?? 0),
+    }
+  }
+
+  // Assign metadata per node
+  nodes.forEach((node) => {
+    const level = computeLevel(node.id)
+    node.column = level
+
+    // Dependents
+    const dependents = Array.from(dependentsMap.get(node.id) ?? [])
+    node.dependents = dependents
+
+    // Unlock summary (direct dependents per type)
+    if (dependents.length > 0) {
+      const summary: Partial<Record<TechNodeType, number>> = {}
+      dependents.forEach((depId) => {
+        const depNode = nodeMap.get(depId)
+        if (!depNode) return
+        summary[depNode.type] = (summary[depNode.type] ?? 0) + 1
+      })
+      node.unlockSummary = summary
+    } else {
+      node.unlockSummary = {}
+    }
+
+    // Prerequisite summary
+    const ancestors = gatherAncestors(node.id)
+    let depth = 0
+    ancestors.forEach((ancestorId) => {
+      const ancestorLevel = computeLevel(ancestorId)
+      if (ancestorLevel + 1 > depth) {
+        depth = ancestorLevel + 1
+      }
+    })
+
+    let aggregatedCost: TechNodeCosts = {}
+    ancestors.forEach((ancestorId) => {
+      const ancestorNode = nodeMap.get(ancestorId)
+      if (ancestorNode?.costs) {
+        aggregatedCost = addCosts(aggregatedCost, ancestorNode.costs)
+      }
+    })
+
+    node.prerequisiteSummary = {
+      depth,
+      prerequisiteCount: ancestors.size,
+      totalCost: aggregatedCost,
+    }
+  })
 }
 
 /**

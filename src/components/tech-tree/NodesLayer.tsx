@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { TechNodeData, ViewportBounds } from '@/types/tech-tree.types'
-import { HexNode } from './HexNode'
-import { applyViewportCulling } from '@/lib/layoutAlgorithms'
+import { NodeCard } from './NodeCard'
 
 interface NodesLayerProps {
   nodes: TechNodeData[]
@@ -13,6 +13,13 @@ interface NodesLayerProps {
   zoom?: number
   buffer?: number
   highlightedNodes?: string[]
+  showHeatmap?: boolean
+  showEmpireProgress?: boolean
+  showComparison?: boolean
+  comparisonPlanetCount?: number
+  completedNodes?: Set<string>
+  queuedNodes?: Set<string>
+  inProgressNodes?: Set<string>
 }
 
 export const NodesLayer = memo(function NodesLayer({
@@ -25,6 +32,13 @@ export const NodesLayer = memo(function NodesLayer({
   zoom = 1,
   buffer = 200,
   highlightedNodes = [],
+  showHeatmap = false,
+  showEmpireProgress = false,
+  showComparison = false,
+  comparisonPlanetCount = 0,
+  completedNodes,
+  queuedNodes,
+  inProgressNodes,
 }: NodesLayerProps) {
   // Create position map from nodes
   const positionsMap = useMemo(() => {
@@ -39,27 +53,25 @@ export const NodesLayer = memo(function NodesLayer({
   
   // Apply viewport culling - temporarily disabled to ensure all nodes render
   const visibleNodes = useMemo(() => {
-    // For now, show all nodes to debug rendering issues
-    return nodes.filter((node) => node.position !== undefined)
-    
-    // Original culling logic (commented out for debugging)
-    /*
-    const positions = new Map<string, { x: number; y: number; angle: number; radius: number }>()
-    
-    nodes.forEach((node) => {
-      if (node.position) {
-        positions.set(node.id, node.position)
-      }
-    })
-    
-    const culled = applyViewportCulling(positions, viewport, buffer)
-    
     return nodes.filter((node) => {
-      const pos = culled.get(node.id)
-      return pos && pos.visible
+      if (!node.position) return false
+      const { x, y } = node.position
+      return (
+        x >= viewport.minX - buffer &&
+        x <= viewport.maxX + buffer &&
+        y >= viewport.minY - buffer &&
+        y <= viewport.maxY + buffer
+      )
     })
-    */
-  }, [nodes])
+  }, [nodes, viewport, buffer])
+
+  const maxDepth = useMemo(() => {
+    if (!showHeatmap) return 0
+    return visibleNodes.reduce((max, node) => {
+      const depth = node.prerequisiteSummary?.depth ?? 0
+      return depth > max ? depth : max
+    }, 0)
+  }, [visibleNodes, showHeatmap])
   
   return (
     <div
@@ -74,10 +86,35 @@ export const NodesLayer = memo(function NodesLayer({
         if (!position) return null
         
         const isHighlighted = highlightedNodes.includes(node.id)
-        const variant = isHighlighted ? 'highlighted' : node.status
+        const heatmapValue =
+          showHeatmap && maxDepth > 0 ? (node.prerequisiteSummary?.depth ?? 0) / maxDepth : undefined
+
+        let progressState: 'completed' | 'queued' | 'in-progress' | 'locked' | undefined
+        if (showEmpireProgress) {
+          if (completedNodes?.has(node.id)) {
+            progressState = 'completed'
+          } else if (queuedNodes?.has(node.id)) {
+            progressState = 'queued'
+          } else if (inProgressNodes?.has(node.id)) {
+            progressState = 'in-progress'
+          } else if (node.status === 'locked') {
+            progressState = 'locked'
+          }
+        }
+
+        const comparisonInfo =
+          showComparison && comparisonPlanetCount > 0
+            ? {
+                selected: comparisonPlanetCount,
+                ready:
+                  node.status === 'available' || node.status === 'completed'
+                    ? comparisonPlanetCount
+                    : 0,
+              }
+            : undefined
         
         return (
-          <div
+          <motion.div
             key={node.id}
             data-node-id={node.id}
             className="absolute"
@@ -88,13 +125,16 @@ export const NodesLayer = memo(function NodesLayer({
               zIndex: isHighlighted ? 10 : 1,
             }}
           >
-            <HexNode
+            <NodeCard
               node={node}
+              highlighted={isHighlighted}
               onClick={onNodeClick}
               onHover={onNodeHover}
-              variant={variant}
+              heatmapValue={heatmapValue}
+              progressState={progressState}
+              comparisonInfo={comparisonInfo}
             />
-          </div>
+          </motion.div>
         )
       })}
     </div>

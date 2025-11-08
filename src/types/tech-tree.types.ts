@@ -67,6 +67,19 @@ export interface TechNodeData {
   // Prerequisites
   prerequisites?: string[] // Array of node IDs
   
+  // Graph placement metadata
+  column?: number // Derived column index for hierarchical layouts
+  row?: number // Derived row index within column/era
+
+  // Dependency metadata
+  dependents?: string[] // Direct child node IDs
+  unlockSummary?: Partial<Record<TechNodeType, number>> // Direct unlock counts
+  prerequisiteSummary?: {
+    depth: number // Longest prerequisite chain depth
+    prerequisiteCount: number // Total unique prerequisites
+    totalCost: TechNodeCosts // Aggregated cost of prerequisites
+  }
+
   // Costs and resources
   costs?: TechNodeCosts
   production?: TechNodeProduction

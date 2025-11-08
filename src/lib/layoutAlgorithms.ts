@@ -204,41 +204,55 @@ export function calculateHierarchicalLayout(
   const eras = Array.from(eraGroups.keys()).sort((a, b) => a - b)
   
   // Layout configuration
-  const nodeWidth = 120 // Hex node width
-  const nodeHeight = 140 // Hex node height
-  const padding = 40
-  const eraSpacing = 250 // Vertical spacing between eras
-  const topBottomPadding = 100
-  
+  const columnSpacing = 240
+  const rowSpacing = 170
+  const eraSpacing = 220
+  const topPadding = 160
   const centerX = config.width / 2
-  
-  // Calculate total height needed for all eras
-  const totalHeight = eras.length * eraSpacing - eraSpacing + topBottomPadding * 2
-  
-  // Center vertically by starting from the middle minus half the content height
-  const startY = (config.height - totalHeight) / 2 + topBottomPadding
   
   eras.forEach((era, eraIndex) => {
     const eraNodes = eraGroups.get(era)!
-    
     if (eraNodes.length === 0) return
     
-    // Calculate horizontal spacing
-    const totalWidth = eraNodes.length * (nodeWidth + padding) - padding
-    const startX = centerX - totalWidth / 2
+    const columnsMap = new Map<number, TechNodeData[]>()
+    eraNodes.forEach((node) => {
+      const columnIndex = node.column ?? 0
+      if (!columnsMap.has(columnIndex)) {
+        columnsMap.set(columnIndex, [])
+      }
+      columnsMap.get(columnIndex)!.push(node)
+    })
     
-    // Calculate Y position for this era
-    const currentY = startY + eraIndex * eraSpacing
+    const sortedColumnKeys = Array.from(columnsMap.keys()).sort((a, b) => a - b)
+    const columnCount = sortedColumnKeys.length || 1
+    const totalWidth = columnCount * columnSpacing
+    const startX = centerX - totalWidth / 2 + columnSpacing / 2
+    const eraBaseY = topPadding + eraIndex * eraSpacing
     
-    // Position nodes horizontally
-    eraNodes.forEach((node, index) => {
-      const x = startX + index * (nodeWidth + padding) + nodeWidth / 2
+    sortedColumnKeys.forEach((columnKey, columnOrder) => {
+      const columnNodes = columnsMap.get(columnKey)!
+      columnNodes.sort((a, b) => {
+        const rowA = a.row ?? 0
+        const rowB = b.row ?? 0
+        if (rowA === rowB) {
+          return a.name.localeCompare(b.name)
+        }
+        return rowA - rowB
+      })
       
-      positions.set(node.id, {
-        x,
-        y: currentY,
-        angle: 0,
-        radius: 0,
+      const baseX = startX + columnOrder * columnSpacing
+      
+      columnNodes.forEach((node, index) => {
+        const rowIndex = node.row ?? index
+        const y = eraBaseY + rowIndex * rowSpacing
+        
+        node.row = rowIndex
+        positions.set(node.id, {
+          x: baseX,
+          y,
+          angle: 0,
+          radius: 0,
+        })
       })
     })
   })
