@@ -50,7 +50,7 @@ export function FacilityPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="panel-glass border-cyan/20 max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="panel-glass surface-gradient card-glow border-cyan/30 max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Facility Preview: {facility.name}</DialogTitle>
           <DialogDescription>

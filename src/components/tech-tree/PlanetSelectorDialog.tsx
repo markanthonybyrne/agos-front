@@ -57,7 +57,7 @@ export function PlanetSelectorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(value) => (value ? undefined : onClose())}>
-      <DialogContent className="sm:max-w-[700px] panel-glass">
+      <DialogContent className="sm:max-w-[700px] panel-glass surface-gradient card-glow border-border/30">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <headerMeta.icon className="w-5 h-5 text-cyan-400" />

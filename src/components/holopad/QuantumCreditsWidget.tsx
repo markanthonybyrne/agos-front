@@ -68,7 +68,7 @@ export function QuantumCreditsWidget({
       ) : (
         <div className="space-y-4">
           {/* Balance Display */}
-          <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-cyan/20">
+          <div className="glass-section border-cyan/30 p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img
                 src={getQuantumCreditsImage()}
@@ -83,7 +83,7 @@ export function QuantumCreditsWidget({
           </div>
 
           {/* Daily Login */}
-          <div className="p-4 bg-card rounded-lg border border-yellow/20">
+          <div className="glass-section border-yellow/30 p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-yellow-400" />
@@ -111,7 +111,7 @@ export function QuantumCreditsWidget({
           </div>
 
           {hasSecondaryBooster && (
-            <div className="flex items-center gap-2 p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-xs text-cyan-200">
+            <div className="glass-section border-cyan-500/40 p-3 flex items-center gap-2 text-xs text-cyan-200">
               <Droplets className="w-4 h-4" />
               Secondary Extraction Booster active — enjoy increased materials yield!
             </div>

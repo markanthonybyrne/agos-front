@@ -87,7 +87,7 @@ export const dealsApi = apiSlice.injectEndpoints({
           params === undefined ? undefined : params
 
         return {
-          url: '/market/deals/open',
+        url: '/market/deals/open',
           params: queryParams,
         }
       },

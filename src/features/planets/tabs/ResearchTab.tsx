@@ -478,7 +478,7 @@ export function ResearchTab({ planet }: ResearchTabProps) {
                               Start Research
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="panel-glass border-purple/20">
+                          <DialogContent className="panel-glass surface-gradient card-glow border-purple/30">
                             <DialogHeader>
                               <DialogTitle>Start Research</DialogTitle>
                               <DialogDescription>

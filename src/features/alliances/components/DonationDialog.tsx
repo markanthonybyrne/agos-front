@@ -101,7 +101,7 @@ export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialo
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px] panel-glass">
+      <DialogContent className="sm:max-w-[500px] panel-glass surface-gradient card-glow border-primary/30">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-green-400" />

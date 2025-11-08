@@ -76,17 +76,17 @@ export function CustomModal({
       {/* Modal Content */}
       <div
         className={cn(
-          'relative z-50 w-full max-w-2xl mx-4',
+          'relative z-50 w-full max-w-2xl mx-4 rounded-2xl',
           'panel-glass surface-gradient card-glow vignette border-cyan-500/40',
           'shadow-2xl',
           className
         )}
         style={{
-          clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0% 100%)',
           zIndex: zIndex + 1,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
+          borderRadius: '1.75rem',
         }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -235,11 +235,11 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
         }}
       >
         <div className="pointer-events-auto">
-          <img 
-            src={BRAND.logo} 
-            alt="A Game Of Space" 
-            className="h-10 sm:h-12 w-auto object-contain"
-          />
+            <img 
+              src={BRAND.logo} 
+              alt="A Game Of Space" 
+              className="h-10 sm:h-12 w-auto object-contain"
+            />
         </div>
         {!hudVisible && (
           <button
@@ -250,21 +250,21 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
             Open HUD
           </button>
         )}
-      </div>
+          </div>
 
       {hudVisible && (
-        <div
+            <div 
           className={cn(
             'fixed z-40 max-w-full pointer-events-none',
             className
           )}
-          style={{
+              style={{
             top: limitedPosition.top,
             left: limitedPosition.left,
           }}
         >
           <div
-            className="pointer-events-auto w-[min(92vw,440px)] rounded-xl border border-border/60 bg-[rgba(8,14,23,0.92)] p-4 shadow-[0_20px_45px_rgba(0,0,0,0.55)]"
+                className="pointer-events-auto w-[min(92vw,440px)] rounded-xl panel-glass surface-gradient card-glow p-4"
             onMouseMove={registerActivity}
             onMouseDown={registerActivity}
             onClick={registerActivity}
@@ -299,11 +299,11 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                   <p className="text-xs text-muted-foreground/50 truncate max-w-[180px]">
                     {displayEmpire?.name ?? 'Uncharted Empire'}
                   </p>
-                </div>
-              </div>
+            </div>
+          </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
+            <Button
+              variant="ghost"
                   size="icon"
                   onClick={(event) => {
                     event.stopPropagation()
@@ -311,20 +311,20 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                     openPanel(PanelType.NOTIFICATIONS, PanelSize.MEDIUM)
                   }}
                   className="relative h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
-                >
-                  <Bell className="w-4 h-4" />
-                  {notificationsCount > 0 && (
-                    <Badge 
-                      variant="destructive" 
+            >
+              <Bell className="w-4 h-4" />
+              {notificationsCount > 0 && (
+                <Badge 
+                  variant="destructive" 
                       className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[9px] flex items-center justify-center"
-                    >
-                      {notificationsCount > 9 ? '9+' : notificationsCount}
-                    </Badge>
-                  )}
-                </Button>
-                {showClose && backdropVisible && (
-                  <Button
-                    variant="ghost"
+                >
+                  {notificationsCount > 9 ? '9+' : notificationsCount}
+                </Badge>
+              )}
+            </Button>
+            {showClose && backdropVisible && (
+              <Button
+                variant="ghost"
                     size="icon"
                     onClick={(event) => {
                       event.stopPropagation()
@@ -332,10 +332,10 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                       closeAllPanels()
                     }}
                     className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-destructive/20"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -348,8 +348,8 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                 >
                   <X className="w-4 h-4" />
                 </Button>
-              </div>
-            </div>
+        </div>
+      </div>
 
             <div className="mt-4 grid gap-4">
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/40 bg-card/35 p-2">
@@ -373,41 +373,41 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
               </div>
 
               <div className="grid gap-3 rounded-lg border border-border/40 bg-card/30 p-3">
-                {displayEmpire && (
+          {displayEmpire && (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-border/30 bg-primary/5 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-purple-400" />
+                  <Trophy className="w-4 h-4 text-purple-400" />
                       <span className="text-muted-foreground/70">Rank</span>
                       <span className="font-mono font-semibold text-purple-300">
                         {rank ? `#${rank}` : 'Unranked'}
-                      </span>
+                  </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground/70">Score</span>
                       <span className="font-mono font-semibold text-cyan-300">
                         {displayEmpire.score?.toLocaleString?.() || displayEmpire.score || 0}
-                      </span>
+              </span>
                     </div>
-                  </div>
-                )}
+            </div>
+          )}
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => openPanel(PanelType.QUANTUM_CREDITS, PanelSize.MEDIUM)}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openPanel(PanelType.QUANTUM_CREDITS, PanelSize.MEDIUM)}
                   className="relative flex items-center justify-between gap-3 rounded-md border border-border/30 bg-cyan-500/10 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-cyan-200 transition hover:border-cyan-400/40 hover:bg-cyan-500/20"
-                >
+          >
                   <span className="flex items-center gap-2">
-                    <img
-                      src={getQuantumCreditsImage()}
-                      alt="Quantum Credits"
+            <img
+              src={getQuantumCreditsImage()}
+              alt="Quantum Credits"
                       className="h-5 w-5"
-                    />
+            />
                     Quantum Credits
                   </span>
                   <span className="font-mono text-sm font-semibold">
-                    {qcData?.balance ?? 0}
-                  </span>
+              {qcData?.balance ?? 0}
+            </span>
                   {qcData?.can_claim_daily && (
                     <Badge 
                       variant="outline" 
@@ -416,9 +416,9 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
                       Daily Ready
                     </Badge>
                   )}
-                </Button>
-              </div>
-            </div>
+          </Button>
+        </div>
+      </div>
           </div>
         </div>
       )}

@@ -6,11 +6,11 @@ import { BuildableItems as BuildableItemsType, BuildableItem } from '@/types/api
 import { formatResource } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { formatPrerequisiteSlug, getDefenceRequirements } from '@/lib/prerequisites'
-import {
-  Settings,
-  Shield,
-  Ship,
-  FlaskConical,
+import { 
+  Settings, 
+  Shield, 
+  Ship, 
+  FlaskConical, 
   Plus,
   CheckCircle,
   Clock,
@@ -30,9 +30,9 @@ interface BuildableItemsProps {
   layout?: 'grid' | 'list'
 }
 
-export function BuildableItems({
-  planetId,
-  buildableItems,
+export function BuildableItems({ 
+  planetId, 
+  buildableItems, 
   onBuildItem,
   className = '',
   layout = 'grid'
@@ -189,7 +189,7 @@ export function BuildableItems({
         return (
           <div
             key={item.slug}
-            className="flex items-center gap-3 rounded-lg border border-cyan-500/20 bg-black/30 p-3 transition hover:border-cyan-400/40 hover:bg-black/40"
+            className="glass-section border-cyan-500/40 p-3 flex items-center gap-3 transition hover:border-cyan-300/50"
           >
             {image && (
               <img
@@ -232,6 +232,21 @@ export function BuildableItems({
                       </Badge>
                     )
                   })}
+                </div>
+              )}
+
+              {!isDefenceTab && Array.isArray((item as any)?.prerequisite_research) && (item as any).prerequisite_research.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {((item as any).prerequisite_research as string[]).map((slug) => (
+                    <Badge
+                      key={slug}
+                      variant="outline"
+                      className="text-[10px] uppercase tracking-[0.2em] border-blue-400/40 bg-blue-500/10 text-blue-200"
+                      title={`Research prerequisite: ${formatPrerequisiteSlug(slug)}`}
+                    >
+                      Research: {formatPrerequisiteSlug(slug)}
+                    </Badge>
+                  ))}
                 </div>
               )}
               {isDefenceTab && missingPrereqs.length > 0 && (
@@ -279,25 +294,25 @@ export function BuildableItems({
             })}
           </TabsList>
           {tabs.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="mt-4">
-              {tab.items.length > 0 ? (
+              <TabsContent key={tab.id} value={tab.id} className="mt-4">
+                {tab.items.length > 0 ? (
                 layout === 'list'
                   ? renderList(
                       tab.items.filter((item) => item && typeof item === 'object' && item.slug) as BuildableItem[],
                       tab.id,
                     )
                   : (
-                      <VisualItemGrid
-                        items={tab.items
+                  <VisualItemGrid
+                    items={tab.items
                           .filter((item) => item != null && typeof item === 'object' && item.slug)
-                          .map((item) => {
+                      .map((item) => {
                             const costT =
                               item != null && typeof item === 'object' && 'tellerium_cost' in item
-                                ? (item as any).tellerium_cost
+                          ? (item as any).tellerium_cost
                                 : item?.base_tellerium_cost ?? 0
                             const costK =
                               item != null && typeof item === 'object' && 'krypton_cost' in item
-                                ? (item as any).krypton_cost
+                          ? (item as any).krypton_cost
                                 : item?.base_krypton_cost ?? 0
                             const isDefenceTab = tab.id === 'defences'
                             const canBuild = !isDefenceTab || (item as any)?.can_build !== false
@@ -320,14 +335,14 @@ export function BuildableItems({
                               if (!item?.slug || !canBuild) return
                               onBuildItem(tab.id, item.slug)
                             }
-
-                            return {
-                              id: item?.slug || 'unknown',
-                              name: item?.name || 'Unknown',
-                              image: getItemImage(item, tab.id),
-                              imageAlt: item?.name || 'Unknown',
+                        
+                        return {
+                          id: item?.slug || 'unknown',
+                          name: item?.name || 'Unknown',
+                          image: getItemImage(item, tab.id),
+                          imageAlt: item?.name || 'Unknown',
                               description: `${formatResource(costT)} T, ${formatResource(costK)} K${extraDescription}`,
-                              badge: (
+                          badge: (
                                 <Badge
                                   variant="outline"
                                   className={cn('flex items-center gap-1', badgeClass)}
@@ -335,24 +350,24 @@ export function BuildableItems({
                                 >
                                   <StatusIcon className="w-3 h-3" />
                                   {badgeLabel}
-                                </Badge>
-                              ),
+                            </Badge>
+                          ),
                               onClick: handleClick,
                               disabled: !canBuild,
-                            }
-                          })
                         }
-                        columns={4}
-                      />
+                      })
+                    }
+                    columns={4}
+                  />
                     )
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <tab.icon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">No {tab.label.toLowerCase()} available</p>
-                  <p className="text-sm mt-2">Complete prerequisites to unlock more items</p>
-                </div>
-              )}
-            </TabsContent>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <tab.icon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No {tab.label.toLowerCase()} available</p>
+                    <p className="text-sm mt-2">Complete prerequisites to unlock more items</p>
+                  </div>
+                )}
+              </TabsContent>
           ))}
         </Tabs>
       </CardContent>

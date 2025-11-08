@@ -139,7 +139,7 @@ function ResourceSummaryCard({
   imageSrc,
 }: ResourceSummaryCardProps) {
   return (
-    <div className="p-4 bg-card rounded-lg border border-border flex items-center justify-between">
+    <div className="glass-section border-border/50 p-4 flex items-center justify-between">
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2">
           <span className={cn('text-sm', textClass)}>{label}</span>

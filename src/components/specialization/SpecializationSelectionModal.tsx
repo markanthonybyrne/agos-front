@@ -71,7 +71,7 @@ export function SpecializationSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="panel-glass border-purple/20 max-w-2xl">
+      <DialogContent className="panel-glass surface-gradient card-glow border-purple/30 max-w-2xl">
         <DialogHeader>
           <DialogTitle>Choose Your Specialization</DialogTitle>
           <DialogDescription>

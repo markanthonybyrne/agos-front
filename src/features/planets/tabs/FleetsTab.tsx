@@ -529,7 +529,7 @@ export function FleetsTab({ planet }: FleetsTabProps) {
                 Build Fleet
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto panel-glass surface-gradient card-glow border-cyan/30">
               <DialogHeader>
                 <DialogTitle>Build Fleet from {planet?.name || 'Unknown Planet'}</DialogTitle>
                 <DialogDescription>

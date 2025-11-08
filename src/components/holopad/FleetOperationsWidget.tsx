@@ -37,7 +37,7 @@ export function FleetOperationsWidget({
       className="border-blue/20"
     >
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-card rounded-lg border border-border">
+          <div className="glass-section border-border/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">In Transit</span>
               <Badge variant="outline" className="text-yellow-400 border-yellow-400">
@@ -47,7 +47,7 @@ export function FleetOperationsWidget({
             <p className="text-2xl font-bold">{fleetsInTransit.length}</p>
             <p className="text-xs text-muted-foreground mt-1">Fleets traveling</p>
           </div>
-          <div className="p-4 bg-card rounded-lg border border-border">
+          <div className="glass-section border-border/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Stationed</span>
               <Badge variant="outline" className="text-green-400 border-green-400">

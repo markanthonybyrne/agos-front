@@ -141,7 +141,7 @@ export function SlidingPanel({
       <div
         ref={panelRef}
         className={cn(
-          'sliding-panel-container fixed right-0 top-0 flex h-full max-h-screen bg-card border-l border-border shadow-2xl',
+          'sliding-panel-container fixed right-0 top-0 flex h-full max-h-screen border-l border-border shadow-2xl bg-transparent',
           'overflow-hidden flex-col',
           className?.includes(CUSTOM_WIDTH_CLASS) ? '' : SIZE_MAP[size],
           className

@@ -273,16 +273,16 @@ export function ConstructionQueue({
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
         {hasFilteredResults ? (
-          <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="popLayout">
             {filteredConstructions.map((construction) => (
-              <ConstructionCard
-                key={construction.id}
-                construction={construction}
-                onCancel={handleCancel}
-                isCancelling={cancellingId === construction.id}
-              />
-            ))}
-          </AnimatePresence>
+            <ConstructionCard
+              key={construction.id}
+              construction={construction}
+              onCancel={handleCancel}
+              isCancelling={cancellingId === construction.id}
+            />
+          ))}
+        </AnimatePresence>
         ) : (
           <div className="rounded-lg border border-border/40 bg-black/30 px-4 py-8 text-center text-sm text-muted-foreground">
             No {filterLabels[typeFilter]} in the queue.

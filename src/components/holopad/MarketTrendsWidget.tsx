@@ -69,7 +69,7 @@ export function MarketTrendsWidget({
         ) : (
           <>
             {/* Tellerium Market */}
-            <div className="p-3 bg-card rounded-lg border border-cyan-500/20">
+            <div className="glass-section border-cyan-500/30 p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Activity className="w-4 h-4 text-cyan-400" />
@@ -111,7 +111,7 @@ export function MarketTrendsWidget({
             </div>
 
             {/* Krypton Market */}
-            <div className="p-3 bg-card rounded-lg border border-purple-500/20">
+            <div className="glass-section border-purple-500/30 p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Activity className="w-4 h-4 text-purple-400" />

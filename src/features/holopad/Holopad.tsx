@@ -171,42 +171,47 @@ export function Holopad() {
     }
   }, [empireState?.should_prompt_specialization])
 
-  // Widget layout state - load from localStorage or use default
+  const DEFAULT_WIDGET_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
+    operations: { x: 0, y: 0, w: 4, h: 5 },
+    resources: { x: 4, y: 0, w: 4, h: 5 },
+    planets: { x: 8, y: 0, w: 4, h: 5 },
+    era_progression: { x: 0, y: 5, w: 4, h: 4 },
+    dark_matter: { x: 4, y: 5, w: 4, h: 4 },
+    research_effects: { x: 8, y: 5, w: 4, h: 4 },
+    status: { x: 0, y: 9, w: 4, h: 4 },
+    quantum_credits: { x: 4, y: 9, w: 4, h: 4 },
+    boosters: { x: 8, y: 9, w: 4, h: 4 },
+    achievements: { x: 0, y: 13, w: 4, h: 4 },
+    announcements: { x: 4, y: 13, w: 4, h: 5 },
+    market_trends: { x: 8, y: 13, w: 4, h: 5 },
+  }
+
+  // Widget layout state - load from localStorage or use default grid
   const [layout, setLayout] = useState(() => {
     const savedLayout = localStorage.getItem('holopad-layout')
     if (savedLayout) {
       try {
-        return JSON.parse(savedLayout)
+        const parsed = JSON.parse(savedLayout)
+        if (Array.isArray(parsed)) {
+          return parsed
+        }
       } catch {
-        // Fall through to default layout
+        // fall through
       }
     }
-    // Default layout: Only Announcements and Planets visible, each at 1/3 width (4 columns)
-    return [
-      { i: 'announcements', x: 0, y: 0, w: 4, h: 6 },
-      { i: 'planets', x: 4, y: 0, w: 4, h: 5 },
-    ]
+    return Object.entries(DEFAULT_WIDGET_LAYOUT).map(([key, value]) => ({
+      i: key,
+      ...value,
+    }))
   })
 
-  // Widget minimize state - load from localStorage or default to all widgets minimized except announcements and planets
+  // Widget minimize state - default to all widgets visible
   const [minimizedWidgets, setMinimizedWidgets] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('holopad-minimized')
     if (saved) {
       return new Set(JSON.parse(saved))
     }
-    // Default: All widgets minimized except announcements and planets
-    return new Set([
-      'operations',
-      'resources',
-      'era_progression',
-      'dark_matter',
-      'research_effects',
-      'status',
-      'quantum_credits',
-      'boosters',
-      'achievements',
-      'market_trends',
-    ])
+    return new Set()
   })
   const [closedWidgets, setClosedWidgets] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('holopad-closed')
@@ -238,9 +243,18 @@ export function Holopad() {
     market_trends: 'Market Trends',
   }
 
+  const clampLayoutItem = (item: any) => ({
+    ...item,
+    x: Math.max(0, Math.min(item.x, 12 - item.w)),
+    y: Math.max(0, item.y),
+    w: Math.min(12, Math.max(2, item.w)),
+    h: Math.max(2, item.h),
+  })
+
   const handleLayoutChange = (newLayout: any) => {
-    setLayout(newLayout)
-    localStorage.setItem('holopad-layout', JSON.stringify(newLayout))
+    const normalized = newLayout.map(clampLayoutItem)
+    setLayout(normalized)
+    localStorage.setItem('holopad-layout', JSON.stringify(normalized))
   }
 
   const handleMinimizeWidget = (widgetId: string) => {
@@ -250,7 +264,11 @@ export function Holopad() {
       return newSet
     })
     // Remove from layout when minimized
-    setLayout((prev: any[]) => prev.filter((item: any) => item.i !== widgetId))
+    setLayout((prev: any[]) => {
+      const next = prev.filter((item: any) => item.i !== widgetId)
+      localStorage.setItem('holopad-layout', JSON.stringify(next))
+      return next
+    })
   }
 
   // Filter out minimized and closed widgets from layout
@@ -273,17 +291,29 @@ export function Holopad() {
       return newSet
     })
     // Add back to layout at a default position
-    const existingLayout = visibleLayout
-    const maxY = existingLayout.length > 0 
-      ? Math.max(...existingLayout.map((item: any) => item.y + item.h))
-      : 0
-    setLayout([...existingLayout, {
-      i: widgetId,
-      x: 0,
-      y: maxY,
-      w: 4,
-      h: 4,
-    }])
+    const existingLayout = visibleLayout.map(clampLayoutItem)
+    const defaultPosition = DEFAULT_WIDGET_LAYOUT[widgetId] || { x: 0, y: 0, w: 4, h: 4 }
+    const candidate = { i: widgetId, ...defaultPosition }
+
+    const collides = (test: { x: number; y: number; w: number; h: number }) =>
+      existingLayout.some((item: any) => {
+        const separated =
+          test.x + test.w <= item.x ||
+          test.x >= item.x + item.w ||
+          test.y + test.h <= item.y ||
+          test.y >= item.y + item.h
+        return !separated
+      })
+
+    let attempts = 0
+    while (collides(candidate) && attempts < 50) {
+      candidate.y += candidate.h
+      attempts += 1
+    }
+
+    const updated = [...existingLayout, clampLayoutItem(candidate)]
+    setLayout(updated)
+    localStorage.setItem('holopad-layout', JSON.stringify(updated))
   }
 
   const handleCloseWidget = (widgetId: string) => {
@@ -294,7 +324,11 @@ export function Holopad() {
       return newSet
     })
     // Remove from layout
-    setLayout((prev: any[]) => prev.filter((item: any) => item.i !== widgetId))
+    setLayout((prev: any[]) => {
+      const next = prev.filter((item: any) => item.i !== widgetId)
+      localStorage.setItem('holopad-layout', JSON.stringify(next))
+      return next
+    })
   }
 
   const handleReorderWidgets = (newOrder: string[]) => {
@@ -363,11 +397,11 @@ export function Holopad() {
         onLayoutChange={handleLayoutChange}
         cols={12}
         rowHeight={60}
-        width={windowWidth - 64}
+        width={Math.max(960, windowWidth - 64)}
         isDraggable={true}
         isResizable={true}
-        margin={[16, 16]}
-        compactType={null}
+        margin={[20, 24]}
+        compactType="vertical"
         preventCollision={false}
         draggableHandle=".widget-drag-handle"
         useCSSTransforms={true}

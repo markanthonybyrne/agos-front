@@ -70,7 +70,7 @@ export function AchievementsWidget({
     >
       <div className="space-y-4">
         {/* Progress Summary */}
-        <div className="p-3 rounded-lg bg-card border border-amber/20">
+        <div className="glass-section border-amber/30 p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-amber-400" />
@@ -99,7 +99,7 @@ export function AchievementsWidget({
             {recentAchievements.map((achievement) => (
               <div
                 key={achievement.slug}
-                className="p-2 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-between"
+                className="glass-section border-green-500/30 p-2 flex items-center justify-between"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <CheckCircle className="w-3 h-3 text-green-400 flex-shrink-0" />

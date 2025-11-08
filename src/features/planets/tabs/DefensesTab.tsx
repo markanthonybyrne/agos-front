@@ -659,7 +659,7 @@ export function DefensesTab({ planet }: DefensesTabProps) {
                             Destroy
                           </Button>
                         </DialogTrigger>
-                    <DialogContent className="panel-glass border-destructive/20">
+                    <DialogContent className="panel-glass surface-gradient card-glow border-destructive/30">
                       <DialogHeader>
                         <DialogTitle>Destroy Defenses</DialogTitle>
                         <DialogDescription>

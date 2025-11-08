@@ -245,7 +245,7 @@ export function AllianceFund({ allianceId }: AllianceFundProps) {
                 Donate Funds
               </Button>
             </DialogTrigger>
-            <DialogContent className="panel-glass border-purple/20">
+            <DialogContent className="panel-glass surface-gradient card-glow border-purple/30">
               <DialogHeader>
                 <DialogTitle>Donate to Alliance Fund</DialogTitle>
                 <DialogDescription>
@@ -363,7 +363,7 @@ export function AllianceFund({ allianceId }: AllianceFundProps) {
                   Withdraw Funds
                 </Button>
               </DialogTrigger>
-              <DialogContent className="panel-glass border-blue/20">
+              <DialogContent className="panel-glass surface-gradient card-glow border-blue/30">
                 <DialogHeader>
                   <DialogTitle>Withdraw Funds</DialogTitle>
                   <DialogDescription>
@@ -456,7 +456,7 @@ export function AllianceFund({ allianceId }: AllianceFundProps) {
                   Transfer Funds
                 </Button>
               </DialogTrigger>
-              <DialogContent className="panel-glass border-green/20">
+              <DialogContent className="panel-glass surface-gradient card-glow border-green/30">
                 <DialogHeader>
                   <DialogTitle>Transfer Funds to Planet</DialogTitle>
                   <DialogDescription>

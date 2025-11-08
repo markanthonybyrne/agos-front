@@ -300,7 +300,7 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
           </div>
 
           {/* Current Price Display */}
-          <div className="p-4 bg-muted/20 rounded-lg border border-border/50 space-y-2">
+            <div className="p-4 bg-muted/20 rounded-lg border border-border/50 space-y-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Current Market Price:</span>
               <span className="font-mono font-semibold">{currentPrice.toFixed(4)}</span>
@@ -326,7 +326,7 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
                   <span className="font-mono">{formatNumber(secondaryCapacityRemaining)}</span>
                 </div>
               )}
-          </div>
+            </div>
 
           {insufficientBuyFunds && (
             <Alert variant="destructive">

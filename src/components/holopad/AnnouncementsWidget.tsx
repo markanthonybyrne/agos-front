@@ -88,10 +88,10 @@ export function AnnouncementsWidget({
             {announcements.map((announcement) => (
               <div
                 key={announcement.id}
-                className={`p-3 bg-card rounded-lg border ${
+                className={`glass-section p-3 ${
                   announcement.is_important 
-                    ? 'border-purple-400/50 bg-purple-500/10' 
-                    : 'border-border'
+                    ? 'border-purple-400/60'
+                    : 'border-border/40'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-2">

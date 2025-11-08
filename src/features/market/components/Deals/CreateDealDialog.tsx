@@ -118,7 +118,7 @@ export function CreateDealDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl panel-glass surface-gradient card-glow border-border/40">
         <DialogHeader>
           <DialogTitle>Create Free Market Deal</DialogTitle>
         </DialogHeader>

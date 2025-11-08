@@ -475,7 +475,7 @@ export function PlanetPopulationPanel({ planetId, isOpen }: PlanetPopulationPane
                   Manage Specialisation
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl border border-cyan-500/30 bg-background">
+              <DialogContent className="max-w-3xl panel-glass surface-gradient card-glow border-cyan-500/40">
                 <DialogHeader>
                   <DialogTitle>Choose Colony Specialisation</DialogTitle>
                   <DialogDescription>

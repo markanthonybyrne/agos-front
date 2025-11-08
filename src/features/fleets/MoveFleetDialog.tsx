@@ -282,7 +282,7 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto panel-glass surface-gradient card-glow border-cyan/30">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-cyan-400" />

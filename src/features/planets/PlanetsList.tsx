@@ -495,7 +495,7 @@ export function PlanetsList() {
         <PlanetHexGridView
           planet={hexPlanet}
           onClose={() => setHexPlanet(null)}
-        />
+      />
       )}
     </div>
   )

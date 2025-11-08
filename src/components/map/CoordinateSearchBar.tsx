@@ -120,7 +120,7 @@ export function CoordinateSearchBar({ onSearch, className, planets }: Coordinate
               <button
                 key={index}
                 type="button"
-              onClick={() => {
+                onClick={() => {
                   setQuery(suggestion)
                   setSuggestions([])
                   setIsFocused(false)

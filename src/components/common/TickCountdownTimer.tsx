@@ -141,8 +141,15 @@ export function TickCountdownTimer() {
     }
   }, [totalSecondsRemaining, millisecondsRemaining, isInCountdown])
 
-  // Don't show if not authenticated or no tick data
-  if (!isAuthenticated || !nextTickETA || totalSecondsRemaining === null || !mounted) {
+  const shouldRender =
+    isAuthenticated &&
+    nextTickETA &&
+    totalSecondsRemaining !== null &&
+    totalSecondsRemaining <= 120 &&
+    mounted
+
+  // Don't show if not authenticated, missing data, or we're more than 2 minutes out
+  if (!shouldRender) {
     return null
   }
 
