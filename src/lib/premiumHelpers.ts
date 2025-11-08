@@ -37,6 +37,7 @@ export function getBoosterDisplayName(type: string): string {
     production: '⚡ 2x Resource Production',
     construction: '🔨 1.5x Build Speed',
     signal: '📡 Signal Bonus',
+    secondary_extraction: '💠 Secondary Extraction Boost',
   }
   return displayNames[type] || type
 }

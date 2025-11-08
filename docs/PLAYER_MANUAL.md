@@ -19,10 +19,14 @@ Complete guide to gameplay, strategy, and tactics for Astralus.
 13. [NPC Empires](#npc-empires)
 14. [Market System](#market-system)
 15. [Quantum Credits & Boosters](#quantum-credits--boosters)
-16. [Strategy Guide](#strategy-guide)
-17. [Advanced Tactics](#advanced-tactics)
-18. [Reference Tables](#reference-tables)
-19. [Tips & Best Practices](#tips--best-practices)
+16. [Construction & Manufacturing](#construction--manufacturing)
+17. [Missions & Interactions](#missions--interactions)
+18. [Events & Notifications](#events--notifications)
+19. [User Interface Expectations](#user-interface-expectations)
+20. [Strategy Guide](#strategy-guide)
+21. [Advanced Tactics](#advanced-tactics)
+22. [Reference Tables](#reference-tables)
+23. [Tips & Best Practices](#tips--best-practices)
 
 ---
 
@@ -42,14 +46,14 @@ This is your moment, Commander. The stars await your command.
 
 Astralus is a tick-based grand strategy browser game where you:
 
--   Build and command fleets of starships
--   Colonize planets across a vast galaxy
--   Research advanced technologies
--   Construct facilities and defences
--   Form alliances or fight alone
--   Compete for dominance in a living universe
+- Build and command fleets of starships
+- Colonize planets across a vast galaxy
+- Research advanced technologies
+- Construct facilities and defences
+- Form alliances or fight alone
+- Compete for dominance in a living universe
 
-The game runs on **server-driven ticks** (default: 30 minutes). Every tick, resource production, construction, fleet movement, and combat are processed automatically.
+The game runs on **server-driven ticks** (default: 30 minutes - testing: 5 minutes). Every tick, resource production, construction, fleet movement, and combat are processed automatically.
 
 ### Key Concepts
 
@@ -79,55 +83,49 @@ The game runs on **server-driven ticks** (default: 30 minutes). Every tick, reso
 ### First Hour Checklist
 
 1. **Explore Your Homeworld**:
-
-    - View planet coordinates and type
-    - Check initial resource balances
-    - Review available construction options
+   - View planet coordinates and type
+   - Check initial resource balances
+   - Review available construction options
 
 2. **Build Infrastructure**:
-
-    - Purchase Mines (for Tellerium production)
-    - Purchase Probes (for Krypton production)
-    - Build Research Lab (enables research)
+   - Purchase Mines (for Tellerium production)
+   - Purchase Probes (for Krypton production)
+   - Build Research Lab (enables research)
 
 3. **Start Research**:
-
-    - Research `Military Doctrine` (unlocks Basic Shipyard)
-    - Research `Basic Combat` (unlocks Assault Fighter)
+   - Research `Military Doctrine` (unlocks Basic Shipyard)
+   - Research `Basic Combat` (unlocks Assault Fighter)
 
 4. **Build Facilities**:
-
-    - Build Basic Shipyard (enables ship production)
+   - Build Basic Shipyard (enables ship production)
 
 5. **Build Your First Fleet**:
-
-    - Build Scout Fighters (for exploration)
-    - Build Assault Fighters (for basic combat)
+   - Build Scout Fighters (for exploration)
+   - Build Assault Fighters (for basic combat)
 
 6. **Explore Nearby Systems**:
-
-    - Use Signal Scanning to discover nearby systems
-    - Find colonizable planets within 2 regions distance
+   - Use Signal Scanning to discover nearby systems
+   - Find colonizable planets within 2 regions distance
 
 7. **Colonize Your First Planet**:
-    - Research `Colony Management` (required for colonization)
-    - Build Colony Ship
-    - Send fleet to colonize nearby habitable planet
+   - Research `Colony Management` (required for colonization)
+   - Build Colony Ship
+   - Send fleet to colonize nearby habitable planet
 
 ### Holopad Interface
 
 The Holopad is your command center. Key sections:
 
--   **Message of the Day**: Developer announcements
--   **Foreign Fleets**: Incoming/outgoing fleets near your planets
--   **Planets**: List of your planets with resources and status
--   **Research**: Active and available research projects
--   **Facilities**: Construction queue and built facilities
--   **Fleets**: Stationed and in-transit fleets
--   **Fleet Construction**: Queued ship orders
--   **Orbital Defence**: Defences protecting your planets
--   **Orbital Construction**: Queued defence orders
--   **Resources**: Mine/probe counts and production rates
+- **Message of the Day**: Developer announcements
+- **Foreign Fleets**: Incoming/outgoing fleets near your planets
+- **Planets**: List of your planets with resources and status
+- **Research**: Active and available research projects
+- **Facilities**: Construction queue and built facilities
+- **Fleets**: Stationed and in-transit fleets
+- **Fleet Construction**: Queued ship orders
+- **Orbital Defence**: Defences protecting your planets
+- **Orbital Construction**: Queued defence orders
+- **Resources**: Mine/probe counts and production rates
 
 ---
 
@@ -154,24 +152,24 @@ The Holopad is your command center. Key sections:
 
 **Empire Score**: Calculated from:
 
--   Ship value (total worth / 10)
--   Defence value (total worth / 10)
--   Probes (quantity × 500)
--   Mines (quantity × 500)
--   Planets (quantity × 100,000)
--   Facility value (total worth)
+- Ship value (total worth / 10)
+- Defence value (total worth / 10)
+- Probes (quantity × 500)
+- Mines (quantity × 500)
+- Planets (quantity × 100,000)
+- Facility value (total worth)
 
 **Empire Limits**:
 
--   Maximum 5 planets (1 homeworld + 4 colonies)
--   No limit on fleets, ships, or defences
--   No limit on facilities per planet
+- Maximum 5 planets (1 homeworld + 4 colonies)
+- No limit on fleets, ships, or defences
+- No limit on facilities per planet
 
 **Empire Visibility**:
 
--   Starts with small square area around homeworld visible
--   Expand visibility through research and signal scanning
--   Fog of war hides unexplored areas
+- Starts with small square area around homeworld visible
+- Expand visibility through research and signal scanning
+- Fog of war hides unexplored areas
 
 ### Planet Management
 
@@ -179,21 +177,21 @@ The Holopad is your command center. Key sections:
 
 **Planet States**:
 
--   `unsettled`: Uncolonized, available for colonization
--   `colony`: Colonized by an empire
--   `homeworld`: Empire's starting planet (cannot be captured)
+- `unsettled`: Uncolonized, available for colonization
+- `colony`: Colonized by an empire
+- `homeworld`: Empire's starting planet (cannot be captured)
 
 **Planet Ownership**:
 
--   Planets can be captured through combat
--   Owner changes when planet is successfully attacked
--   Homeworlds cannot be captured
+- Planets can be captured through combat
+- Owner changes when planet is successfully attacked
+- Homeworlds cannot be captured
 
 **Planet Resources**:
 
--   Resources stored per-planet
--   Can be transferred between your planets
--   Production calculated per-planet
+- Resources stored per-planet
+- Can be transferred between your planets
+- Production calculated per-planet
 
 ---
 
@@ -201,23 +199,13 @@ The Holopad is your command center. Key sections:
 
 ### Resource Types
 
-**Tellerium (T)**:
-
--   Manufacturing resource
--   Used for building ships, facilities, defences
--   Produced by mines and production facilities
-
-**Krypton (K)**:
-
--   Fuel resource
--   Used for fleet movement, research, signals
--   Produced by probes and extraction facilities
-
-**Dark Matter (DM)**:
-
--   Exotic resource (Era 5+)
--   Used for advanced facilities and ships
--   Produced by Singularity Reactor Core
+| Resource             | Tier      | Description            | Primary Uses                                   | Production Sources                                  |
+| -------------------- | --------- | ---------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| Tellerium (T)        | Primary   | Manufacturing alloy    | Facilities, ships, defences, upkeep            | Mines, production facilities, passive planet bonus  |
+| Krypton (K)          | Primary   | Fuel and energy        | Travel, research, signal scans, upkeep         | Probes, extraction facilities, passive planet bonus |
+| Dark Matter (DM)     | Exotic    | Advanced energy        | Quantum facilities, late-era ships             | Singularity Reactor Core, incidents, missions       |
+| Quantum Credits (QC) | Premium   | Account-based currency | Boosters, storage upgrades, cosmetics (future) | Daily login, achievements, purchases, events        |
+| Secondary Materials  | Secondary | Biome-linked deposits  | Crafting, upgrades, market trading             | Planet reserves, incidents, missions                |
 
 ### Base Production
 
@@ -227,8 +215,8 @@ The Holopad is your command center. Key sections:
 
 **Example**:
 
--   10 Mines + 2 Planets = (10 × 1,000) + (2 × 250) = 10,500 T/tick
--   8 Probes + 2 Planets = (8 × 750) + (2 × 250) = 6,500 K/tick
+- 10 Mines + 2 Planets = (10 × 1,000) + (2 × 250) = 10,500 T/tick
+- 8 Probes + 2 Planets = (8 × 750) + (2 × 250) = 6,500 K/tick
 
 ### Facility Production
 
@@ -236,30 +224,48 @@ Many facilities produce resources per tick:
 
 **Early Game**:
 
--   Reclaimed Surface Mines: +10 T/tick
--   Atmospheric Probe Nets: +8 K/tick
--   Crude Extractor: +6 T + 6 K/tick
+- Reclaimed Surface Mines: +10 T/tick
+- Atmospheric Probe Nets: +8 K/tick
+- Crude Extractor: +6 T + 6 K/tick
 
 **Mid Game**:
 
--   Deep-Core Extraction Facility: +35 T + 20 K/tick
--   Molecular Extraction Facility: +100 T/tick
+- Deep-Core Extraction Facility: +35 T + 20 K/tick
+- Molecular Extraction Facility: +100 T/tick
 
 **Late Game**:
 
--   Automated Production Complex: +250 T/tick
--   Singularity Reactor Core: +1,000 T + 50 DM/tick
+- Automated Production Complex: +250 T/tick
+- Singularity Reactor Core: +1,000 T + 50 DM/tick
+
+### Secondary Resource Materials
+
+Secondary resources are specialised materials extracted directly from planetary biomes. Every colonisable planet spawns with a finite reserve tied to its `planet type`.
+
+| Rarity | Tier | Materials                                                                | Primary Planet Types                                                         |
+| ------ | ---- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Common | 1    | Bio-Lattice, Hydro Pods, Silica Fragments, Xenoflora Spores, Ferrite Ore | Terran, Temperate, Oceanic, Swamp, Forest, Desert, Rocky, Metallic, Asteroid |
+| Rare   | 2    | Cryo Crystals, Magma Alloys, Volatile Isotopes                           | Ice, Tundra, Volcanic, Molten, Toxic, Nebulous                               |
+| Exotic | 3    | Ionized Helium, Phase Matter                                             | Gas Giant, Ringed, Quantum, Crystalline, Exotic                              |
+
+Key facts:
+
+- Reserves track `initial` and `current` quantities plus a `richness` modifier (0.8-1.6×) and optional slow replenishment. When `current_reserves` hits zero, the planet is depleted until refill events occur.
+- Extraction runs automatically each tick alongside Tellerium/Krypton income. Output scales with mines, probes, Extraction Hub levels, and the **Secondary Extraction Booster** (Quantum Credit purchase).
+- Resources are stored empire-wide rather than on individual planets. Storage capacity increases with planet ownership and can be expanded via premium vault upgrades.
+- Secondary materials fuel late-game crafting: advanced ship modules, alliance megaprojects, incident rewards, and player market recipes. They can be traded on NPC and bilateral markets just like primary resources.
+- Reserve status (remaining, richness, replenishment) is visible on the planet screen once colonised or scanned.
 
 ### Production Multipliers
 
 **Research Bonuses**:
 
--   Resource Optimization: +10% Tellerium production
--   Industrial Automation: +20% per-tick production (global)
+- Resource Optimization: +10% Tellerium production
+- Industrial Automation: +20% per-tick production (global)
 
 **Booster Multipliers**:
 
--   Production Booster: +25% production for 24 hours (purchased with Quantum Credits)
+- Production Booster: +25% production for 24 hours (purchased with Quantum Credits)
 
 **Multipliers are multiplicative** - stack multiple bonuses for significant increases.
 
@@ -269,9 +275,9 @@ Many facilities consume resources per tick as upkeep:
 
 **Examples**:
 
--   Research Lab: 50 T + 50 K/tick
--   Advanced Shipyard: 200 T + 150 K/tick
--   Quantum Research Facility: 500 T + 500 K/tick
+- Research Lab: 50 T + 50 K/tick
+- Advanced Shipyard: 200 T + 150 K/tick
+- Quantum Research Facility: 500 T + 500 K/tick
 
 **Important**: Ensure production exceeds upkeep or facilities will shut down.
 
@@ -279,9 +285,9 @@ Many facilities consume resources per tick as upkeep:
 
 Transfer resources between your planets:
 
--   Instant transfer (no travel time)
--   No transfer cost
--   Useful for consolidating resources for large purchases
+- Instant transfer (no travel time)
+- No transfer cost
+- Useful for consolidating resources for large purchases
 
 ---
 
@@ -319,28 +325,28 @@ Ships are organized into 7 classes:
 
 Ships can have special abilities:
 
--   **scout**: Enhanced reconnaissance
--   **assault**: Bonus damage vs specific targets
--   **patrol**: Defensive patrol patterns
--   **defensive**: Enhanced defensive capabilities
--   **strike**: High-damage precision strikes
--   **escort**: Protects other ships
--   **battle**: Bonus in fleet combat
--   **heavy_weapons**: Devastating firepower
--   **carrier**: Can deploy fighters
--   **fighter_deployment**: Launches fighter squadrons
--   **command**: Fleet coordination bonuses
--   **fortress**: Immobile defensive platform
--   **quantum_weapons**: Advanced energy weapons
--   **planetary_capture**: Enables planet capture
+- **scout**: Enhanced reconnaissance
+- **assault**: Bonus damage vs specific targets
+- **patrol**: Defensive patrol patterns
+- **defensive**: Enhanced defensive capabilities
+- **strike**: High-damage precision strikes
+- **escort**: Protects other ships
+- **battle**: Bonus in fleet combat
+- **heavy_weapons**: Devastating firepower
+- **carrier**: Can deploy fighters
+- **fighter_deployment**: Launches fighter squadrons
+- **command**: Fleet coordination bonuses
+- **fortress**: Immobile defensive platform
+- **quantum_weapons**: Advanced energy weapons
+- **planetary_capture**: Enables planet capture
 
 ### Combat System
 
 **Deterministic Resolution**:
 
--   Combat outcomes are deterministic (same inputs = same results)
--   Uses seeded RNG for reproducibility
--   Ensures fair gameplay
+- Combat outcomes are deterministic (same inputs = same results)
+- Uses seeded RNG for reproducibility
+- Ensures fair gameplay
 
 **Combat Phases**:
 
@@ -368,22 +374,22 @@ Result: Fleet wins, 0 losses
 
 **Build Time**:
 
--   Ships built in parallel (up to 10 at normal speed)
--   Large quantities use diminishing returns
--   Faster ships build faster
+- Ships built in parallel (up to 10 at normal speed)
+- Large quantities use diminishing returns
+- Faster ships build faster
 
 **Costs**:
 
--   Vary by ship class and era
--   Early ships: 1,000-5,000 T + K
--   Late ships: 100,000+ T + K
+- Vary by ship class and era
+- Early ships: 1,000-5,000 T + K
+- Late ships: 100,000+ T + K
 
 **Shipyard Requirements**:
 
--   Basic Shipyard: Fighters only
--   Advanced Shipyard: Corvettes, Frigates
--   Capital Shipyard: Cruisers, Carriers
--   Quantum Shipyard: Motherships, Fortresses
+- Basic Shipyard: Fighters only
+- Advanced Shipyard: Corvettes, Frigates
+- Capital Shipyard: Cruisers, Carriers
+- Quantum Shipyard: Motherships, Fortresses
 
 ### Fleet Composition
 
@@ -391,28 +397,28 @@ Result: Fleet wins, 0 losses
 
 **Early Game** (Scout/Exploration):
 
--   5 Scout Fighters
--   10 Assault Fighters
+- 5 Scout Fighters
+- 10 Assault Fighters
 
 **Mid Game** (Balanced):
 
--   20 Assault Fighters
--   10 Strike Corvettes
--   5 Battle Frigates
+- 20 Assault Fighters
+- 10 Strike Corvettes
+- 5 Battle Frigates
 
 **Late Game** (Power):
 
--   50+ Assault Fighters
--   20+ Strike Corvettes
--   10+ Battle Frigates
--   5+ Battle Cruisers
--   1 Carrier (deploy fighters)
+- 50+ Assault Fighters
+- 20+ Strike Corvettes
+- 10+ Battle Frigates
+- 5+ Battle Cruisers
+- 1 Carrier (deploy fighters)
 
 **Specialized**:
 
--   **Defence Fleet**: Mix of defensive ships (Patrol Corvettes, Defence Frigates)
--   **Strike Fleet**: High-damage ships (Strike Corvettes, Strike Frigates)
--   **Carrier Fleet**: Carriers with fighter deployments
+- **Defence Fleet**: Mix of defensive ships (Patrol Corvettes, Defence Frigates)
+- **Strike Fleet**: High-damage ships (Strike Corvettes, Strike Frigates)
+- **Carrier Fleet**: Carriers with fighter deployments
 
 ---
 
@@ -422,16 +428,16 @@ Result: Fleet wins, 0 losses
 
 **Orbital Defences**:
 
--   Fixed defences protecting planets
--   Built per-planet
--   Cannot move
--   Destroyed in combat
+- Fixed defences protecting planets
+- Built per-planet
+- Cannot move
+- Destroyed in combat
 
 **Defence Classes**:
 
--   **Basic**: Ion Cannons, Plasma Turrets
--   **Advanced**: Quantum Disruptors, Particle Beams
--   **Exotic**: Dark Matter Shields, Singularity Generators
+- **Basic**: Ion Cannons, Plasma Turrets
+- **Advanced**: Quantum Disruptors, Particle Beams
+- **Exotic**: Dark Matter Shields, Singularity Generators
 
 ### Defence Statistics
 
@@ -445,162 +451,160 @@ Result: Fleet wins, 0 losses
 
 **Special Abilities**:
 
--   **ion_disable**: Disables enemy ships (prevent firing)
--   **instant_kill**: Mines - instant kill on hit
--   **shielding**: Reduces incoming damage
+- **ion_disable**: Disables enemy ships (prevent firing)
+- **instant_kill**: Mines - instant kill on hit
+- **shielding**: Reduces incoming damage
 
 ### Facility Types
 
 **Production Facilities**:
 
--   Mines, Probes (resource production)
--   Extractors (bonus production)
--   Production Complexes (massive production)
+- Mines, Probes (resource production)
+- Extractors (bonus production)
+- Production Complexes (massive production)
 
 **Military Facilities**:
 
--   Shipyards (ship production)
--   Defence Grids (defence production)
--   Command Centers (fleet coordination)
+- Shipyards (ship production)
+- Defence Grids (defence production)
+- Command Centers (fleet coordination)
 
 **Research Facilities**:
 
--   Research Labs (enables research)
--   Advanced Labs (faster research)
--   Quantum Labs (Era 5+ research)
+- Research Labs (enables research)
+- Advanced Labs (faster research)
+- Quantum Labs (Era 5+ research)
 
 **Special Facilities**:
 
--   Tachyon Broadcast Centers (signal scanning bonuses)
--   Storage Facilities (resource storage)
--   Dark Matter Reactors (Dark Matter production)
+- Tachyon Broadcast Centers (signal scanning bonuses)
+- Storage Facilities (resource storage)
+- Dark Matter Reactors (Dark Matter production)
 
 ### Facility Levels
 
 Facilities can be upgraded:
 
--   Level 1: Base capabilities
--   Level 2-5: Improved production/effects
--   Higher levels: Exponential cost increases
+- Level 1: Base capabilities
+- Level 2-5: Improved production/effects
+- Higher levels: Exponential cost increases
 
 **Upgrade Benefits**:
 
--   Increased production (mines, probes)
--   Reduced build times (shipyards)
--   Enhanced effects (research labs)
+- Increased production (mines, probes)
+- Reduced build times (shipyards)
+- Enhanced effects (research labs)
 
 ### Construction System
 
 **Build Time**:
 
--   Facilities: Linear time (level × base_time)
--   Ships: Parallel construction (up to 10 normal speed)
--   Defences: Parallel construction (up to 10 normal speed)
--   Research: Linear time (cannot be parallelized)
+- Facilities: Linear time (level × base_time)
+- Ships: Parallel construction (up to 10 normal speed)
+- Defences: Parallel construction (up to 10 normal speed)
+- Research: Linear time (cannot be parallelized)
 
 **Costs**:
 
--   Increase with level/quantity
--   Early facilities: 1,000-10,000 T + K
--   Late facilities: 100,000+ T + K
+- Increase with level/quantity
+- Early facilities: 1,000-10,000 T + K
+- Late facilities: 100,000+ T + K
 
 **Prerequisites**:
 
--   Must have required facilities
--   Must have completed research
--   Must have sufficient resources
+- Must have required facilities
+- Must have completed research
+- Must have sufficient resources
 
 ---
 
 ## Research & Technology
 
-### Research System
+### Research System Overview
 
-**Requirements**:
+- Research projects are queued per planet through the Construction Queue (`type = research`).
+- Requirements: an operational Research Lab (or higher), all listed prerequisite facilities/research nodes, and the Tellerium + Krypton cost.
+- Completion immediately applies effects to the empire (`empire.active_research_effects`) via `ResearchEffectService`.
+- Era 1 doctrines (basic combat, colonial survival) are unlocked at start; the formal tech tree begins in Era 2.
 
--   Research Lab (Level 1) on planet
--   Prerequisites completed (previous research)
--   Sufficient resources (Tellerium + Krypton)
+### Calculating Research Time & Cost
 
-**Research Effects**:
+- **Total resource cost** = `cost_tellerium + cost_krypton`.
+- **Tick duration** = `build_time_ticks`. Research advances at the end of each global tick.
+- **Real-time duration** = `build_time_ticks × (game.tick_interval ÷ 3600)` hours. With the default `TICK_INTERVAL_MINUTES = 30`, each tick equals 0.5 hours.
+- Research completion is deterministic and shared across all players (no RNG).
 
--   Unlock new facilities, ships, defences
--   Production multipliers
--   Visibility unlocks
--   Special abilities
+### Effect Stacking Rules
 
-### Research Tree
+`ResearchEffectService` categorises effects:
 
-**Era 1: Foundation** (Days 1-7):
+- **Multipliers** (`*_mul`, `per_tick_prod_mul`, `travel_ticks_mul`, `upkeep_reduction`, `build_time_mul`, `repair_rate_mul`) multiply existing values.
+- **Additives** (`ship_armor`, `ship_attack`, `fleet_attack_bonus`, `shield_strength`, `detection_range`, `colony_cap`) add flat bonuses.
+- **Boolean / Unlocks** (`invasion_enabled`, `warp_enabled`, etc.) flip features on when research completes.
 
--   Military Doctrine (unlocks Basic Shipyard)
--   Basic Combat (unlocks Assault Fighter)
--   Colony Management (enables colonization)
+Multipliers combine multiplicatively; additive bonuses sum.
 
-**Era 2: Expansion** (Days 8-20):
+### Tech Tree Reference
 
--   Advanced Shipyard (unlocks Corvettes)
--   Advanced Combat (unlocks Strike Corvettes)
--   Sensor Technology (unlocks current region visibility)
+> Real-time durations assume the default 30-minute tick. Adjust proportionally if the server’s tick interval changes.
 
-**Era 3: Consolidation** (Days 21-35):
+#### Era 1: Foundation (Starting Knowledge)
 
--   Capital Shipyard (unlocks Cruisers)
--   Fleet Tactics (unlocks Carriers)
--   Deep Space Scanning (unlocks adjacent regions)
+Recovered Consortium basics (colony logistics, rudimentary combat, Research Lab operations) are unlocked by default; no projects need completion in this era.
 
-**Era 4: Domination** (Days 36-50):
+#### Era 2: Expansion (Days 8-20)
 
--   Quantum Research (unlocks Quantum facilities)
--   Galactic Mapping (unlocks spiral arm visibility)
--   Advanced Defences (unlocks Quantum defences)
+| Research                    | Cost (T/K)    | Ticks | Real Time\* | Prerequisites          | Effects / Unlocks                                         |
+| --------------------------- | ------------- | ----- | ----------- | ---------------------- | --------------------------------------------------------- |
+| Military Doctrine           | 5,000 / 5,000 | 5     | 2.5 h       | Facility: Research Lab | +5% ship attack; unlocks Basic Shipyard & military branch |
+| Resource Optimization       | 4,000 / 6,000 | 4     | 2 h         | Facility: Research Lab | ×1.10 Tellerium per tick (multiplicative)                 |
+| Sensor Technology           | 6,000 / 5,000 | 5     | 2.5 h       | Facility: Research Lab | +1 detection range; reveals current region                |
+| Energy Distribution Systems | 7,000 / 6,000 | 6     | 3 h         | Facility: Research Lab | −5% facility upkeep (multiplicative)                      |
+| Colony Management           | 8,000 / 7,000 | 6     | 3 h         | Facility: Research Lab | +1 colony capacity; required for colonisation             |
+| Basic Combat Systems        | 2,000 / 3,000 | 5     | 2.5 h       | Facility: Research Lab | +3% ship attack; prerequisite for Advanced Combat         |
+| Propulsion Technology       | 3,000 / 2,000 | 4     | 2 h         | Facility: Research Lab | ×0.90 travel time                                         |
+| Armor Technology            | 2,500 / 3,500 | 6     | 3 h         | Facility: Research Lab | +2 ship armour (flat)                                     |
 
-**Era 5: Mastery** (Days 51+):
+#### Era 3: Consolidation (Days 21-35)
 
--   Singularity Research (unlocks Dark Matter)
--   Quantum Sensors (reveals hidden systems)
--   Relic Technology (unlocks Relic facilities)
+| Research                   | Cost (T/K)      | Ticks | Real Time\* | Prerequisites                                                        | Effects / Unlocks                                       |
+| -------------------------- | --------------- | ----- | ----------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
+| Energy Shield Technology   | 15,000 / 12,000 | 8     | 4 h         | Facility: Advanced Research Lab<br>Research: Basic Combat Systems    | +50 shield strength; unlocks Planetary Shield Generator |
+| Fleet Coordination Tactics | 12,000 / 15,000 | 7     | 3.5 h       | Research: Military Doctrine & Advanced Combat Systems                | +8% fleet attack bonus                                  |
+| Deep Space Scanning        | 10,000 / 12,000 | 6     | 3 h         | Research: Sensor Technology                                          | +2% anomaly discovery; reveals distant systems          |
+| Industrial Automation      | 18,000 / 16,000 | 9     | 4.5 h       | Facility: Advanced Research Lab<br>Research: Resource Optimization   | ×1.20 global per-tick production                        |
+| Advanced Materials Science | 20,000 / 18,000 | 10    | 5 h         | Facility: Advanced Research Lab<br>Research: Armor Technology        | +10 ship armour; prerequisite for Guardian Frigate tier |
+| Advanced Combat Systems    | 10,000 / 15,000 | 12    | 6 h         | Facility: Advanced Research Lab<br>Research: Basic Combat Systems    | +12% ship attack; unlocks advanced weaponry             |
+| Planetary Assault          | 15,000 / 20,000 | 14    | 7 h         | Facility: Advanced Research Lab<br>Research: Advanced Combat Systems | Enables invasion gameplay & Conquest vessels            |
 
-### Research Bonuses
+#### Era 4: Ascension (Days 36-50)
 
-**Production Bonuses**:
+| Research                   | Cost (T/K)      | Ticks | Real Time\* | Prerequisites                                                      | Effects / Unlocks                                                  |
+| -------------------------- | --------------- | ----- | ----------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Nanotechnology             | 40,000 / 35,000 | 15    | 7.5 h       | Research: Industrial Automation & Advanced Materials               | ×1.5 repair rate, ×0.80 build time; unlocks Nano-Fabrication Plant |
+| Quantum Physics            | 45,000 / 50,000 | 16    | 8 h         | Facility: Quantum Research Laboratory                              | Opens Graviton Manipulation & relic-tier science                   |
+| Graviton Manipulation      | 50,000 / 45,000 | 17    | 8.5 h       | Research: Warp Technology & Quantum Physics                        | Enables warp-level propulsion (`warp_enabled`)                     |
+| Neural Network Integration | 35,000 / 40,000 | 14    | 7 h         | Facility: Quantum Processing Core                                  | +10% command bonus; prerequisite for Command Nexus                 |
+| Warp Technology            | 15,000 / 20,000 | 15    | 7.5 h       | Facility: Advanced Research Lab<br>Research: Propulsion Technology | ×0.75 travel time; required for warp gates & capital ships         |
+| Quantum Armor              | 20,000 / 25,000 | 18    | 9 h         | Facility: Advanced Research Lab<br>Research: Armor Technology      | +25 ship armour; unlocks Fortress/Titan hulls                      |
 
--   Resource Optimization: +10% Tellerium
--   Industrial Automation: +20% global production
--   Advanced Extraction: +15% Krypton
+#### Era 5: Supremacy (Days 51+)
 
-**Combat Bonuses**:
+| Research                | Cost (T/K)        | Ticks | Real Time\* | Prerequisites                                                            | Effects / Unlocks                                   |
+| ----------------------- | ----------------- | ----- | ----------- | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| Dimensional Engineering | 100,000 / 90,000  | 25    | 12.5 h      | Research: Graviton Manipulation & Quantum Physics                        | Unlocks void-tier structures and fortress evolution |
+| Consciousness Transfer  | 120,000 / 110,000 | 28    | 14 h        | Research: Neural Networks & Quantum Physics                              | Enables ship-mind integration & transhuman missions |
+| Dark Matter Harvesting  | 150,000 / 130,000 | 30    | 15 h        | Facility: Singularity Reactor Core<br>Research: Graviton Manipulation    | Generates +5 Dark Matter per tick; opens DM economy |
+| Carrier Technology      | 30,000 / 40,000   | 20    | 10 h        | Facility: Orbital Shipyard<br>Research: Advanced Combat Systems          | Unlocks high-tier carrier variants                  |
+| Fortress Technology     | 75,000 / 100,000  | 30    | 15 h        | Facility: Fortress Shipyard<br>Research: Quantum Armor & Warp Technology | Unlocks Fortress-class constructs                   |
 
--   Advanced Targeting: +5% accuracy
--   Improved Shields: +10% armour
--   Fleet Coordination: +5% damage
-
-**Visibility Bonuses**:
-
--   Sensor Technology: Unlocks current region
--   Deep Space Scanning: Unlocks adjacent regions
--   Galactic Mapping: Unlocks spiral arm
--   Quantum Sensors: Reveals hidden systems
+\*Real time assumes 30-minute ticks; adjust based on server configuration.
 
 ### Research Strategy
 
-**Early Game**:
-
-1. Military Doctrine → Basic Shipyard
-2. Basic Combat → Assault Fighter
-3. Colony Management → Colonization
-
-**Mid Game**:
-
-1. Advanced Shipyard → Corvettes
-2. Sensor Technology → Region visibility
-3. Resource Optimization → Production boost
-
-**Late Game**:
-
-1. Quantum Research → Advanced facilities
-2. Galactic Mapping → Full visibility
-3. Relic Technology → Dark Matter
+- **Early Era (Expansion)**: Military Doctrine, Basic Combat, and Propulsion Technology for defence/scouting, followed by Colony Management and Resource Optimization for growth.
+- **Mid Era (Consolidation)**: Combine Industrial Automation with Advanced Materials for economic and defensive spikes; choose Fleet Coordination for military focus or Deep Space Scanning for exploration.
+- **Late Era (Ascension & Supremacy)**: Use Nanotechnology and Warp Technology to accelerate production and movement, then branch into quantum/graviton paths for capital ships, dark matter infrastructure, or relic tech specialisations.
 
 ---
 
@@ -610,11 +614,11 @@ Facilities can be upgraded:
 
 **Order Types**:
 
--   `attack`: Attack planet (combat on arrival)
--   `defend`: Defend planet (join defence)
--   `station`: Station at planet (no combat)
--   `colonize`: Colonize planet (requires colony ship)
--   `return`: Return to origin (retreat)
+- `attack`: Attack planet (combat on arrival)
+- `defend`: Defend planet (join defence)
+- `station`: Station at planet (no combat)
+- `colonize`: Colonize planet (requires colony ship)
+- `return`: Return to origin (retreat)
 
 ### Travel Time Calculation
 
@@ -628,16 +632,16 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Factors**:
 
--   Distance (Euclidean)
--   Slowest ship in fleet (determines speed)
--   Distance multiplier (caps at 5x)
+- Distance (Euclidean)
+- Slowest ship in fleet (determines speed)
+- Distance multiplier (caps at 5x)
 
 **Example**:
 
--   Fleet: 10 Assault Fighters (Travel: 2 ticks)
--   Distance: 300 units
--   Multiplier: 1 + (300/100) = 4.0
--   Travel Time: 2 × 4.0 = 8 ticks
+- Fleet: 10 Assault Fighters (Travel: 2 ticks)
+- Distance: 300 units
+- Multiplier: 1 + (300/100) = 4.0
+- Travel Time: 2 × 4.0 = 8 ticks
 
 ### Fleet Status
 
@@ -659,18 +663,18 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Speed**:
 
--   Use fast ships for quick responses (Scout Fighters)
--   Slow ships for long-range attacks (Battle Cruisers)
+- Use fast ships for quick responses (Scout Fighters)
+- Slow ships for long-range attacks (Battle Cruisers)
 
 **Composition**:
 
--   Balanced fleets for versatility
--   Specialized fleets for specific roles
+- Balanced fleets for versatility
+- Specialized fleets for specific roles
 
 **Timing**:
 
--   Coordinate arrivals with allies
--   Time attacks with tick processing
+- Coordinate arrivals with allies
+- Time attacks with tick processing
 
 ---
 
@@ -680,40 +684,40 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Planet Requirements**:
 
--   Must be `unsettled` state
--   Must be `is_habitable: true`
--   Must be within galaxy boundaries
+- Must be `unsettled` state
+- Must be `is_habitable: true`
+- Must be within galaxy boundaries
 
 **Player Requirements**:
 
--   Must have `colony_management` research
--   Must have at least one planet (homeworld)
--   Must have discovered planet OR within 2 regions distance
+- Must have `colony_management` research
+- Must have at least one planet (homeworld)
+- Must have discovered planet OR within 2 regions distance
 
 **Fleet Requirements**:
 
--   Fleet must contain at least one Colony Ship
--   Fleet order type: `colonize`
+- Fleet must contain at least one Colony Ship
+- Fleet order type: `colonize`
 
 ### Discovery Methods
 
 **1. Signal Scanning**:
 
--   Discovery Signal: 1,000 Krypton, 70% success
--   System Signal: 500 Krypton, 15% success
--   On success: All planets in system marked as discovered
+- Discovery Signal: 1,000 Krypton, 70% success
+- System Signal: 500 Krypton, 15% success
+- On success: All planets in system marked as discovered
 
 **2. Manual Exploration**:
 
--   Endpoint: `/planets/discover/{region}/{system}`
--   Cost: 1,000 Krypton
--   Effect: Discovers all planets in system + unlocks system visibility
+- Endpoint: `/planets/discover/{region}/{system}`
+- Cost: 1,000 Krypton
+- Effect: Discovers all planets in system + unlocks system visibility
 
 **3. Proximity Discovery**:
 
--   Automatic discovery within ~2,100 units (2 regions)
--   No signal required
--   Based on X/Y distance from owned planets
+- Automatic discovery within ~2,100 units (2 regions)
+- No signal required
+- Based on X/Y distance from owned planets
 
 ### Colonization Process
 
@@ -723,40 +727,47 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 4. **Fleet Travels**: Fleet moves to destination
 5. **Arrival**: Colonization completes automatically
 6. **Planet Claimed**: Ownership transfers, state changes to `colony`
+7. **Reserve Extraction**: Secondary reserve assigned; automated extraction begins next tick
 
 ### Colonization Strategy
 
 **Early Game**:
 
--   Colonize nearby planets (within 2 regions)
--   Focus on habitable planets (Terran, Temperate)
--   Build infrastructure on colonies
+- Colonize nearby planets (within 2 regions)
+- Focus on habitable planets (Terran, Temperate)
+- Build infrastructure on colonies
+- Check the planet's secondary reserve (hover in Holopad) and secure at least one source of each common material
 
 **Mid Game**:
 
--   Expand to adjacent regions
--   Use discovery signals for distant systems
--   Strategic colonization (resource-rich areas)
+- Expand to adjacent regions
+- Use discovery signals for distant systems
+- Strategic colonization (resource-rich areas)
+- Target planet types that unlock rare reserves (Ice for Cryo Crystals, Volcanic for Magma Alloys, Toxic for Volatile Isotopes)
 
 **Late Game**:
 
--   Control key systems
--   Deny enemies strategic positions
--   Maximize planet value
+- Control key systems
+- Deny enemies strategic positions
+- Maximize planet value
+- Secure exotic sources (Gas Giants for Ionized Helium, Quantum/Crystalline worlds for Phase Matter) before rivals
 
 ### Planet Selection
 
 **Best Planet Types**:
 
--   Terran (ideal conditions)
--   Temperate (balanced)
--   Oceanic (resource-rich)
+- Terran/Temperate (balanced + Bio-Lattice fallback)
+- Oceanic/Swamp (Hydro Pods & Xenoflora Spores)
+- Volcanic/Molten (Magma Alloys)
+- Ice/Tundra (Cryo Crystals)
+- Gas Giant/Ringed (Ionized Helium)
+- Quantum/Crystalline (Phase Matter jackpot)
 
 **Strategic Positions**:
 
--   Near homeworld (defence)
--   Resource-rich systems
--   Chokepoints (system control)
+- Near homeworld (defence)
+- Resource-rich systems
+- Chokepoints (system control)
 
 ---
 
@@ -782,19 +793,19 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **New Players**:
 
--   Small square area around homeworld visible
--   Approximately 15-25 systems visible
--   Creates noticeable visible area on map
+- Small square area around homeworld visible
+- Approximately 15-25 systems visible
+- Creates noticeable visible area on map
 
 **Visibility Expansion**:
 
--   Research unlocks regions
--   Signal scanning discovers systems
--   Exploration reveals planets
+- Research unlocks regions
+- Signal scanning discovers systems
+- Exploration reveals planets
 
 ### Research Unlocks
 
-**Sensor Technology**: Unlocks current region (all systems visible)
+**Sensor Technology**: Unlocks current region (all systems visible and shown on galaxy map)
 
 **Deep Space Scanning**: Unlocks adjacent regions (±1 region)
 
@@ -806,35 +817,35 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Discovery Signal**:
 
--   Cost: 1,000 Krypton
--   Success: 70%
--   Effect: Discovers all planets in system + unlocks system visibility
+- Cost: 1,000 Krypton
+- Success: 70%
+- Effect: Discovers all planets in system + unlocks system visibility
 
 **System Signal**:
 
--   Cost: 500 Krypton
--   Success: 15%
--   Effect: Discovers all planets in system
+- Cost: 500 Krypton
+- Success: 15%
+- Effect: Discovers all planets in system
 
 ### Visibility Strategy
 
 **Early Game**:
 
--   Use initial visibility for first colonization
--   Research Sensor Technology for region visibility
--   Signal scan key systems for expansion
+- Use initial visibility for first colonization
+- Research Sensor Technology for region visibility
+- Signal scan key systems for expansion
 
 **Mid Game**:
 
--   Research Deep Space Scanning for adjacent regions
--   Strategic signal scanning for target systems
--   Plan expansion based on visibility
+- Research Deep Space Scanning for adjacent regions
+- Strategic signal scanning for target systems
+- Plan expansion based on visibility
 
 **Late Game**:
 
--   Research Galactic Mapping for full visibility
--   Quantum Sensors for hidden system discovery
--   Complete map awareness
+- Research Galactic Mapping for full visibility
+- Quantum Sensors for hidden system discovery
+- Complete map awareness
 
 ---
 
@@ -846,18 +857,18 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Benefits**:
 
--   Shared defence (alliance members can defend each other)
--   Coordinated attacks (timed fleet arrivals)
--   Alliance funds (resource pooling)
--   Alliance chat (private communication)
--   Alliance homepage (shared information)
+- Shared defence (alliance members can defend each other)
+- Coordinated attacks (timed fleet arrivals)
+- Alliance funds (resource pooling)
+- Alliance chat (private communication)
+- Alliance homepage (shared information)
 
 ### Alliance Creation
 
 **Requirements**:
 
--   Must not be in an alliance
--   Must have sufficient resources (varies by server)
+- Must not be in an alliance
+- Must have sufficient resources (varies by server)
 
 **Process**:
 
@@ -868,10 +879,11 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 ### Alliance Membership
 
-**Roles**:
+**Default Roles**:
 
--   **Leader**: Full control (manage members, funds, settings)
--   **Member**: Standard access (chat, fund access, defence)
+- **Leader**: Full control (manage members, funds, settings)
+- **Member**: Standard access (chat, fund access, defence)
+- leader can create and assign alliance roles
 
 **Join Process**:
 
@@ -886,51 +898,51 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Operations**:
 
--   **Donate**: Contribute resources to fund
--   **Withdraw**: Withdraw resources (requires permission)
--   **Transfer**: Transfer between alliance planets
+- **Donate**: Contribute resources to fund
+- **Withdraw**: Withdraw resources (requires permission)
+- **Transfer**: Transfer between alliance planets
 
 **Uses**:
 
--   Large purchases (facilities, ships)
--   Emergency defence funding
--   Coordinated expansion
+- Large purchases (facilities, ships)
+- Emergency defence funding
+- Coordinated expansion
 
 ### Alliance Chat
 
 **Features**:
 
--   Private channel (alliance members only)
--   Real-time messaging
--   Message history
--   Typing indicators
+- Private channel (alliance members only)
+- Real-time messaging
+- Message history
+- Typing indicators
 
 **Uses**:
 
--   Strategy coordination
--   Attack planning
--   Defence coordination
--   Social interaction
+- Strategy coordination
+- Attack planning
+- Defence coordination
+- Social interaction
 
 ### Alliance Strategy
 
 **Defence**:
 
--   Coordinate fleet movements
--   Share intelligence
--   Pool resources for defences
+- Coordinate fleet movements
+- Share intelligence
+- Pool resources for defences
 
 **Offence**:
 
--   Coordinated attacks
--   Timed fleet arrivals
--   Target selection
+- Coordinated attacks
+- Timed fleet arrivals
+- Target selection
 
 **Expansion**:
 
--   Colonization coordination
--   Territory planning
--   Resource sharing
+- Colonization coordination
+- Territory planning
+- Resource sharing
 
 ---
 
@@ -942,77 +954,87 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Generation**:
 
--   2% chance per tick
--   Max 10 active incidents
--   Min 200 units between incidents
+- 2% chance per tick
+- Max 10 active incidents
+- Min 200 units between incidents
 
 ### Incident Types
 
 **1. Wormhole** (8 ticks):
 
--   **Effect**: Teleportation to distant regions
--   **Radius**: 50 units
--   **Success Chance**: 70%
--   **Max Uses**: 10
--   **Strategy**: Use for rapid expansion or escape
+- **Effect**: Teleportation to distant regions
+- **Radius**: 50 units
+- **Success Chance**: 70%
+- **Max Uses**: 10
+- **Strategy**: Use for rapid expansion or escape
 
 **2. Asteroid Storm** (10 ticks):
 
--   **Effect**: Planet damage (10 damage/tick)
--   **Radius**: 100 units
--   **Affected**: Barren, Rocky planets
--   **Strategy**: Avoid or defend affected planets
+- **Effect**: Planet damage (10 damage/tick)
+- **Radius**: 100 units
+- **Affected**: Barren, Rocky planets
+- **Strategy**: Avoid or defend affected planets
 
 **3. Resource Rush** (15 ticks):
 
--   **Effect**: Production bonus (1.5x multiplier)
--   **Radius**: 150 units
--   **Resource**: Both Tellerium and Krypton
--   **Strategy**: Maximize production during rush
+- **Effect**: Production bonus (1.5x multiplier)
+- **Radius**: 150 units
+- **Resource**: Both Tellerium and Krypton
+- **Strategy**: Maximize production during rush
 
 **4. Pirate Raid** (12 ticks):
 
--   **Effect**: NPC attacks on nearby planets
--   **Radius**: 75 units
--   **Fleet Strength**: 100
--   **Strategy**: Defend or counter-attack
+- **Effect**: NPC attacks on nearby planets
+- **Radius**: 75 units
+- **Fleet Strength**: 100
+- **Strategy**: Defend or counter-attack
 
 **5. Anomaly** (Permanent):
 
--   **Effect**: Research bonus (+20%) and discovery chance (30%)
--   **Radius**: 30 units
--   **Strategy**: Investigate for bonuses
+- **Effect**: Research bonus (+20%) and discovery chance (30%)
+- **Radius**: 30 units
+- **Strategy**: Investigate for bonuses
+
+**6. Alien Invasion** (Phased, region-wide or galactic):
+
+- **Effect**: Dedicated NPC empire launches escalating waves into multiple regions
+- **Scope**: Starts as regional incursion; can escalate to galaxy-wide if population is high
+- **Phases**: Incursion → Occupation → Onslaught (each raises intensity and fleet size)
+- **Waves**: Spawns attack fleets at regular intervals targeting high-value player planets in impacted regions
+- **Visibility**: Impacted regions are revealed to all active empires to coordinate defence
+- **Rewards**: Participation grants bonus loot multipliers and a chance at rare artifacts; defence success reduces empire loss risk
+- **Strategy**: Rally with allies, intercept waves before they reach planets, and push to resolve the invasion before it escalates
 
 ### Incident Interaction
 
 **Requirements**:
 
--   Must have planet within incident radius
--   Must have discovered planet in system (for wormhole/anomaly)
+- Must have planet within incident radius
+- Must have discovered planet in system (for wormhole/anomaly)
 
 **Interactions**:
 
--   **enter_wormhole**: Teleport to distant region
--   **attack_pirates**: Engage pirate raid
--   **investigate_anomaly**: Gain research bonus/discoveries
--   **collect_resources**: Collect from resource rush
+- **enter_wormhole**: Teleport to distant region
+- **attack_pirates**: Engage pirate raid
+- **investigate_anomaly**: Gain research bonus/discoveries
+- **collect_resources**: Collect from resource rush
 
 ### Incident Strategy
 
 **Early Game**:
 
--   Avoid dangerous incidents (asteroid storms, pirate raids)
--   Use resource rushes for production boost
+- Avoid dangerous incidents (asteroid storms, pirate raids)
+- Use resource rushes for production boost
 
 **Mid Game**:
 
--   Use wormholes for expansion
--   Investigate anomalies for research bonuses
+- Use wormholes for expansion
+- Investigate anomalies for research bonuses
 
 **Late Game**:
 
--   Coordinate incident usage with allies
--   Maximize resource rush benefits
+- Coordinate incident usage with allies
+- Maximize resource rush benefits
 
 ---
 
@@ -1030,71 +1052,71 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Basic NPCs**:
 
--   Balanced approach
--   General exploration
--   Moderate aggression
+- Balanced approach
+- General exploration
+- Moderate aggression
 
 **Boss NPCs**:
 
--   Powerful defensive empires
--   Vast resources
--   High-level facilities
+- Powerful defensive empires
+- Vast resources
+- High-level facilities
 
 **Pirates**:
 
--   Aggressive raiding
--   Frequent attacks
--   Hit-and-run tactics
+- Aggressive raiding
+- Frequent attacks
+- Hit-and-run tactics
 
 **Marauders**:
 
--   Highly aggressive
--   Specialize in attacks
--   Fast expansion
+- Highly aggressive
+- Specialize in attacks
+- Fast expansion
 
 **Trading Guilds**:
 
--   Friendly empires
--   Economic focus
--   Rarely attack
+- Friendly empires
+- Economic focus
+- Rarely attack
 
 **Isolationists**:
 
--   Defensive focus
--   Avoid conflict
--   Protection priority
+- Defensive focus
+- Avoid conflict
+- Protection priority
 
 **Expansionists**:
 
--   Aggressive colonizers
--   Constant expansion
--   Territory-focused
+- Aggressive colonizers
+- Constant expansion
+- Territory-focused
 
 **Scavengers**:
 
--   Raid inactive players
--   Target abandoned planets
--   Opportunistic
+- Raid inactive players
+- Target abandoned planets
+- Opportunistic
 
 ### NPC Strategy
 
 **Early Game**:
 
--   Avoid powerful NPCs
--   Focus on weak targets
--   Build defences
+- Avoid powerful NPCs
+- Focus on weak targets
+- Build defences
 
 **Mid Game**:
 
--   Engage moderate NPCs
--   Coordinate attacks with allies
--   Capture NPC planets
+- Engage moderate NPCs
+- Coordinate attacks with allies
+- Capture NPC planets
 
 **Late Game**:
 
--   Challenge boss NPCs
--   Control NPC territories
--   Eliminate threats
+- Challenge boss NPCs
+- Control NPC territories
+- Eliminate threats
 
 ---
 
@@ -1102,24 +1124,40 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 ### Market Overview
 
-**Purpose**: Trade resources between players (if enabled)
+**Purpose**:
 
-**Pricing**: Dynamic supply/demand
+- **Galactic Market**: Trade against NPC-simulated supply/demand
+- **Free Market Deals**: Negotiate direct swaps with other empires
+- **Secondary Materials Exchange**: Move biome-specific resources (Bio-Lattice, Cryo Crystals, Phase Matter, etc.) between empires for crafting and tech
 
-**Base Price**: 1.0 for both Tellerium and Krypton
+**Pricing**:
+
+- Galactic market pricing follows dynamic supply/demand across primary and secondary resources
+- Free market deal pricing is entirely player-defined
+
+**Base Price**:
+
+- Tellerium/Krypton start at 1.0 (NPC reference price)
+- Secondary resources use the configurable `base_value` from `secondary_resources.php`
+
+**Monitoring Tools**:
+
+- `GET /market/prices`: Snapshot of all tradable resources (UI recommendation: split into “Primary” and “Materials” groups for clarity).
+- `GET /market/statistics`: Supply/demand ratio, trade volume, active order counts for dashboards.
+- `GET /market/prices/history`: Historical price data (ticks parameter controls depth, ideal for charts).
 
 ### Market Orders
 
 **Order Types**:
 
--   **Buy**: Purchase resources (set price limit)
--   **Sell**: Sell resources (set price limit)
+- **Buy**: Purchase resources (set price limit)
+- **Sell**: Sell resources (set price limit)
 
 **Order Parameters**:
 
--   Resource type (Tellerium or Krypton)
--   Quantity (min: 1,000, max: 100,000,000)
--   Price limit (optional)
+- Resource type (any primary or secondary slug that your empire has unlocked)
+- Quantity (min: 1,000, max: 100,000,000)
+- Price limit (optional)
 
 **Order Expiry**: 50 ticks (configurable)
 
@@ -1127,31 +1165,59 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Algorithm**:
 
--   Matches buy/sell orders
--   Price within limits
--   First-come-first-served
+- Matches buy/sell orders
+- Price within limits
+- First-come-first-served
 
 **Fees**: None (server-dependent)
+
+### Free Market Deals
+
+**Flow**:
+
+- Create an offer: choose source/receive planets and lock offered resources immediately
+- Offers list publicly and can be filtered by other empires
+- Another empire accepts: both sides pick delivery planets and resources transfer instantly
+- Creator can cancel before acceptance; expired offers automatically refund locked goods
+
+**Limits**:
+
+- Tellerium, Krypton, and any secondary resource in your empire ledger
+- Maximum 10 open offers per empire
+- Expiry duration 1-72 hours (24h default)
+- AI empires cannot create or accept free-market deals
+
+**Client Guidance**:
+
+- Show current ledger balance along with input fields to prevent overselling.
+- Display locked quantities and remaining time for each open deal.
+
+**Tips**:
+
+- Lock resources from a logistics planet so production worlds keep buffers
+- Include clear notes (via diplomacy/chat) to coordinate larger trades
+- Set reasonable expiries; shorter timers reduce the risk of price swings
 
 ### Market Strategy
 
 **Selling**:
 
--   Sell excess resources
--   Price above base for profit
--   Time sales with demand
+- Sell excess resources
+- Price above base for profit
+- Time sales with demand
 
 **Buying**:
 
--   Purchase needed resources
--   Price below base for savings
--   Bulk purchases for discounts
+- Purchase needed resources
+- Price below base for savings
+- Bulk purchases for discounts
 
 **Market Timing**:
 
--   Monitor price trends
--   Buy low, sell high
--   Coordinate with allies
+- Monitor price trends
+- Buy low, sell high
+- Coordinate with allies
+- Use free-market deals for custom rates, then hedge against galactic prices if needed
 
 ---
 
@@ -1163,30 +1229,33 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Earning**:
 
--   Daily login: 1-2 QC per day (streak bonus after 7 days)
--   Achievements: 5-100 QC per achievement
--   Future: Real money purchases
+- Daily login: 1-2 QC per day (streak bonus after 7 days)
+- Achievements: 5-100 QC per achievement
+- Future: Real money purchases
 
 **Uses**:
 
--   Purchase boosters (temporary bonuses)
--   Future: Cosmetic items, convenience features
+- Purchase boosters (temporary bonuses)
+- Future: Cosmetic items, convenience features
+- Unlock Secondary Resource Vault upgrades (increases ledger capacity by +25%)
+- Buy Secondary Extraction Booster charges for short bursts of extra yield
 
 ### Boosters
 
 **Types**:
 
--   **Production Booster**: +25% production for 24 hours
--   **Research Booster**: +25% research speed for 24 hours
--   **Construction Booster**: +25% construction speed for 24 hours
+- **Production Booster**: +25% production for 24 hours
+- **Research Booster**: +25% research speed for 24 hours
+- **Construction Booster**: +25% construction speed for 24 hours
+- **Secondary Extraction Booster**: +35% secondary resource yield for 24 hours
 
 **Cost**: Varies by duration (24h, 48h, 72h)
 
 **Strategy**:
 
--   Use during critical periods (expansion, research)
--   Stack with research bonuses
--   Coordinate with allies
+- Use during critical periods (expansion, research)
+- Stack with research bonuses
+- Coordinate with allies
 
 ### Achievements
 
@@ -1194,10 +1263,10 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Types**:
 
--   **Milestone**: Reach specific goals (planets, ships, score)
--   **Combat**: Win battles, capture planets
--   **Exploration**: Discover systems, regions
--   **Social**: Join alliances, send messages
+- **Milestone**: Reach specific goals (planets, ships, score)
+- **Combat**: Win battles, capture planets
+- **Exploration**: Discover systems, regions
+- **Social**: Join alliances, send messages
 
 **Rewards**: 5-100 Quantum Credits per achievement
 
@@ -1216,16 +1285,16 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Priorities**:
 
--   Resource production (mines/probes)
--   Research (Military Doctrine, Basic Combat, Colony Management)
--   Fleet building (Scout Fighters, Assault Fighters)
--   Colonization (nearby planets)
+- Resource production (mines/probes)
+- Research (Military Doctrine, Basic Combat, Colony Management)
+- Fleet building (Scout Fighters, Assault Fighters)
+- Colonization (nearby planets)
 
 **Avoid**:
 
--   Large fleet battles (too expensive)
--   Distant colonization (too slow)
--   Advanced research (prerequisites not met)
+- Large fleet battles (too expensive)
+- Distant colonization (too slow)
+- Advanced research (prerequisites not met)
 
 ### Mid Game (Days 8-35)
 
@@ -1238,16 +1307,16 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Priorities**:
 
--   Advanced shipyard (Corvettes, Frigates)
--   Sensor Technology (region visibility)
--   Resource Optimization (production boost)
--   Alliance formation
+- Advanced shipyard (Corvettes, Frigates)
+- Sensor Technology (region visibility)
+- Resource Optimization (production boost)
+- Alliance formation
 
 **Expansion**:
 
--   Colonize adjacent regions
--   Use discovery signals for distant systems
--   Strategic planet selection
+- Colonize adjacent regions
+- Use discovery signals for distant systems
+- Strategic planet selection
 
 ### Late Game (Days 36+)
 
@@ -1260,16 +1329,16 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Priorities**:
 
--   Quantum Research (advanced facilities)
--   Galactic Mapping (full visibility)
--   Capital Shipyard (Cruisers, Carriers)
--   Dark Matter production
+- Quantum Research (advanced facilities)
+- Galactic Mapping (full visibility)
+- Capital Shipyard (Cruisers, Carriers)
+- Dark Matter production
 
 **Domination**:
 
--   Control key systems
--   Eliminate threats
--   Alliance coordination
+- Control key systems
+- Eliminate threats
+- Alliance coordination
 
 ---
 
@@ -1279,107 +1348,107 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Balanced Fleet**:
 
--   Mix of ship classes
--   Versatile for all situations
--   Example: 20 Fighters + 10 Corvettes + 5 Frigates
+- Mix of ship classes
+- Versatile for all situations
+- Example: 20 Fighters + 10 Corvettes + 5 Frigates
 
 **Strike Fleet**:
 
--   High-damage ships
--   Fast travel time
--   Example: 30 Strike Corvettes + 10 Strike Frigates
+- High-damage ships
+- Fast travel time
+- Example: 30 Strike Corvettes + 10 Strike Frigates
 
 **Carrier Fleet**:
 
--   Carriers with fighter deployments
--   Overwhelming numbers
--   Example: 5 Carriers (deploy 50 fighters each)
+- Carriers with fighter deployments
+- Overwhelming numbers
+- Example: 5 Carriers (deploy 50 fighters each)
 
 **Defence Fleet**:
 
--   Defensive ships
--   High armour
--   Example: 20 Patrol Corvettes + 10 Defence Frigates
+- Defensive ships
+- High armour
+- Example: 20 Patrol Corvettes + 10 Defence Frigates
 
 ### Combat Tactics
 
 **Initiative Stacking**:
 
--   Use ships with low initiative (fire first)
--   Eliminate enemies before they fire
--   Example: Scout Fighters (Init 20) fire before Assault Fighters (Init 18)
+- Use ships with low initiative (fire first)
+- Eliminate enemies before they fire
+- Example: Scout Fighters (Init 20) fire before Assault Fighters (Init 18)
 
 **Target Priority**:
 
--   Focus fire on high-value targets
--   Eliminate threats first
--   Example: Target Carriers before Fighters
+- Focus fire on high-value targets
+- Eliminate threats first
+- Example: Target Carriers before Fighters
 
 **Special Abilities**:
 
--   Use ion disable to prevent enemy firing
--   Use mines for instant kills
--   Use stingers for ship capture
+- Use ion disable to prevent enemy firing
+- Use mines for instant kills
+- Use stingers for ship capture
 
 ### Resource Management
 
 **Production Optimization**:
 
--   Maximize mines/probes early
--   Build production facilities mid-game
--   Upgrade facilities for bonuses
+- Maximize mines/probes early
+- Build production facilities mid-game
+- Upgrade facilities for bonuses
 
 **Resource Allocation**:
 
--   Balance Tellerium and Krypton
--   Transfer resources between planets
--   Plan large purchases in advance
+- Balance Tellerium and Krypton
+- Transfer resources between planets
+- Plan large purchases in advance
 
 **Upkeep Management**:
 
--   Ensure production exceeds upkeep
--   Shut down unused facilities
--   Upgrade facilities for efficiency
+- Ensure production exceeds upkeep
+- Shut down unused facilities
+- Upgrade facilities for efficiency
 
 ### Colonization Strategy
 
 **Expansion Patterns**:
 
--   **Linear**: Expand in one direction (easy defence)
--   **Cluster**: Colonize nearby systems (strong defence)
--   **Strategic**: Control key systems (chokepoints)
+- **Linear**: Expand in one direction (easy defence)
+- **Cluster**: Colonize nearby systems (strong defence)
+- **Strategic**: Control key systems (chokepoints)
 
 **Planet Selection**:
 
--   Prioritize habitable planets (Terran, Temperate)
--   Consider strategic positions (chokepoints)
--   Balance resources (production vs defence)
+- Prioritize habitable planets (Terran, Temperate)
+- Consider strategic positions (chokepoints)
+- Balance resources (production vs defence)
 
 **Colonization Timing**:
 
--   Colonize during low activity (fewer attacks)
--   Coordinate with allies (mutual defence)
--   Time with research completion (Colony Management)
+- Colonize during low activity (fewer attacks)
+- Coordinate with allies (mutual defence)
+- Time with research completion (Colony Management)
 
 ### Alliance Coordination
 
 **Defence Coordination**:
 
--   Share intelligence (enemy fleets)
--   Pool resources (alliance funds)
--   Coordinate fleet movements
+- Share intelligence (enemy fleets)
+- Pool resources (alliance funds)
+- Coordinate fleet movements
 
 **Attack Coordination**:
 
--   Timed fleet arrivals (simultaneous attacks)
--   Target selection (weakest first)
--   Resource sharing (fund transfers)
+- Timed fleet arrivals (simultaneous attacks)
+- Target selection (weakest first)
+- Resource sharing (fund transfers)
 
 **Expansion Coordination**:
 
--   Colonization planning (territory division)
--   Resource pooling (alliance funds)
--   Mutual defence (shared protection)
+- Colonization planning (territory division)
+- Resource pooling (alliance funds)
+- Mutual defence (shared protection)
 
 ---
 
@@ -1389,109 +1458,109 @@ travelTicks = ceil(slowestShipTravelTicks × distanceMultiplier)
 
 **Era 2: Fighters**
 
--   Scout Fighter: 5 Armour, 10 Gun Power, Init 20
--   Assault Fighter: 8 Armour, 15 Gun Power, Init 18
--   Defence Drone: 3 Armour, 5 Gun Power, Init 22 (defence only)
+- Scout Fighter: 5 Armour, 10 Gun Power, Init 20
+- Assault Fighter: 8 Armour, 15 Gun Power, Init 18
+- Defence Drone: 3 Armour, 5 Gun Power, Init 22 (defence only)
 
 **Era 3: Corvettes**
 
--   Patrol Corvette: 15 Armour, 25 Gun Power, Init 15
--   Strike Corvette: 12 Armour, 30 Gun Power, Init 16
+- Patrol Corvette: 15 Armour, 25 Gun Power, Init 15
+- Strike Corvette: 12 Armour, 30 Gun Power, Init 16
 
 **Era 3: Frigates**
 
--   Battle Frigate: 30 Armour, 50 Gun Power, Init 12
--   Defence Frigate: 40 Armour, 35 Gun Power, Init 14
+- Battle Frigate: 30 Armour, 50 Gun Power, Init 12
+- Defence Frigate: 40 Armour, 35 Gun Power, Init 14
 
 **Era 4: Cruisers**
 
--   Battle Cruiser: 60 Armour, 100 Gun Power, Init 10
--   Strike Cruiser: 50 Armour, 120 Gun Power, Init 11
+- Battle Cruiser: 60 Armour, 100 Gun Power, Init 10
+- Strike Cruiser: 50 Armour, 120 Gun Power, Init 11
 
 **Era 4: Carriers**
 
--   Carrier: 80 Armour, 60 Gun Power, Init 8 (deploys fighters)
+- Carrier: 80 Armour, 60 Gun Power, Init 8 (deploys fighters)
 
 **Era 5: Motherships**
 
--   Mothership: 150 Armour, 200 Gun Power, Init 5
+- Mothership: 150 Armour, 200 Gun Power, Init 5
 
 **Era 5: Fortresses**
 
--   Fortress: 300 Armour, 250 Gun Power, Init 3 (immobile)
+- Fortress: 300 Armour, 250 Gun Power, Init 3 (immobile)
 
 ### Defence Reference
 
 **Basic Defences**:
 
--   Ion Cannon: 50 Armour, 30 Gun Power, Init 12 (ion disable)
--   Plasma Turret: 40 Armour, 25 Gun Power, Init 14
+- Ion Cannon: 50 Armour, 30 Gun Power, Init 12 (ion disable)
+- Plasma Turret: 40 Armour, 25 Gun Power, Init 14
 
 **Advanced Defences**:
 
--   Quantum Disruptor: 100 Armour, 60 Gun Power, Init 10
--   Particle Beam: 80 Armour, 50 Gun Power, Init 11
+- Quantum Disruptor: 100 Armour, 60 Gun Power, Init 10
+- Particle Beam: 80 Armour, 50 Gun Power, Init 11
 
 **Exotic Defences**:
 
--   Dark Matter Shield: 200 Armour, 100 Gun Power, Init 8 (shielding)
+- Dark Matter Shield: 200 Armour, 100 Gun Power, Init 8 (shielding)
 
 ### Facility Reference
 
 **Production Facilities**:
 
--   Reclaimed Surface Mines: +10 T/tick
--   Atmospheric Probe Nets: +8 K/tick
--   Crude Extractor: +6 T + 6 K/tick
--   Deep-Core Extraction Facility: +35 T + 20 K/tick
--   Molecular Extraction Facility: +100 T/tick
--   Automated Production Complex: +250 T/tick
--   Singularity Reactor Core: +1,000 T + 50 DM/tick
+- Reclaimed Surface Mines: +10 T/tick
+- Atmospheric Probe Nets: +8 K/tick
+- Crude Extractor: +6 T + 6 K/tick
+- Deep-Core Extraction Facility: +35 T + 20 K/tick
+- Molecular Extraction Facility: +100 T/tick
+- Automated Production Complex: +250 T/tick
+- Singularity Reactor Core: +1,000 T + 50 DM/tick
 
 **Military Facilities**:
 
--   Basic Shipyard: Enables Fighters
--   Advanced Shipyard: Enables Corvettes, Frigates
--   Capital Shipyard: Enables Cruisers, Carriers
--   Quantum Shipyard: Enables Motherships, Fortresses
+- Basic Shipyard: Enables Fighters
+- Advanced Shipyard: Enables Corvettes, Frigates
+- Capital Shipyard: Enables Cruisers, Carriers
+- Quantum Shipyard: Enables Motherships, Fortresses
 
 **Research Facilities**:
 
--   Research Lab: Enables research
--   Advanced Research Lab: +25% research speed
--   Quantum Research Facility: +50% research speed
+- Research Lab: Enables research
+- Advanced Research Lab: +25% research speed
+- Quantum Research Facility: +50% research speed
 
 ### Research Reference
 
 **Era 1**:
 
--   Military Doctrine: Unlocks Basic Shipyard
--   Basic Combat: Unlocks Assault Fighter
--   Colony Management: Enables colonization
+- Military Doctrine: Unlocks Basic Shipyard
+- Basic Combat: Unlocks Assault Fighter
+- Colony Management: Enables colonization
 
 **Era 2**:
 
--   Advanced Shipyard: Unlocks Corvettes
--   Sensor Technology: Unlocks current region visibility
--   Resource Optimization: +10% Tellerium production
+- Advanced Shipyard: Unlocks Corvettes
+- Sensor Technology: Unlocks current region visibility
+- Resource Optimization: +10% Tellerium production
 
 **Era 3**:
 
--   Capital Shipyard: Unlocks Cruisers
--   Deep Space Scanning: Unlocks adjacent regions
--   Advanced Combat: Unlocks Strike Corvettes
+- Capital Shipyard: Unlocks Cruisers
+- Deep Space Scanning: Unlocks adjacent regions
+- Advanced Combat: Unlocks Strike Corvettes
 
 **Era 4**:
 
--   Quantum Research: Unlocks Quantum facilities
--   Galactic Mapping: Unlocks spiral arm visibility
--   Advanced Defences: Unlocks Quantum defences
+- Quantum Research: Unlocks Quantum facilities
+- Galactic Mapping: Unlocks spiral arm visibility
+- Advanced Defences: Unlocks Quantum defences
 
 **Era 5**:
 
--   Singularity Research: Unlocks Dark Matter
--   Quantum Sensors: Reveals hidden systems
--   Relic Technology: Unlocks Relic facilities
+- Singularity Research: Unlocks Dark Matter
+- Quantum Sensors: Reveals hidden systems
+- Relic Technology: Unlocks Relic facilities
 
 ---
 

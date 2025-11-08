@@ -4,6 +4,7 @@ import { useContextMenu } from '@/hooks/useContextMenu'
 import { useWindow } from '@/components/common/WindowManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { Planet } from '@/types/api.types'
+import { formatCoordinate, getPlanetXY } from '@/lib/coordinates'
 import { 
   Eye, 
   Ship, 
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { toast } from 'sonner'
 
 interface MapContextMenuProviderProps {
   children: React.ReactNode
@@ -118,7 +120,18 @@ function getPlanetContextMenuItems(
       icon: MapPin,
       onClick: () => {
         navigate(`/map`)
-        // TODO: Center map on planet
+        const xy = getPlanetXY(planet)
+        if (xy) {
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('map:centerOn', {
+                detail: { x: xy.x, y: xy.y, zoom: 0.95 },
+              })
+            )
+          }, 250)
+        } else {
+          toast.warning('We could not determine this planet’s exact position to center the map.')
+        }
       },
     },
     { label: '', icon: undefined, onClick: () => {}, separator: true },
@@ -150,8 +163,17 @@ function getPlanetContextMenuItems(
     label: 'Scan Planet',
     icon: Search,
     onClick: () => {
-      // TODO: Implement scan action
-      console.log('Scan planet:', planet.id)
+      const coordinate = formatCoordinate(planet.coordinate)
+      if (!coordinate || coordinate === 'Invalid coordinate') {
+        toast.error('Unable to prefill scan target for this planet.')
+        return
+      }
+      openPanel(PanelType.SIGNALS, PanelSize.LARGE, {
+        initialTarget: {
+          coordinate,
+          type: 'planetary',
+        },
+      })
     },
   })
 

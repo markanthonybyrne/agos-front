@@ -6,23 +6,21 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCoordinate } from '@/lib/coordinates'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Map } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import { getPlanetImage } from '@/lib/planetImages'
 import { formatResource } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Planet } from '@/types/api.types'
 import { useAuth } from '@/hooks/useAuth'
-import { parseCoordinate } from '@/lib/coordinates'
 import { PlanetTechProgressGauge } from '@/components/planets/PlanetTechProgressGauge'
-import { PlanetDetailPanel } from '@/components/planets/PlanetDetailPanel'
+import { PlanetHexGridView } from '@/components/map/PlanetHexGridView'
 import { Badge } from '@/components/ui/badge'
 import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 
 export function PlanetsList() {
   const navigate = useNavigate()
   const { empire } = useAuth()
-  const [selectedPlanet, setSelectedPlanet] = useState<Planet | null>(null)
-  const [isPanelOpen, setIsPanelOpen] = useState(false)
+  const [hexPlanet, setHexPlanet] = useState<Planet | null>(null)
   const { data, isLoading, error } = useGetPlanetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
@@ -34,6 +32,11 @@ export function PlanetsList() {
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [hasScrolled, setHasScrolled] = useState(false)
+  const [activePlanetIndex, setActivePlanetIndex] = useState(0)
+
+  const PLANET_CARD_WIDTH = 280
+  const PLANET_GAP = 64
+  const SLOT_WIDTH = PLANET_CARD_WIDTH + PLANET_GAP
 
   // Sort planets to put homeworld in the center
   const sortedPlanets = useMemo(() => {
@@ -56,6 +59,15 @@ export function PlanetsList() {
     return [...before, homeworld, ...after]
   }, [planetsRaw, empire?.homeworld_planet_id])
 
+  useEffect(() => {
+    if (sortedPlanets.length === 0) return
+    const homeworldId = empire?.homeworld_planet_id
+    const homeworldIndex = sortedPlanets.findIndex(
+      (p) => p.id === homeworldId || p.state === 'homeworld'
+    )
+    setActivePlanetIndex(homeworldIndex >= 0 ? homeworldIndex : 0)
+  }, [sortedPlanets, empire?.homeworld_planet_id])
+
   // Check if scrolling is needed and update scroll indicators
   useEffect(() => {
     if (isLoading || error) return // Skip if loading or error
@@ -70,6 +82,13 @@ export function PlanetsList() {
       // Check if user can scroll in either direction
       setCanScrollLeft(scrollLeft > 10) // 10px threshold for smooth UX
       setCanScrollRight(scrollLeft < maxScroll - 10)
+
+      if (sortedPlanets.length > 0) {
+        const containerCenter = scrollLeft + container.clientWidth / 2
+        const index = Math.round(containerCenter / SLOT_WIDTH)
+        const clampedIndex = Math.min(sortedPlanets.length - 1, Math.max(0, index))
+        setActivePlanetIndex(clampedIndex)
+      }
       
       // Only show indicators if scrolling is needed
       if (!canScroll) {
@@ -115,15 +134,13 @@ export function PlanetsList() {
     if (homeworldIndex >= 0) {
       // Calculate scroll position to center the homeworld
       const container = scrollContainerRef.current
-      const planetWidth = 280 // width of each planet container
-      const gap = 64 // gap between planets (gap-16 = 4rem = 64px)
-      const planetWithGap = planetWidth + gap
+      const planetWithGap = SLOT_WIDTH
       
       // Calculate the position of the homeworld
       const homeworldPosition = homeworldIndex * planetWithGap
       
       // Center it in the viewport
-      const scrollPosition = homeworldPosition - (container.clientWidth / 2) + (planetWidth / 2)
+      const scrollPosition = homeworldPosition - (container.clientWidth / 2) + (PLANET_CARD_WIDTH / 2)
       
       // Scroll to center
       container.scrollTo({
@@ -190,30 +207,7 @@ export function PlanetsList() {
   }
 
   const handlePlanetClick = (planet: Planet) => {
-    setSelectedPlanet(planet)
-    setIsPanelOpen(true)
-  }
-
-  const handleClosePanel = () => {
-    setIsPanelOpen(false)
-    setSelectedPlanet(null)
-  }
-
-  const handleGalaxyMapClick = () => {
-    // Find homeworld planet
-    const homeworld = sortedPlanets.find(p => p.id === empire?.homeworld_planet_id || p.state === 'homeworld')
-    
-    if (homeworld) {
-      const coord = parseCoordinate(homeworld.coordinate)
-      if (coord) {
-        // Navigate to map with homeworld galaxy coordinates
-        navigate(`/map?quadrant=${coord.quadrant}&sector=${coord.sector}&galaxy=${coord.galaxy}`)
-        return
-      }
-    }
-    
-    // Fallback to default map view
-    navigate('/map')
+    setHexPlanet(planet)
   }
 
   const getPlanetGlowColor = (slug?: string) => {
@@ -233,21 +227,36 @@ export function PlanetsList() {
     }
   }
 
+  const scrollToPlanet = (index: number) => {
+    if (sortedPlanets.length === 0) return
+    const container = scrollContainerRef.current
+    if (!container) return
+    if (!hasScrolled) {
+      setHasScrolled(true)
+    }
+    const clampedIndex = Math.min(sortedPlanets.length - 1, Math.max(0, index))
+    const target =
+      clampedIndex * SLOT_WIDTH - container.clientWidth / 2 + PLANET_CARD_WIDTH / 2
+
+    container.scrollTo({
+      left: Math.max(0, target),
+      behavior: 'smooth',
+    })
+  }
+
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      {/* Top Header Bar */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-4">
-        <div className="panel-glass surface-gradient border-border/20 px-6 py-3 backdrop-blur-md">
-          <h1 className="text-xl font-heading glow-cyan">Planet Command</h1>
-        </div>
-        <Button onClick={handleGalaxyMapClick} variant="outline" size="lg">
-          <Map className="w-5 h-5 mr-2" />
-          Galaxy Map
-        </Button>
-      </div>
-
       {/* Main Content Area - Horizontal Planet Display */}
-      <div className="absolute inset-0 flex items-center justify-center pt-20 pb-20">
+      <div className="absolute inset-0 flex items-center justify-center pt-12 pb-20">
+        {!hasScrolled && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 panel-glass surface-gradient border border-cyan/30 bg-[rgba(8,14,23,0.85)] px-6 py-3 rounded-full shadow-lg flex items-center gap-3">
+            <ChevronLeft className="w-4 h-4 text-cyan-300 animate-pulse" />
+            <span className="text-xs uppercase tracking-[0.32em] text-cyan-200">
+              Scroll horizontally to browse your worlds
+            </span>
+            <ChevronRight className="w-4 h-4 text-cyan-300 animate-pulse" />
+          </div>
+        )}
         {/* Scroll Indicators - Show if scrolling is possible */}
         {showScrollIndicators && (canScrollLeft || canScrollRight) && (
           <>
@@ -293,7 +302,7 @@ export function PlanetsList() {
                 key={planet.id}
                 className="group flex-shrink-0 transition-all duration-300 relative"
                 style={{
-                  width: '280px',
+                  width: `${PLANET_CARD_WIDTH}px`,
                 }}
               >
                 {/* Homeworld Indicator - Techy Green Pointer */}
@@ -456,12 +465,38 @@ export function PlanetsList() {
         </div>
       </div>
 
-      {/* Planet Detail Panel */}
-      <PlanetDetailPanel
-        isOpen={isPanelOpen}
-        onClose={handleClosePanel}
-        planet={selectedPlanet}
-      />
+      {sortedPlanets.length > 1 && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-border/40 bg-[rgba(8,14,23,0.85)] px-4 py-2 shadow-lg backdrop-blur-md">
+          {sortedPlanets.map((planet, index) => {
+            const isActive = index === activePlanetIndex
+            return (
+              <button
+                key={planet.id}
+                type="button"
+                onClick={() => scrollToPlanet(index)}
+                className={cn(
+                  'relative h-2 w-8 rounded-full transition-all duration-200',
+                  isActive
+                    ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]'
+                    : 'bg-border/60 hover:bg-border/80'
+                )}
+                aria-label={`Focus ${planet.name}`}
+              >
+                {isActive && (
+                  <span className="absolute inset-0 rounded-full border border-cyan-200/70 animate-ping" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {hexPlanet && (
+        <PlanetHexGridView
+          planet={hexPlanet}
+          onClose={() => setHexPlanet(null)}
+        />
+      )}
     </div>
   )
 }

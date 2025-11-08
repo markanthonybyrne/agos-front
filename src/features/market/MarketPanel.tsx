@@ -5,19 +5,23 @@ import { MarketDashboard } from './components/MarketDashboard'
 import { OrderForm } from './components/OrderForm'
 import { OrderList } from './components/OrderList'
 import { TradeHistory } from './components/TradeHistory'
+import { DealsBoard } from './components/Deals/DealsBoard'
 
 export function MarketPanel() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'buy' | 'sell' | 'orders' | 'history'>('dashboard')
+  const [activeTab, setActiveTab] = useState<
+    'dashboard' | 'buy' | 'sell' | 'orders' | 'history' | 'deals'
+  >('dashboard')
 
   return (
     <div className="h-full flex flex-col">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="buy">Buy</TabsTrigger>
           <TabsTrigger value="sell">Sell</TabsTrigger>
           <TabsTrigger value="orders">My Orders</TabsTrigger>
           <TabsTrigger value="history">Trade History</TabsTrigger>
+          <TabsTrigger value="deals">Free Market Deals</TabsTrigger>
         </TabsList>
 
         <div className="flex-1 overflow-y-auto mt-4">
@@ -39,6 +43,10 @@ export function MarketPanel() {
 
           <TabsContent value="history" className="mt-0">
             <TradeHistory />
+          </TabsContent>
+
+          <TabsContent value="deals" className="mt-0">
+            <DealsBoard />
           </TabsContent>
         </div>
       </Tabs>

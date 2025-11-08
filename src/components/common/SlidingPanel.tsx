@@ -156,7 +156,7 @@ export function SlidingPanel({
       >
         <Card className="flex h-full min-h-0 flex-col rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
           {/* Sleek header with minimize/maximize */}
-          <CardHeader
+          <CardHeader 
             className={cn(
               "sliding-panel-content sticky top-0 z-10 border-b border-brand-cyan/30 bg-[rgba(8,14,23,0.88)] backdrop-blur-md",
               "p-3 transition-opacity duration-200 flex-shrink-0 shadow-[0_10px_25px_rgba(0,0,0,0.35)]",

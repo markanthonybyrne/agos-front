@@ -1,13 +1,21 @@
 import { apiSlice } from '../apiSlice'
 
-export interface MarketPrice {
+export interface MarketPriceEntry {
   price: number
-  resource_type: 'tellerium' | 'krypton'
+  resource_type: string
+  spread?: number
+  change_percent?: number
+  last_updated?: string
 }
 
-export interface MarketPrices {
-  tellerium: MarketPrice
-  krypton: MarketPrice
+export interface MarketPricesResponse {
+  primary: Record<string, MarketPriceEntry>
+  secondary: Record<string, MarketPriceEntry>
+  timestamp?: string
+}
+
+export interface MarketPricesResult extends MarketPricesResponse {
+  lookup: Record<string, MarketPriceEntry>
 }
 
 export interface PriceHistoryEntry {
@@ -19,14 +27,14 @@ export interface PriceHistoryEntry {
   created_at: string
 }
 
-export interface PriceHistory {
-  resource_type: 'tellerium' | 'krypton'
+export interface PriceHistoryResponse {
+  resource_type: string
   ticks: number
   history: PriceHistoryEntry[]
 }
 
-export interface MarketStatistics {
-  resource_type: 'tellerium' | 'krypton'
+export interface MarketStatisticsResponse {
+  resource_type: string
   current_price: number
   total_supply: number
   total_production: number
@@ -41,13 +49,13 @@ export interface MarketStatistics {
 export interface MarketOrder {
   id: number
   order_type: 'buy' | 'sell'
-  resource_type: 'tellerium' | 'krypton'
+  resource_type: string
   quantity: number
   filled_quantity: number
   remaining_quantity: number
   price_limit: number | null
-  status: 'pending' | 'partial' | 'completed' | 'cancelled'
-  expires_at: string
+  status: 'pending' | 'partial' | 'completed' | 'cancelled' | 'expired'
+  expires_at: string | null
   planet: {
     id: number
     name: string
@@ -62,7 +70,7 @@ export interface MarketOrdersResponse {
 export interface CreateOrderRequest {
   planet_id: number
   order_type: 'buy' | 'sell'
-  resource_type: 'tellerium' | 'krypton'
+  resource_type: string
   quantity: number
   price_limit?: number | null
 }
@@ -76,7 +84,7 @@ export interface CreateOrderResponse {
 export interface MarketTrade {
   id: number
   tick_number: number
-  resource_type: 'tellerium' | 'krypton'
+  resource_type: string
   quantity: number
   price: number
   total_value: number
@@ -94,14 +102,27 @@ export interface MarketTradesResponse {
 
 export const marketApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getMarketPrices: builder.query<MarketPrices, void>({
+    getMarketPrices: builder.query<MarketPricesResult, void>({
       query: () => '/market/prices',
-      providesTags: ['Market'],
+      transformResponse: (response: MarketPricesResponse): MarketPricesResult => {
+        const lookup: Record<string, MarketPriceEntry> = {}
+        Object.entries(response.primary ?? {}).forEach(([slug, entry]) => {
+          lookup[slug] = entry
+        })
+        Object.entries(response.secondary ?? {}).forEach(([slug, entry]) => {
+          lookup[slug] = entry
+        })
+        return {
+          ...response,
+          lookup,
+        }
+      },
+      providesTags: ['Market', 'SecondaryResource'],
     }),
 
     getPriceHistory: builder.query<
-      PriceHistory,
-      { resource_type?: 'tellerium' | 'krypton'; ticks?: number }
+      PriceHistoryResponse,
+      { resource_type?: string; ticks?: number }
     >({
       query: ({ resource_type = 'tellerium', ticks = 100 }) => ({
         url: '/market/prices/history',
@@ -114,8 +135,8 @@ export const marketApi = apiSlice.injectEndpoints({
     }),
 
     getMarketStatistics: builder.query<
-      MarketStatistics,
-      { resource_type?: 'tellerium' | 'krypton' }
+      MarketStatisticsResponse,
+      { resource_type?: string }
     >({
       query: ({ resource_type = 'tellerium' }) => ({
         url: '/market/statistics',
@@ -126,7 +147,7 @@ export const marketApi = apiSlice.injectEndpoints({
 
     getMarketOrders: builder.query<
       MarketOrdersResponse,
-      { status?: 'pending' | 'partial' | 'completed' | 'cancelled' }
+      { status?: 'pending' | 'partial' | 'completed' | 'cancelled' | 'expired' }
     >({
       query: ({ status }) => ({
         url: '/market/orders',
@@ -141,7 +162,7 @@ export const marketApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Market', 'MarketOrder', 'MarketTrade', 'Planet', 'Resource'],
+      invalidatesTags: ['Market', 'MarketOrder', 'MarketTrade', 'Planet', 'Resource', 'SecondaryResource'],
     }),
 
     cancelMarketOrder: builder.mutation<
@@ -152,12 +173,12 @@ export const marketApi = apiSlice.injectEndpoints({
         url: `/market/orders/${orderId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Market', 'MarketOrder', 'Planet', 'Resource'],
+      invalidatesTags: ['Market', 'MarketOrder', 'Planet', 'Resource', 'SecondaryResource'],
     }),
 
     getMarketTrades: builder.query<
       MarketTradesResponse,
-      { resource_type?: 'tellerium' | 'krypton'; limit?: number }
+      { resource_type?: string; limit?: number }
     >({
       query: ({ resource_type, limit = 50 }) => ({
         url: '/market/trades',

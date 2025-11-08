@@ -35,17 +35,19 @@ export function MarketTrendsWidget({
     const activeOrders = orders.filter(order => 
       order.status === 'pending' || order.status === 'partial'
     )
-    
-    return {
-      tellerium: {
-        buy: activeOrders.filter(o => o.resource_type === 'tellerium' && o.order_type === 'buy').length,
-        sell: activeOrders.filter(o => o.resource_type === 'tellerium' && o.order_type === 'sell').length,
-      },
-      krypton: {
-        buy: activeOrders.filter(o => o.resource_type === 'krypton' && o.order_type === 'buy').length,
-        sell: activeOrders.filter(o => o.resource_type === 'krypton' && o.order_type === 'sell').length,
-      },
-    }
+    const map = new Map<string, { buy: number; sell: number }>()
+
+    activeOrders.forEach((order) => {
+      const entry = map.get(order.resource_type) ?? { buy: 0, sell: 0 }
+      if (order.order_type === 'buy') {
+        entry.buy += 1
+      } else {
+        entry.sell += 1
+      }
+      map.set(order.resource_type, entry)
+    })
+
+    return map
   }, [ordersData])
 
   const isLoading = pricesLoading || telleriumStatsLoading || kryptonStatsLoading || ordersLoading
@@ -74,7 +76,7 @@ export function MarketTrendsWidget({
                   <span className="font-semibold text-sm">Tellerium</span>
                 </div>
                 <span className="font-mono font-bold text-cyan-400">
-                  {prices?.tellerium?.price?.toFixed(4) || '0.0000'}
+                  {prices?.lookup?.tellerium?.price?.toFixed(4) || '0.0000'}
                 </span>
               </div>
               {telleriumStats && (
@@ -94,11 +96,15 @@ export function MarketTrendsWidget({
                   </div>
                   <div>
                     <span className="text-muted-foreground">Buy Orders:</span>
-                    <span className="ml-1 font-semibold text-green-400">{orderCounts.tellerium.buy}</span>
+                    <span className="ml-1 font-semibold text-green-400">
+                      {orderCounts.get('tellerium')?.buy ?? 0}
+                    </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Sell Orders:</span>
-                    <span className="ml-1 font-semibold text-red-400">{orderCounts.tellerium.sell}</span>
+                    <span className="ml-1 font-semibold text-red-400">
+                      {orderCounts.get('tellerium')?.sell ?? 0}
+                    </span>
                   </div>
                 </div>
               )}
@@ -112,7 +118,7 @@ export function MarketTrendsWidget({
                   <span className="font-semibold text-sm">Krypton</span>
                 </div>
                 <span className="font-mono font-bold text-purple-400">
-                  {prices?.krypton?.price?.toFixed(4) || '0.0000'}
+                  {prices?.lookup?.krypton?.price?.toFixed(4) || '0.0000'}
                 </span>
               </div>
               {kryptonStats && (
@@ -132,11 +138,15 @@ export function MarketTrendsWidget({
                   </div>
                   <div>
                     <span className="text-muted-foreground">Buy Orders:</span>
-                    <span className="ml-1 font-semibold text-green-400">{orderCounts.krypton.buy}</span>
+                    <span className="ml-1 font-semibold text-green-400">
+                      {orderCounts.get('krypton')?.buy ?? 0}
+                    </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Sell Orders:</span>
-                    <span className="ml-1 font-semibold text-red-400">{orderCounts.krypton.sell}</span>
+                    <span className="ml-1 font-semibold text-red-400">
+                      {orderCounts.get('krypton')?.sell ?? 0}
+                    </span>
                   </div>
                 </div>
               )}
@@ -147,10 +157,10 @@ export function MarketTrendsWidget({
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">My Active Orders:</span>
                 <span className="font-semibold">
-                  {orderCounts.tellerium.buy + 
-                   orderCounts.tellerium.sell + 
-                   orderCounts.krypton.buy + 
-                   orderCounts.krypton.sell}
+                  {Array.from(orderCounts.values()).reduce(
+                    (total, entry) => total + entry.buy + entry.sell,
+                    0,
+                  )}
                 </span>
               </div>
             </div>

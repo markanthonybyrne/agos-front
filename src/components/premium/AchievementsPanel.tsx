@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { getAchievementDisplayName } from '@/lib/premiumHelpers'
 import { Trophy, CheckCircle, Lock, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { Progress } from '@/components/ui/progress'
+import { formatNumber } from '@/lib/formatters'
 
 export function AchievementsPanel() {
   const { data, isLoading } = useGetAchievementsQuery()
@@ -20,6 +22,7 @@ export function AchievementsPanel() {
 
   const achievements = data?.achievements ?? []
   const available = data?.available ?? {}
+  const progressMap = data?.progress ?? {}
   
   const unlockedAchievements = achievements.filter((a) => a.unlocked_at !== null)
   const lockedAchievementSlugs = Object.keys(available).filter(
@@ -120,13 +123,24 @@ export function AchievementsPanel() {
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {lockedAchievementSlugs.map((slug) => {
                 const reward = available[slug]
-                // Check if this might be in progress (would need game state to determine)
-                const isInProgress = false // TODO: Implement progress checking
+                const progressEntry = progressMap[slug]
+                const hasProgress =
+                  progressEntry && progressEntry.target > 0 && progressEntry.current >= 0
+                const percent = hasProgress
+                  ? Math.min(
+                      100,
+                      progressEntry.percent ??
+                        Math.round((progressEntry.current / progressEntry.target) * 100)
+                    )
+                  : 0
+                const isInProgress = hasProgress && percent > 0 && percent < 100
 
                 return (
                   <div
                     key={slug}
-                    className="p-3 rounded-lg bg-muted/10 border border-border/50 flex items-center justify-between opacity-60"
+                    className={`p-3 rounded-lg bg-muted/10 border border-border/50 flex items-center justify-between ${
+                      isInProgress ? '' : 'opacity-60'
+                    }`}
                   >
                     <div className="flex items-center gap-3 flex-1">
                       {isInProgress ? (
@@ -136,8 +150,14 @@ export function AchievementsPanel() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium">{getAchievementDisplayName(slug)}</p>
-                        {isInProgress && (
-                          <p className="text-xs text-yellow-400">In Progress...</p>
+                        {isInProgress && progressEntry && (
+                          <div className="space-y-1 mt-1">
+                            <p className="text-xs text-yellow-400">
+                              In progress — {formatNumber(progressEntry.current ?? 0)} /{' '}
+                              {formatNumber(progressEntry.target ?? 0)}
+                            </p>
+                            <Progress value={percent} className="h-1.5 bg-border/40" />
+                          </div>
                         )}
                       </div>
                     </div>

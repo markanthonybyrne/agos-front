@@ -3,7 +3,7 @@ import { useGetUniverseConfigQuery, useGetMapQuery, useGetVisibilityQuery } from
 import { useGetIncidentsQuery } from '@/api/endpoints/incidentsApi'
 import { useNavigate } from 'react-router-dom'
 import { buildGalaxyData, SystemData, RegionData } from '@/lib/galaxyUtils'
-import { useZoomPan } from '@/hooks/useZoomPan'
+import { useZoomPan, normalizedToRenderScale } from '@/hooks/useZoomPan'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppSelector } from '@/app/hooks'
 import { useWindow } from '@/components/common/WindowManager'
@@ -25,12 +25,19 @@ import { IncidentDetailPanel } from '@/components/incidents/IncidentDetailPanel'
 import { Incident } from '@/types/api.types'
 // import { Loader } from '@/components/ui/loader' // Replaced with blurred glass overlay
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
-import { getPlanetXY } from '@/lib/coordinates'
+import { getPlanetXY, formatCoordinate } from '@/lib/coordinates'
 import { isPlanetVisible } from '@/lib/visibilityUtils'
 import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
+import { formatNumber } from '@/lib/formatters'
+import { ResourceRarity } from '@/types/api.types'
+import { toast } from 'sonner'
 
 const DEFAULT_GRID_WIDTH = 2000
 const DEFAULT_GRID_HEIGHT = 2000
+
+type RarityFilter = 'all' | ResourceRarity
 
 /**
  * GalaxyMap - Main galaxy-level map component
@@ -59,6 +66,8 @@ export function GalaxyMap() {
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
   const [isFadingOut, setIsFadingOut] = useState(false)
+  const [resourceFilter, setResourceFilter] = useState<string>('all')
+  const [rarityFilter, setRarityFilter] = useState<RarityFilter>('all')
   
   // Load universe config
   const { data: configData, isLoading: isLoadingConfig } = useGetUniverseConfigQuery()
@@ -85,6 +94,15 @@ export function GalaxyMap() {
     }
     return mapData?.planets || []
   }, [reduxPlanets, planetsLoaded, mapData?.planets])
+
+  const aggregatedReserves = useMemo(
+    () => planetsToUse.flatMap((planet) => planet.secondary_reserves ?? []),
+    [planetsToUse],
+  )
+
+  const { secondaryResources, getMetadata } = useResourcesCatalog({
+    reserves: aggregatedReserves,
+  })
   
   // Fetch incidents (filtered by visibility automatically by API)
   const { data: incidentsData } = useGetIncidentsQuery()
@@ -294,6 +312,21 @@ export function GalaxyMap() {
     zoomSensitivity: 0.1
   })
   
+  useEffect(() => {
+    const handleCenter = (event: Event) => {
+      const detail = (event as CustomEvent<{ x: number; y: number; zoom?: number }>).detail
+      if (!detail) return
+      const { x, y, zoom = 0.95 } = detail
+      const targetScale = normalizedToRenderScale(zoom)
+      const targetPanX = (gridWidth / 2 - x) * targetScale
+      const targetPanY = (gridHeight / 2 - y) * targetScale
+      zoomPan.smoothSetZoomAndPan(targetScale, targetPanX, targetPanY, 600)
+    }
+
+    window.addEventListener('map:centerOn', handleCenter as EventListener)
+    return () => window.removeEventListener('map:centerOn', handleCenter as EventListener)
+  }, [gridWidth, gridHeight, zoomPan])
+  
   // Handle system click - navigate to system view when zoomed in enough
   const handleSystemClick = useCallback((system: SystemData) => {
     // If zoomed in enough (5x initial scale), navigate to system view
@@ -425,8 +458,23 @@ export function GalaxyMap() {
                 icon: Search,
                 onClick: () => {
                   closeContextMenu()
-                  // TODO: Implement explore action
-                  console.log('Explore system:', contextMenuSystem)
+                  if (!contextMenuSystem) return
+                  const firstPlanet = contextMenuSystem.planets?.[0]
+                  if (!firstPlanet) {
+                    toast.error('No planets available in this system to scan yet.')
+                    return
+                  }
+                  const coordinate = formatCoordinate(firstPlanet.coordinate)
+                  if (!coordinate || coordinate === 'Invalid coordinate') {
+                    toast.error('Unable to determine system coordinates for scanning.')
+                    return
+                  }
+                  openPanel(PanelType.SIGNALS, PanelSize.LARGE, {
+                    initialTarget: {
+                      coordinate,
+                      type: 'all_frequency',
+                    },
+                  })
                 },
               },
             ]
@@ -631,7 +679,7 @@ export function GalaxyMap() {
     // Add padding
     const padding = Math.max(finalWidth, finalHeight) * 0.1
     return `${minX - padding} ${minY - padding} ${finalWidth + padding * 2} ${finalHeight + padding * 2}`
-  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight])
+  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight, zoomPan.containerRef])
 
   // Calculate viewport bounds for FogOfWarLayer (from viewBox) - with padding for better culling
   const viewportBounds = useMemo(() => {
@@ -661,7 +709,7 @@ export function GalaxyMap() {
       minY: Math.max(-padding, centerY - visibleHeight / 2 - padding),
       maxY: Math.min(gridHeight + padding, centerY + visibleHeight / 2 + padding),
     }
-  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight])
+  }, [zoomPan.scale, zoomPan.panX, zoomPan.panY, gridWidth, gridHeight, zoomPan.containerRef])
   
   // Wait for planets to be loaded from Redux store before rendering map
   // This ensures we have all 8,000+ planets available
@@ -696,6 +744,61 @@ export function GalaxyMap() {
       onWheel={zoomPan.onWheel}
       onContextMenu={handleMapContextMenu}
     >
+      <div className="absolute top-4 left-4 z-[200] w-64 space-y-2">
+        <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 backdrop-blur-sm p-3 shadow-lg shadow-cyan-500/10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200 mb-2">
+            Materials Overlay
+          </p>
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <label className="text-[11px] uppercase text-muted-foreground tracking-wide">
+                Highlight Resource
+              </label>
+              <Select
+                value={resourceFilter}
+                onValueChange={(value) => setResourceFilter(value)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="All materials" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All materials</SelectItem>
+                  {secondaryResources.map((resource) => (
+                    <SelectItem key={resource.slug} value={resource.slug}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: resource.color }}
+                        />
+                        {resource.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] uppercase text-muted-foreground tracking-wide">
+                Rarity Filter
+              </label>
+              <Select
+                value={rarityFilter}
+                onValueChange={(value) => setRarityFilter(value as RarityFilter)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="All rarities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All rarities</SelectItem>
+                  <SelectItem value="common">Common</SelectItem>
+                  <SelectItem value="rare">Rare</SelectItem>
+                  <SelectItem value="exotic">Exotic</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </div>
       {/* Blurred glass overlay while loading - fades out when complete */}
       {showLoadingOverlay && (
         <div
@@ -794,6 +897,9 @@ export function GalaxyMap() {
           homeSystem={homeSystem}
           initialScale={initialScale}
           visibilityData={visibilityData}
+          highlightResource={resourceFilter === 'all' ? null : resourceFilter}
+          highlightRarity={rarityFilter}
+          getResourceMetadata={getMetadata}
         />
         
         {/* Layer 5: Incidents */}
@@ -840,6 +946,40 @@ export function GalaxyMap() {
         const lineStartY = tooltipY + tooltipHeight // Bottom of tooltip
         const lineEndY = systemScreenPos.y // System center
         const lineLength = lineEndY - lineStartY
+
+        const materialSummaryMap = new Map<
+          string,
+          {
+            slug: string
+            metadataColor: string
+            name: string
+            totalRemaining: number
+            planetCount: number
+            rarity?: string
+          }
+        >()
+
+        hoveredSystem.planets.forEach((planet) => {
+          const reserves = planet.secondary_reserves ?? []
+          reserves.forEach((reserve) => {
+            const metadata = getMetadata(reserve.slug)
+            const summary = materialSummaryMap.get(reserve.slug) || {
+              slug: reserve.slug,
+              metadataColor: metadata.color,
+              name: metadata.name,
+              totalRemaining: 0,
+              planetCount: 0,
+              rarity: metadata.rarity,
+            }
+            summary.totalRemaining += reserve.remaining ?? 0
+            summary.planetCount += 1
+            materialSummaryMap.set(reserve.slug, summary)
+          })
+        })
+
+        const materialSummaries = Array.from(materialSummaryMap.values()).sort(
+          (a, b) => b.totalRemaining - a.totalRemaining,
+        )
         
         return (
           <>
@@ -925,6 +1065,38 @@ export function GalaxyMap() {
                       </span>
                     )}
                   </div>
+                  {materialSummaries.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Materials
+                      </p>
+                      {materialSummaries.slice(0, 4).map((summary) => (
+                        <div
+                          key={`${hoveredSystem.region}-${hoveredSystem.system}-${summary.slug}`}
+                          className="flex items-center justify-between text-xs text-muted-foreground"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: summary.metadataColor }}
+                            />
+                            <span className="text-white">{summary.name}</span>
+                            <span className="text-[10px] uppercase text-muted-foreground">
+                              ×{summary.planetCount}
+                            </span>
+                          </div>
+                          <span className="font-mono text-white">
+                            {formatNumber(summary.totalRemaining)}
+                          </span>
+                        </div>
+                      ))}
+                      {materialSummaries.length > 4 && (
+                        <p className="text-[10px] text-muted-foreground/80">
+                          +{materialSummaries.length - 4} more ores
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

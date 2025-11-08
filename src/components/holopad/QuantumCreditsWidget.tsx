@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { WidgetWindow } from './WidgetWindow'
 import { getQuantumCreditsImage } from '@/lib/quantumCreditsImages'
-import { Coins, Calendar, Flame, ArrowRight } from 'lucide-react'
+import { Coins, Calendar, Flame, ArrowRight, Droplets } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAppSelector } from '@/app/hooks'
 
 interface QuantumCreditsWidgetProps {
   onMinimize?: () => void
@@ -25,6 +26,10 @@ export function QuantumCreditsWidget({
   })
   const [claimDailyLogin, { isLoading: isClaiming }] = useClaimDailyLoginMutation()
   const { openPanel } = usePanel()
+  const activeBoosters = useAppSelector((state) => state.auth.empire?.active_boosters || [])
+  const hasSecondaryBooster = activeBoosters.some(
+    (booster) => booster.type === 'secondary_extraction',
+  )
 
   const handleClaimDaily = async () => {
     try {
@@ -105,8 +110,15 @@ export function QuantumCreditsWidget({
             </Button>
           </div>
 
+          {hasSecondaryBooster && (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-xs text-cyan-200">
+              <Droplets className="w-4 h-4" />
+              Secondary Extraction Booster active — enjoy increased materials yield!
+            </div>
+          )}
+
           {/* Quick Actions */}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -117,7 +129,7 @@ export function QuantumCreditsWidget({
               onMouseDown={(e) => {
                 e.stopPropagation()
               }}
-              className="flex-1"
+              className="w-full"
             >
               Boosters
             </Button>
@@ -131,9 +143,24 @@ export function QuantumCreditsWidget({
               onMouseDown={(e) => {
                 e.stopPropagation()
               }}
-              className="flex-1"
+              className="w-full"
             >
               Achievements
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                openPanel(PanelType.BOOSTERS, PanelSize.MEDIUM)
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+              }}
+              className="w-full border-cyan-400/40 text-cyan-300 hover:text-cyan-200"
+            >
+              <Droplets className="w-4 h-4 mr-1" />
+              Materials Booster
             </Button>
           </div>
 

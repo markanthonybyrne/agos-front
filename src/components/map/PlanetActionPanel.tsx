@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { useNavigate } from 'react-router-dom'
 import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
-import { formatResource } from '@/lib/formatters'
+import { formatResource, formatNumber } from '@/lib/formatters'
 import { 
   Home, 
   MapPin, 
@@ -15,7 +15,8 @@ import {
   Telescope, 
   ExternalLink,
   User,
-  AlertCircle
+  AlertCircle,
+  Droplets
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { TravelTimeCalculator } from './TravelTimeCalculator'
@@ -23,6 +24,7 @@ import { getPlanetImage } from '@/lib/planetImages'
 import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
 
 interface PlanetActionPanelProps {
   planet: Planet | null
@@ -43,6 +45,7 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
   })
 
   const displayPlanet = planetDetails?.planet || planet
+  const { getMetadata } = useResourcesCatalog({ reserves: displayPlanet?.secondary_reserves })
   if (!displayPlanet) return null
 
   const coord = parseCoordinate(displayPlanet.coordinate)
@@ -196,6 +199,55 @@ export function PlanetActionPanel({ planet, isOpen, onClose, onRefresh }: Planet
                     <label className="text-sm text-muted-foreground">Probes</label>
                   </div>
                   <div className="mt-1 font-semibold">{displayPlanet.probes}</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {displayPlanet.secondary_reserves && displayPlanet.secondary_reserves.length > 0 && (
+            <>
+              <div className="border-t border-border/50 my-4" />
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Droplets className="w-4 h-4 text-cyan-300" />
+                  Ore Veins
+                </h3>
+                <div className="space-y-2">
+                  {displayPlanet.secondary_reserves.map((reserve) => {
+                    const metadata = getMetadata(reserve.slug)
+                    const richnessPercent = Math.round(((reserve.richness ?? 1) - 1) * 100)
+                    return (
+                      <div
+                        key={`${reserve.slug}-${reserve.remaining}-${reserve.depleted_at ?? 'active'}`}
+                        className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: metadata.color }}
+                            />
+                            <span className="text-sm font-medium text-foreground">{metadata.name}</span>
+                            <Badge variant="outline" className="text-[10px] uppercase">
+                              {metadata.rarity}
+                            </Badge>
+                          </div>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {formatNumber(reserve.remaining ?? 0)} remaining
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Richness: {richnessPercent >= 0 ? '+' : ''}
+                            {richnessPercent}%
+                          </span>
+                          {reserve.depleted_at && (
+                            <span className="text-red-300">Depleted</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </>

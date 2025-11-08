@@ -12,9 +12,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Planet } from '@/types/api.types'
 import { formatResource, formatNumber } from '@/lib/formatters'
-import { Zap, Settings, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
+import { Zap, Settings, AlertCircle, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Layers, AlertTriangle, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
 import { DarkMatterDisplay } from '@/components/resources/DarkMatterDisplay'
@@ -24,6 +26,10 @@ import {
   previewFacilityUpkeep,
 } from '@/lib/productionHelpers'
 import { useGetFacilityDefinitionsQuery } from '@/api/endpoints/facilitiesApi'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
+import { usePanel } from '@/components/common/PanelManager'
+import { PanelSize, PanelType } from '@/app/slices/panelSlice'
+import { cn } from '@/lib/utils'
 
 const mineSchema = z.object({
   quantity: z.number().min(1, 'Must buy at least 1 mine').max(100, 'Cannot buy more than 100 mines at once'),
@@ -43,6 +49,7 @@ interface ResourcesTabProps {
 export function ResourcesTab({ planet }: ResourcesTabProps) {
   const [buyMines, { isLoading: isBuyingMines }] = useBuyMinesMutation()
   const [buyProbes, { isLoading: isBuyingProbes }] = useBuyProbesMutation()
+  const [showOreVeins, setShowOreVeins] = useState(true)
 
   const { data: facilitiesData } = useGetPlanetFacilitiesQuery(Number(planet.id), {
     refetchOnMountOrArgChange: true,
@@ -57,6 +64,45 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
   const { data: facilityDefinitions } = useGetFacilityDefinitionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   })
+  const { ledger, getMetadata } = useResourcesCatalog({ reserves: planet.secondary_reserves })
+  const { openPanel } = usePanel()
+  const secondaryReserves = planet.secondary_reserves || []
+
+  const ledgerMap = useMemo(() => {
+    const map = new Map<string, typeof ledger[number]>()
+    ledger.forEach((entry) => {
+      map.set(entry.slug, entry)
+    })
+    return map
+  }, [ledger])
+
+  const oreVeins = useMemo(() => {
+    return secondaryReserves.map((reserve) => {
+      const metadata = getMetadata(reserve.slug)
+      const ledgerEntry = ledgerMap.get(reserve.slug)
+      const initial = reserve.initial ?? (reserve.remaining > 0 ? reserve.remaining : 0)
+      const remaining = reserve.remaining ?? 0
+      const remainingPercent = initial > 0 ? Math.max(0, Math.round((remaining / initial) * 100)) : 0
+      const richnessMultiplier = reserve.richness ?? 1
+      const richnessPercent = Math.round((richnessMultiplier - 1) * 100)
+      const isDepleted = Boolean(reserve.depleted_at) || remainingPercent <= 0
+      const capacityCapped =
+        ledgerEntry?.capacity && ledgerEntry.capacity > 0
+          ? ledgerEntry.quantity >= ledgerEntry.capacity
+          : false
+      return {
+        reserve,
+        metadata,
+        ledgerEntry,
+        remaining,
+        initial,
+        remainingPercent,
+        richnessPercent,
+        isDepleted,
+        capacityCapped,
+      }
+    })
+  }, [secondaryReserves, ledgerMap, getMetadata])
 
   // Calculate production/upkeep from facilities
   const facilitiesList = useMemo(() => {
@@ -172,7 +218,119 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
   const canAffordProbes = planet.tellerium_balance >= probeCost.tellerium && planet.krypton_balance >= probeCost.krypton
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-6">
+      {oreVeins.length > 0 && (
+        <Card className="panel-glass border-cyan/20">
+          <CardHeader className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-cyan-300" />
+              <div>
+                <CardTitle className="text-base">Ore Veins</CardTitle>
+                <CardDescription>Secondary materials present on this world</CardDescription>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowOreVeins((prev) => !prev)}
+            >
+              {showOreVeins ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </Button>
+          </CardHeader>
+          {showOreVeins && (
+            <CardContent className="space-y-3">
+              {oreVeins.map(({ reserve, metadata, ledgerEntry, remaining, initial, remainingPercent, richnessPercent, isDepleted, capacityCapped }) => (
+                <div
+                  key={reserve.slug}
+                  className={cn(
+                    'rounded-lg border border-border/40 bg-muted/10 p-4 transition-colors',
+                    isDepleted && 'border-destructive/50 bg-destructive/5',
+                  )}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: metadata.color }}
+                      />
+                      <div>
+                        <p className="text-sm font-semibold">{metadata.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatNumber(remaining)} remaining
+                          {initial > 0 && ` / ${formatNumber(initial)} total`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {capacityCapped && ledgerEntry && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openPanel(PanelType.BOOSTERS, PanelSize.MEDIUM)
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="border-amber-500/40 text-amber-300"
+                              >
+                                <AlertTriangle className="w-4 h-4 mr-1" />
+                                Expand Storage
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs text-xs">
+                              Ledger capacity reached ({formatNumber(ledgerEntry.quantity)} /{' '}
+                              {formatNumber(ledgerEntry.capacity || 0)}). Activate storage upgrades to prevent waste.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {isDepleted ? (
+                        <Badge variant="outline" className="border-destructive/40 text-destructive">
+                          Depleted
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-border/40 text-muted-foreground"
+                          style={{ borderColor: metadata.color }}
+                        >
+                          {richnessPercent >= 0 ? '+' : ''}
+                          {richnessPercent}% yield
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                      <span>Vein Longevity</span>
+                      <span>{remainingPercent}% remaining</span>
+                    </div>
+                    <Progress value={remainingPercent} className="h-2 bg-border/60" />
+                  </div>
+                  {reserve.depleted_at && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Depleted at {reserve.depleted_at}
+                    </p>
+                  )}
+                  {ledgerEntry && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Info className="w-3 h-3" />
+                      <span>
+                        Ledger: {formatNumber(ledgerEntry.quantity)} / {formatNumber(ledgerEntry.capacity || 0)} stored
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Buy Mines */}
       <Card className="panel-glass border-cyan/20">
         <CardHeader>
@@ -570,5 +728,6 @@ export function ResourcesTab({ planet }: ResourcesTabProps) {
         </CardContent>
       </Card>
     </div>
+  </div>
   )
 }

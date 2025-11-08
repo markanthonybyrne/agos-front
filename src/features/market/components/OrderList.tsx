@@ -12,12 +12,14 @@ import { ShoppingCart, X, Clock, CheckCircle, AlertCircle, XCircle } from 'lucid
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
 
 export function OrderList() {
   const dispatch = useAppDispatch()
   const [statusFilter, setStatusFilter] = useState<'pending' | 'partial' | 'completed' | 'cancelled' | undefined>(undefined)
   const { data: ordersData, isLoading, refetch } = useGetMarketOrdersQuery({ status: statusFilter })
   const [cancelOrder] = useCancelMarketOrderMutation()
+  const { getMetadata } = useResourcesCatalog()
 
   // Listen for tick processed events to refetch orders (in case orders were filled)
   useEffect(() => {
@@ -126,10 +128,15 @@ export function OrderList() {
                 ? (order.filled_quantity / order.quantity) * 100 
                 : 0
               const canCancel = order.status === 'pending' || order.status === 'partial'
-              const expiresAt = new Date(order.expires_at)
+              const expiresAt = order.expires_at ? new Date(order.expires_at) : null
               const now = new Date()
-              const timeRemaining = expiresAt.getTime() - now.getTime()
-              const hoursRemaining = Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60)))
+              const timeRemaining = expiresAt ? expiresAt.getTime() - now.getTime() : null
+              const hoursRemaining =
+                timeRemaining !== null
+                  ? Math.max(0, Math.floor(timeRemaining / (1000 * 60 * 60)))
+                  : null
+
+              const metadata = getMetadata(order.resource_type)
 
               return (
                 <Card key={order.id} className="border-border/50">
@@ -145,8 +152,12 @@ export function OrderList() {
                             )}>
                               {order.order_type.toUpperCase()}
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {order.resource_type === 'tellerium' ? 'Tellerium' : 'Krypton'}
+                            <span className="text-sm text-muted-foreground flex items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: metadata.color }}
+                              />
+                              {metadata.name}
                             </span>
                             {getStatusBadge(order.status)}
                           </div>
@@ -171,7 +182,9 @@ export function OrderList() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 text-sm">
                       <div>
                         <p className="text-muted-foreground">Quantity</p>
-                        <p className="font-mono font-semibold">{formatNumber(order.quantity)}</p>
+                        <p className="font-mono font-semibold">
+                          {formatNumber(order.quantity)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Filled</p>
@@ -201,7 +214,7 @@ export function OrderList() {
 
                     <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
                       <span>Created: {formatDateTime(order.created_at)}</span>
-                      {canCancel && hoursRemaining > 0 && (
+                      {canCancel && hoursRemaining !== null && hoursRemaining > 0 && (
                         <span>Expires in: {hoursRemaining}h</span>
                       )}
                     </div>

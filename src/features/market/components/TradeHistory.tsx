@@ -8,9 +8,11 @@ import { History, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
 
 export function TradeHistory() {
-  const [resourceFilter, setResourceFilter] = useState<'tellerium' | 'krypton' | undefined>(undefined)
+  const { allResources, getMetadata } = useResourcesCatalog()
+  const [resourceFilter, setResourceFilter] = useState<string | undefined>(undefined)
   const { data: tradesData, isLoading, refetch } = useGetMarketTradesQuery({
     resource_type: resourceFilter,
     limit: 50,
@@ -61,15 +63,18 @@ export function TradeHistory() {
         <div className="mb-4">
           <Select 
             value={resourceFilter || 'all'} 
-            onValueChange={(value) => setResourceFilter(value === 'all' ? undefined : value as any)}
+            onValueChange={(value) => setResourceFilter(value === 'all' ? undefined : value)}
           >
             <SelectTrigger className="w-full md:w-48">
               <SelectValue placeholder="Filter by resource" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Resources</SelectItem>
-              <SelectItem value="tellerium">Tellerium</SelectItem>
-              <SelectItem value="krypton">Krypton</SelectItem>
+              {allResources.map((resource) => (
+                <SelectItem key={resource.slug} value={resource.slug}>
+                  {resource.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -88,8 +93,10 @@ export function TradeHistory() {
           </div>
         ) : (
           <div className="space-y-3">
-            {trades.map((trade) => (
-              <Card key={trade.id} className="border-border/50">
+            {trades.map((trade) => {
+              const metadata = getMetadata(trade.resource_type)
+              return (
+                <Card key={trade.id} className="border-border/50">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3 flex-1">
@@ -111,7 +118,7 @@ export function TradeHistory() {
                             {trade.side.toUpperCase()}
                           </Badge>
                           <span className="font-semibold">
-                            {formatNumber(trade.quantity)} {trade.resource_type === 'tellerium' ? 'T' : 'K'}
+                            {formatNumber(trade.quantity)} {metadata.name}
                           </span>
                           <span className="text-sm text-muted-foreground">@</span>
                           <span className="font-mono font-semibold">{trade.price.toFixed(4)}</span>
@@ -131,7 +138,8 @@ export function TradeHistory() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              )
+            })}
           </div>
         )}
       </CardContent>

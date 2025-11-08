@@ -29,10 +29,11 @@ export interface QuantumCreditsBalance {
 
 export interface ActiveBooster {
   id: number
-  type: 'production' | 'construction' | 'signal'
+  type: 'production' | 'construction' | 'signal' | 'secondary_extraction'
   multiplier: string
   started_at: string
   expires_at: string
+  metadata?: Record<string, any>
 }
 
 export interface ActiveBoostersResponse {
@@ -40,7 +41,7 @@ export interface ActiveBoostersResponse {
 }
 
 export interface ActivateBoosterRequest {
-  type: 'production' | 'construction'
+  type: 'production' | 'construction' | 'secondary_extraction'
 }
 
 export interface ActivateBoosterResponse {
@@ -60,11 +61,55 @@ export interface Achievement {
   slug: string
   unlocked_at: string | null
   quantum_credits_awarded: number
+  progress_percent?: number
+  progress_current?: number
+  progress_target?: number
 }
 
 export interface AchievementsResponse {
   achievements: Achievement[]
   available: Record<string, number>
+  progress?: Record<
+    string,
+    {
+      current: number
+      target: number
+      percent?: number
+    }
+  >
+}
+
+export type ResourceRarity = 'common' | 'rare' | 'exotic'
+
+export interface SecondaryResourceLedgerEntry {
+  slug: string
+  name: string
+  quantity: number
+  capacity: number
+  rarity: ResourceRarity
+  icon?: string | null
+  delta?: number
+}
+
+export interface SecondaryResourceLedger {
+  total_capacity: number
+  used_capacity: number
+  capacity_bonus_percent?: number
+  entries: SecondaryResourceLedgerEntry[]
+}
+
+export type SecondaryResourceDelta = Record<string, number>
+
+export interface SecondaryReserve {
+  slug: string
+  name?: string
+  rarity?: ResourceRarity
+  remaining: number
+  initial?: number
+  richness?: number
+  replenish_rate?: number
+  depleted_at?: string | null
+  last_extraction_at?: string | null
 }
 
 // Direct response types (for endpoints that don't wrap responses)
@@ -121,6 +166,12 @@ export interface Empire {
   dark_matter_current?: number // Current dark matter amount
   dark_matter_capacity?: number // Maximum dark matter capacity
   active_research_effects?: Record<string, number | boolean> // Active research effects aggregated
+  active_boosters?: ActiveBooster[]
+  secondary_resources?: SecondaryResourceLedgerEntry[]
+  secondary_capacity?: number
+  secondary_capacity_used?: number
+  secondary_capacity_bonus_percent?: number
+  secondary_resource_delta?: SecondaryResourceDelta
 }
 
 // Fog of War Types
@@ -205,6 +256,7 @@ export interface Planet {
   // Region name for new coordinate system
   region_name?: string | null
   is_habitable?: boolean // For colonization checks
+  secondary_reserves?: SecondaryReserve[]
 }
 
 export interface Fleet {

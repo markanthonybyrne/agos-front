@@ -1,14 +1,17 @@
+import { useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { Planet } from '@/types/api.types'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatResource, formatNumber } from '@/lib/formatters'
 import { useGetPlanetResourcesQuery } from '@/api/endpoints/resourcesApi'
 import { useGetPlanetFacilitiesQuery } from '@/api/endpoints/facilitiesApi'
-import { MapPin, Clock, Zap, Shield, Settings } from 'lucide-react'
+import { MapPin, Clock, Zap, Shield, Settings, Droplets, AlertTriangle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getPlanetImage } from '@/lib/planetImages'
 import { getTelleriumImage, getKryptonImage, getMineImage, getProbeImage } from '@/lib/resourceImages'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
 
 interface OverviewTabProps {
   planet: Planet
@@ -21,6 +24,15 @@ export function OverviewTab({ planet }: OverviewTabProps) {
   const { data: facilitiesData, isLoading: isLoadingFacilities } = useGetPlanetFacilitiesQuery(Number(planet.id), {
     refetchOnMountOrArgChange: true,
   })
+  const { ledger, getMetadata } = useResourcesCatalog({ reserves: planet.secondary_reserves })
+
+  const ledgerMap = useMemo(() => {
+    const map = new Map<string, typeof ledger[number]>()
+    ledger.forEach((entry) => {
+      map.set(entry.slug, entry)
+    })
+    return map
+  }, [ledger])
 
   // Get production data from resources API
   const production = resourcesData?.production || {
@@ -148,6 +160,52 @@ export function OverviewTab({ planet }: OverviewTabProps) {
                 </span>
               </div>
             </div>
+
+            {planet.secondary_reserves && planet.secondary_reserves.length > 0 && (
+              <div className="mt-4 border-t border-border pt-3 space-y-2">
+                <p className="text-xs font-semibold text-cyan-300 flex items-center gap-2">
+                  <Droplets className="w-3.5 h-3.5" />
+                  Materials
+                </p>
+                <div className="space-y-2">
+                  {planet.secondary_reserves.map((reserve) => {
+                    const metadata = getMetadata(reserve.slug)
+                    const ledgerEntry = ledgerMap.get(reserve.slug)
+                    const initial = reserve.initial ?? reserve.remaining ?? 0
+                    const remaining = reserve.remaining ?? 0
+                    const remainingPercent =
+                      initial > 0 ? Math.max(0, Math.round((remaining / initial) * 100)) : 0
+
+                    return (
+                      <div
+                        key={reserve.slug}
+                        className="rounded-md border border-border/40 bg-muted/5 p-3 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between text-sm font-medium">
+                          <span>{metadata.name}</span>
+                          {ledgerEntry && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatNumber(ledgerEntry.quantity)} / {formatNumber(ledgerEntry.capacity || 0)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{formatNumber(remaining)} remaining</span>
+                          {initial > 0 && <span>{remainingPercent}%</span>}
+                        </div>
+                        <Progress value={remainingPercent} className="h-1.5 bg-border/60" />
+                        {ledgerEntry?.capacity && ledgerEntry.capacity > 0 && ledgerEntry.quantity >= ledgerEntry.capacity && (
+                          <div className="flex items-center gap-2 text-[10px] text-amber-300">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Ledger full — expand storage to prevent waste</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

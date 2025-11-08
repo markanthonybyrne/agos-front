@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolveCoordinate } from '@/lib/coordinateResolver'
+import { formatCoordinate } from '@/lib/coordinates'
 import { Planet } from '@/types/api.types'
 
 interface CoordinateSearchBarProps {
@@ -27,15 +28,24 @@ export function CoordinateSearchBar({ onSearch, className, planets }: Coordinate
 
   // Debounced autocomplete lookup (future enhancement)
   useEffect(() => {
-    if (query.length >= 2) {
-      // TODO: Query backend for coordinate suggestions
-      // Format: "1:2:3" → suggest "1:2:3:1", "1:2:3:2", etc.
-      // For now, just clear suggestions
+    if (!planets || planets.length === 0 || query.trim().length < 2) {
       setSuggestions([])
-    } else {
-      setSuggestions([])
+      return
     }
-  }, [query])
+
+    const normalizedQuery = query.trim().toLowerCase()
+    const matches = Array.from(
+      new Set(
+        planets
+          .map((planet) => formatCoordinate(planet.coordinate))
+          .filter((coord) => coord && coord !== 'Invalid coordinate')
+      )
+    )
+      .filter((coord) => coord.toLowerCase().includes(normalizedQuery))
+      .slice(0, 10)
+
+    setSuggestions(matches)
+  }, [planets, query])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,10 +120,19 @@ export function CoordinateSearchBar({ onSearch, className, planets }: Coordinate
               <button
                 key={index}
                 type="button"
-                onClick={() => {
+              onClick={() => {
                   setQuery(suggestion)
                   setSuggestions([])
-                  inputRef.current?.focus()
+                  setIsFocused(false)
+                  try {
+                    const resolution = resolveCoordinate(suggestion, planets)
+                    onSearch(resolution.centerX, resolution.centerY, resolution.normalizedZoom)
+                    setQuery('')
+                  } catch (err) {
+                    console.error('Coordinate suggestion error:', err)
+                  } finally {
+                    inputRef.current?.blur()
+                  }
                 }}
                 className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors font-mono"
               >

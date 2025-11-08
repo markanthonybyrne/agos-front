@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { formatTimeRemaining, getBoosterDisplayName, calculateBoosterCost } from '@/lib/premiumHelpers'
-import { Zap, Hammer, AlertTriangle, Clock, Coins } from 'lucide-react'
+import { Zap, Hammer, AlertTriangle, Clock, Coins, Droplets } from 'lucide-react'
 
 const BOOSTER_CONFIG = {
   production: {
@@ -18,16 +18,28 @@ const BOOSTER_CONFIG = {
     duration: 24,
     name: 'Production Booster',
     icon: Zap,
-    description: 'Double all resource production across your empire',
+    description: 'Double all resource production across your empire.',
+    highlight: '+100% resource output',
   },
   construction: {
     baseCost: 30,
     duration: 12,
     name: 'Construction Booster',
     icon: Hammer,
-    description: 'Reduce all build times by 33%',
+    description: 'Reduce all build times by 33%.',
+    highlight: 'Faster construction queues',
+  },
+  secondary_extraction: {
+    baseCost: 120,
+    duration: 12,
+    name: 'Secondary Extraction Booster',
+    icon: Droplets,
+    description: 'Boost secondary extraction yield by 35% and temporarily expand material capacity.',
+    highlight: '+35% extraction • +25% vault capacity',
   },
 } as const
+
+type BoosterType = keyof typeof BOOSTER_CONFIG
 
 export function BoostersPanel() {
   const { data: boostersData, isLoading: boostersLoading, refetch } = useGetActiveBoostersQuery(undefined, {
@@ -53,7 +65,7 @@ export function BoostersPanel() {
     return () => clearInterval(interval)
   }, [boostersData])
 
-  const handleActivateBooster = async (type: 'production' | 'construction') => {
+  const handleActivateBooster = async (type: BoosterType) => {
     try {
       const result = await activateBooster({ type }).unwrap()
       toast.success(
@@ -153,7 +165,7 @@ export function BoostersPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           {Object.entries(BOOSTER_CONFIG).map(([type, config]) => {
-            const boosterType = type as 'production' | 'construction'
+            const boosterType = type as BoosterType
             const cost = calculateBoosterCost(config.baseCost, transactions)
             const canAfford = balance >= cost
             const recentPurchases = transactions.filter(
@@ -176,6 +188,9 @@ export function BoostersPanel() {
                     <div className="flex-1">
                       <p className="font-semibold">{config.name}</p>
                       <p className="text-sm text-muted-foreground">{config.description}</p>
+                        {config.highlight && (
+                          <p className="text-xs text-cyan-300 mt-1">{config.highlight}</p>
+                        )}
                       <p className="text-xs text-muted-foreground mt-1">
                         Duration: {config.duration} hours
                       </p>

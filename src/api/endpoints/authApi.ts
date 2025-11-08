@@ -115,6 +115,7 @@ export const authApi = apiSlice.injectEndpoints({
         'Planet', // getMe includes planets
         'Resource', // planets include resources
         'Statistics', // empire includes score/statistics
+        'SecondaryResource',
         ...(result?.empire?.id ? [{ type: 'Empire' as const, id: result.empire.id }] : []),
         ...(result?.planets?.map((p: Planet) => ({ type: 'Planet' as const, id: p.id })) || []),
       ],

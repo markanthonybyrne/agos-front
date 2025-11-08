@@ -1,8 +1,9 @@
 import { useMemo, memo, useCallback } from 'react'
 import { SystemData } from '@/lib/galaxyUtils'
 import { getRegionSystemColor } from '@/lib/regionColors'
-import { VisibilityResponse } from '@/types/api.types'
+import { VisibilityResponse, ResourceRarity } from '@/types/api.types'
 import { isSystemVisible, getVisibleSystems } from '@/lib/visibilityUtils'
+import { ResourceMetadata } from '@/config/resources'
 
 interface SystemMarkersLayerProps {
   systems: SystemData[]
@@ -15,6 +16,9 @@ interface SystemMarkersLayerProps {
   homeSystem?: SystemData | null // User's home system - always visible
   initialScale?: number // Initial/default zoom scale to show "You are here" indicator
   visibilityData?: VisibilityResponse // Visibility data for fog of war filtering
+  highlightResource?: string | null
+  highlightRarity?: ResourceRarity | 'all'
+  getResourceMetadata?: (slug: string) => ResourceMetadata
 }
 
 /**
@@ -36,7 +40,10 @@ function SystemMarkersLayerComponent({
   viewportBounds,
   homeSystem,
   initialScale,
-  visibilityData
+  visibilityData,
+  highlightResource,
+  highlightRarity = 'all',
+  getResourceMetadata,
 }: SystemMarkersLayerProps & { viewportBounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
   // Get set of visible system keys for fast lookup
   const visibleSystemKeys = useMemo(() => getVisibleSystems(visibilityData), [visibilityData])
@@ -94,6 +101,8 @@ function SystemMarkersLayerComponent({
     return isSystemVisible(system.region, system.system, visibilityData)
   }, [homeSystem, visibilityData])
   
+  const highlightActive = Boolean(highlightResource) || highlightRarity !== 'all'
+
   const markers = useMemo(() => {
     // Sort systems so home system is rendered last (appears on top)
     const sortedSystems = [...visibleSystems].sort((a, b) => {
@@ -113,8 +122,47 @@ function SystemMarkersLayerComponent({
                           system.region === homeSystem.region && 
                           system.system === homeSystem.system
       
-      // Home system uses green dot, all others use cyan (game branding color)
-      const systemColor = isHomeSystem ? '#00FF00' : '#00FFFF'
+      // Determine secondary resource presence for highlighting
+      const systemMaterials = system.planets.flatMap(
+        (planet) => planet.secondary_reserves ?? [],
+      )
+
+      const matchesResource =
+        !highlightResource ||
+        systemMaterials.some((reserve) => reserve.slug === highlightResource)
+
+      const matchesRarity =
+        highlightRarity === 'all' ||
+        systemMaterials.some((reserve) => {
+          const metadata = getResourceMetadata?.(reserve.slug)
+          const rarity = metadata?.rarity ?? reserve.rarity ?? 'common'
+          return rarity === highlightRarity
+        })
+
+      const shouldDimHighlight = highlightActive && !matchesResource
+        || (highlightRarity !== 'all' && !matchesRarity)
+
+      const isHighlighted = highlightActive && !shouldDimHighlight
+
+      // Home system uses green dot, others use cyan (game branding color) unless highlight active
+      let systemColor = isHomeSystem ? '#00FF00' : '#00FFFF'
+      if (!isHomeSystem && isHighlighted) {
+        const targetReserve =
+          systemMaterials.find((reserve) => reserve.slug === highlightResource) ??
+          systemMaterials.find((reserve) => {
+            if (highlightRarity === 'all') return false
+            const metadata = getResourceMetadata?.(reserve.slug)
+            const rarity = metadata?.rarity ?? reserve.rarity ?? 'common'
+            return rarity === highlightRarity
+          })
+
+        if (targetReserve) {
+          const metadata = getResourceMetadata?.(targetReserve.slug)
+          if (metadata?.color) {
+            systemColor = metadata.color
+          }
+        }
+      }
       const cyanGlowColor = 'rgba(0, 255, 255, 0.2)'
       
       // Check if this is a key system (has a name or contains a homeworld)
@@ -138,9 +186,13 @@ function SystemMarkersLayerComponent({
           baseSize = baseSize * 1.5 // 50% larger at other zoom levels
         }
       }
-      const markerSize = isHovered 
+      let markerSize = isHovered 
         ? baseSize * 1.5 
         : baseSize * Math.min(1.2, 1 + (scale - 1) * 0.1)
+
+      if (!isHomeSystem && highlightActive) {
+        markerSize = isHighlighted ? markerSize * 1.3 : markerSize * 0.9
+      }
       
       // Glow radius
       const glowRadius = markerSize * 2.5
@@ -177,6 +229,11 @@ function SystemMarkersLayerComponent({
       const systemOpacity = systemDiscoveryStatus === 'visible' ? 1.0 : 0.6
       const systemBlur = systemDiscoveryStatus === 'fogged' ? 2 : 0
       
+      const systemOpacityBase = systemDiscoveryStatus === 'visible' ? 1.0 : 0.6
+      const finalOpacity = shouldDimHighlight
+        ? systemOpacityBase * 0.25
+        : systemOpacityBase
+
       return (
         <g
           key={`system-${system.region}-${system.system}`}
@@ -207,7 +264,7 @@ function SystemMarkersLayerComponent({
           onMouseLeave={() => onSystemHover?.(null)}
           style={{ 
             cursor: isSystemVisibleForInteraction(system) ? 'pointer' : 'default',
-            opacity: isSystemVisibleForInteraction(system) ? systemOpacity : 0.3,
+            opacity: isSystemVisibleForInteraction(system) ? finalOpacity : 0.3,
             filter: systemBlur > 0 ? `blur(${systemBlur}px)` : 'none',
             pointerEvents: isSystemVisibleForInteraction(system) ? 'auto' : 'none'
           }}
@@ -217,11 +274,11 @@ function SystemMarkersLayerComponent({
             cx={system.center.x}
             cy={system.center.y}
             r={isHomeSystem ? glowRadius * 1.5 : glowRadius}
-            fill={isHomeSystem ? 'rgba(0, 255, 255, 0.4)' : cyanGlowColor}
+            fill={isHomeSystem ? 'rgba(0, 255, 255, 0.4)' : isHighlighted ? `${systemColor}33` : cyanGlowColor}
             opacity={isHomeSystem ? 0.6 : (isHovered ? 0.3 : 0.15)}
             className="system-glow"
             style={{
-              filter: isHomeSystem ? 'blur(1.5px)' : 'blur(1px)',
+            filter: isHomeSystem ? 'blur(1.5px)' : 'blur(1px)',
               transition: 'all 0.2s ease-in-out',
               animation: isHomeSystem ? 'pulse 2s ease-in-out infinite' : 'none'
             }}
@@ -239,9 +296,9 @@ function SystemMarkersLayerComponent({
             style={{
               filter: isHomeSystem
                 ? `drop-shadow(0 0 4px #00FF00) drop-shadow(0 0 2px rgba(0, 255, 0, 0.3))`
-                : (isHovered 
-                  ? `drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 1px rgba(255, 255, 255, 0.3))`
-                  : `drop-shadow(0 0 1.5px #00FFFF)`),
+                : (isHovered || isHighlighted
+                  ? `drop-shadow(0 0 3px ${systemColor}) drop-shadow(0 0 1px rgba(255, 255, 255, 0.3))`
+                  : `drop-shadow(0 0 1.5px ${systemColor})`),
               transition: 'all 0.2s ease-in-out'
             }}
           />
@@ -383,7 +440,21 @@ function SystemMarkersLayerComponent({
         </g>
       )
     })
-  }, [visibleSystems, hoveredSystem, onSystemClick, onSystemRightClick, onSystemHover, scale, homeSystem, initialScale, isSystemVisibleForInteraction])
+  }, [
+    visibleSystems,
+    hoveredSystem,
+    onSystemClick,
+    onSystemRightClick,
+    onSystemHover,
+    scale,
+    homeSystem,
+    initialScale,
+    isSystemVisibleForInteraction,
+    highlightActive,
+    highlightResource,
+    highlightRarity,
+    getResourceMetadata,
+  ])
   
   return (
     <g className="system-markers-layer">

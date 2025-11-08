@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,10 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useDonateToAllianceMutation } from '@/api/endpoints/alliancesApi'
+import { useDonateToAllianceMutation, useGetAllianceFundQuery } from '@/api/endpoints/alliancesApi'
 import { DollarSign, AlertCircle, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatNumber } from '@/lib/formatters'
+import { useAppSelector } from '@/app/hooks'
+import { useGetEmpireResourceSummaryQuery } from '@/api/endpoints/resourcesApi'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const donationSchema = z.object({
   tellerium: z.number().min(0, 'Tellerium amount must be positive').optional(),
@@ -28,14 +30,22 @@ interface DonationDialogProps {
 }
 
 export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialogProps) {
+  const empireId = useAppSelector((state) => state.auth.empire?.id)
   const [donateToAlliance, { isLoading }] = useDonateToAllianceMutation()
+  const { data: fundData, isLoading: isFundLoading, refetch: refetchFund } = useGetAllianceFundQuery(allianceId, {
+    skip: !open,
+  })
+  const { data: resourceSummary } = useGetEmpireResourceSummaryQuery(empireId ?? 0, {
+    skip: !open || !empireId,
+  })
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-    watch
+    watch,
+    setValue
   } = useForm<DonationData>({
     resolver: zodResolver(donationSchema),
     defaultValues: {
@@ -55,6 +65,7 @@ export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialo
         krypton: data.krypton || 0
       }).unwrap()
       toast.success('Donation successful!')
+      refetchFund()
       reset()
       onOpenChange(false)
     } catch (error: any) {
@@ -68,16 +79,25 @@ export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialo
   }
 
   const handleMaxTellerium = () => {
-    // TODO: Get actual empire tellerium balance
-    // For now, set a placeholder value
-    // register('tellerium').onChange({ target: { value: empireTellerium } })
+    const available = resourceSummary?.total_balances?.tellerium ?? 0
+    if (available <= 0) {
+      toast.info('No Tellerium available to donate right now.')
+      return
+    }
+    setValue('tellerium', available, { shouldDirty: true, shouldValidate: true })
   }
 
   const handleMaxKrypton = () => {
-    // TODO: Get actual empire krypton balance
-    // For now, set a placeholder value
-    // register('krypton').onChange({ target: { value: empireKrypton } })
+    const available = resourceSummary?.total_balances?.krypton ?? 0
+    if (available <= 0) {
+      toast.info('No Krypton available to donate right now.')
+      return
+    }
+    setValue('krypton', available, { shouldDirty: true, shouldValidate: true })
   }
+
+  const allianceTellerium = fundData?.fund_balance?.tellerium ?? 0
+  const allianceKrypton = fundData?.fund_balance?.krypton ?? 0
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -105,15 +125,21 @@ export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialo
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-400">
-                    {/* TODO: Get actual alliance balance */}
-                    0
+                    {isFundLoading ? (
+                      <Skeleton className="h-6 w-16 mx-auto" />
+                    ) : (
+                      formatNumber(allianceTellerium)
+                    )}
                   </div>
                   <div className="text-sm text-muted-foreground">Tellerium</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-400">
-                    {/* TODO: Get actual alliance balance */}
-                    0
+                    {isFundLoading ? (
+                      <Skeleton className="h-6 w-16 mx-auto" />
+                    ) : (
+                      formatNumber(allianceKrypton)
+                    )}
                   </div>
                   <div className="text-sm text-muted-foreground">Krypton</div>
                 </div>
@@ -142,6 +168,9 @@ export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialo
                   Max
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Available: {formatNumber(resourceSummary?.total_balances?.tellerium ?? 0)} T
+              </p>
               {errors.tellerium && (
                 <div className="flex items-center gap-1 text-sm text-destructive">
                   <AlertCircle className="w-3 h-3" />
@@ -169,6 +198,9 @@ export function DonationDialog({ open, onOpenChange, allianceId }: DonationDialo
                   Max
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Available: {formatNumber(resourceSummary?.total_balances?.krypton ?? 0)} K
+              </p>
               {errors.krypton && (
                 <div className="flex items-center gap-1 text-sm text-destructive">
                   <AlertCircle className="w-3 h-3" />

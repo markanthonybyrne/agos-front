@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { WidgetWindow } from './WidgetWindow'
 import { formatTimeRemaining, getBoosterDisplayName } from '@/lib/premiumHelpers'
-import { Zap, ArrowRight, Clock } from 'lucide-react'
+import { Zap, ArrowRight, Clock, Hammer, Droplets, Satellite } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useState, useEffect } from 'react'
 
@@ -48,6 +48,21 @@ export function BoostersWidget({
 
   const activeBoosters = data?.boosters ?? []
 
+  const renderIcon = (type: string) => {
+    switch (type) {
+      case 'production':
+        return <Zap className="w-4 h-4 text-purple-400" />
+      case 'construction':
+        return <Hammer className="w-4 h-4 text-purple-400" />
+      case 'signal':
+        return <Satellite className="w-4 h-4 text-purple-400" />
+      case 'secondary_extraction':
+        return <Droplets className="w-4 h-4 text-purple-400" />
+      default:
+        return <Zap className="w-4 h-4 text-purple-400" />
+    }
+  }
+
   return (
     <WidgetWindow
       title="Active Boosters"
@@ -89,7 +104,7 @@ export function BoostersWidget({
                       className="p-3 rounded-lg bg-muted/20 border border-purple/20 flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-purple-400" />
+                        {renderIcon(booster.type)}
                         <div>
                           <p className="text-sm font-medium">{displayName}</p>
                           <p className="text-xs text-muted-foreground">

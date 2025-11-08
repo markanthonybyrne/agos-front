@@ -27,7 +27,14 @@ import { SignalResults } from './components/SignalResults'
 
 type SignalType = 'fleet' | 'orbital_defence' | 'planetary' | 'all_frequency' | 'events'
 
-export function SignalsPage() {
+interface SignalsPageProps {
+  initialTarget?: {
+    coordinate?: string
+    type?: SignalType
+  }
+}
+
+export function SignalsPage({ initialTarget }: SignalsPageProps = {}) {
   const [activeTab, setActiveTab] = useState<'launch' | 'history'>('launch')
   const [searchTerm, setSearchTerm] = useState('')
   const [signalTypeFilter, setSignalTypeFilter] = useState<SignalType | 'all'>('all')
@@ -290,6 +297,7 @@ export function SignalsPage() {
               <SignalForm
                 onLaunch={handleLaunchSignal}
                 isLoading={isLaunching}
+                initialTarget={initialTarget}
               />
             </CardContent>
           </Card>

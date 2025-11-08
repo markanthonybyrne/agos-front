@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -31,9 +31,22 @@ const signalFormSchema = z.object({
 
 type SignalFormData = z.infer<typeof signalFormSchema>
 
+type SignalType = 'fleet' | 'orbital_defence' | 'planetary' | 'all_frequency' | 'events'
+
+interface InitialTarget {
+  coordinate?: string
+  quadrant?: number
+  sector?: number
+  galaxy?: number
+  system?: number
+  planet?: number
+  type?: SignalType
+}
+
 interface SignalFormProps {
   onLaunch: (data: { origin_planet_id: number; target_quadrant: number; target_sector: number; target_galaxy: number; target_system: number; target_planet: number; target_x: number; target_y: number; type: string }) => void | Promise<void>
   isLoading: boolean
+  initialTarget?: InitialTarget
 }
 
 const signalTypes = [
@@ -74,9 +87,9 @@ const signalTypes = [
   }
 ]
 
-export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
+export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormProps) {
   const { empire } = useAuth()
-  const [coordinateInput, setCoordinateInput] = useState('')
+  const [coordinateInput, setCoordinateInput] = useState(initialTarget?.coordinate ?? '')
   const [parsedCoordinate, setParsedCoordinate] = useState<{quadrant: number, sector: number, galaxy: number, system: number, planet: number} | null>(null)
 
   const {
@@ -88,12 +101,12 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
   } = useForm<SignalFormData>({
     resolver: zodResolver(signalFormSchema),
     defaultValues: {
-      type: 'fleet',
-      target_quadrant: 1,
-      target_sector: 1,
-      target_galaxy: 1,
-      target_system: 1,
-      target_planet: 1
+      type: initialTarget?.type ?? 'fleet',
+      target_quadrant: initialTarget?.quadrant ?? 1,
+      target_sector: initialTarget?.sector ?? 1,
+      target_galaxy: initialTarget?.galaxy ?? 1,
+      target_system: initialTarget?.system ?? 1,
+      target_planet: initialTarget?.planet ?? 1
     }
   })
 
@@ -173,6 +186,39 @@ export function SignalForm({ onLaunch, isLoading }: SignalFormProps) {
       type: data.type
     })
   }
+
+  useEffect(() => {
+    if (!initialTarget) return
+
+    if (initialTarget.type) {
+      setValue('type', initialTarget.type)
+    }
+
+    if (initialTarget.coordinate) {
+      handleCoordinateChange(initialTarget.coordinate)
+    } else {
+      if (initialTarget.quadrant) setValue('target_quadrant', initialTarget.quadrant)
+      if (initialTarget.sector) setValue('target_sector', initialTarget.sector)
+      if (initialTarget.galaxy) setValue('target_galaxy', initialTarget.galaxy)
+      if (initialTarget.system) setValue('target_system', initialTarget.system)
+      if (initialTarget.planet) setValue('target_planet', initialTarget.planet)
+      if (
+        initialTarget.quadrant &&
+        initialTarget.sector &&
+        initialTarget.galaxy &&
+        initialTarget.system &&
+        initialTarget.planet
+      ) {
+        setParsedCoordinate({
+          quadrant: initialTarget.quadrant,
+          sector: initialTarget.sector,
+          galaxy: initialTarget.galaxy,
+          system: initialTarget.system,
+          planet: initialTarget.planet,
+        })
+      }
+    }
+  }, [initialTarget, setValue])
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

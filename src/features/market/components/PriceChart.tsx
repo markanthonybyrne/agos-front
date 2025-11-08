@@ -3,9 +3,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useGetPriceHistoryQuery } from '@/api/endpoints/marketApi'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
 
 interface PriceChartProps {
-  resource: 'tellerium' | 'krypton'
+  resource: string
 }
 
 export function PriceChart({ resource }: PriceChartProps) {
@@ -13,6 +14,8 @@ export function PriceChart({ resource }: PriceChartProps) {
     resource_type: resource,
     ticks: 100,
   })
+  const { getMetadata } = useResourcesCatalog()
+  const metadata = getMetadata(resource)
 
   const chartData = useMemo(() => {
     if (!priceHistory?.history) return []
@@ -63,7 +66,7 @@ export function PriceChart({ resource }: PriceChartProps) {
           <Line 
             type="monotone" 
             dataKey="price" 
-            stroke={resource === 'tellerium' ? '#22d3ee' : '#a855f7'}
+            stroke={metadata.color}
             strokeWidth={2}
             dot={false}
           />

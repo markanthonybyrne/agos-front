@@ -127,28 +127,28 @@ export function PlanetDetailPanel({ planetId, onClose }: PlanetDetailPanelProps)
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <img
-          src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
-          alt={planet?.type?.name || planet.type?.slug || 'Planet'}
+          <img
+            src={getPlanetImage(planet?.type?.slug) || getPlanetImage('arid')}
+            alt={planet?.type?.name || planet.type?.slug || 'Planet'}
           className="h-16 w-16 flex-shrink-0 object-contain sm:h-20 sm:w-20"
-          style={{ imageRendering: 'auto', display: 'block' }}
-          onError={(e) => {
-            console.error('Planet image failed to load:', planet?.type?.slug)
-          }}
-        />
+            style={{ imageRendering: 'auto', display: 'block' }}
+            onError={(e) => {
+              console.error('Planet image failed to load:', planet?.type?.slug)
+            }}
+          />
         <div className="space-y-2">
           <h1 className="text-lg font-heading glow-cyan sm:text-xl">{planet?.name || 'Unknown Planet'}</h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            {formatCoordinate(planet?.coordinate || '')} • {planet?.state || ''}
-            {planet?.type?.name && (
-              <>
-                {' '}• <span className="capitalize">{planet?.type?.name}</span>
-              </>
-            )}
-          </p>
-          {planet?.type?.description && (
+              {formatCoordinate(planet?.coordinate || '')} • {planet?.state || ''}
+              {planet?.type?.name && (
+                <>
+                  {' '}• <span className="capitalize">{planet?.type?.name}</span>
+                </>
+              )}
+            </p>
+            {planet?.type?.description && (
             <p className="text-sm italic text-muted-foreground">{planet?.type?.description}</p>
-          )}
+            )}
         </div>
       </div>
 

@@ -156,10 +156,10 @@ function PlanetViewWithAnimation({
       <div
         className={cn(
           "sliding-panel-content fixed left-0 top-0 hidden h-full pointer-events-none transition-all ease-out xl:flex xl:w-1/2 xl:items-center xl:justify-center",
-          isClosing
-            ? "opacity-0 scale-95"
-            : isOpening
-            ? "opacity-0 scale-95"
+          isClosing 
+            ? "opacity-0 scale-95" 
+            : isOpening 
+            ? "opacity-0 scale-95" 
             : "opacity-100 scale-100"
         )}
         style={{
@@ -330,7 +330,7 @@ export const PanelContent = React.memo(function PanelContent({
       return <AchievementsPanel />
     
     case PanelType.SIGNALS:
-      return <SignalsPage />
+      return <SignalsPage initialTarget={panel.data?.initialTarget} />
     
     case PanelType.COMBAT_LOGS:
       return <CombatLogsPage />

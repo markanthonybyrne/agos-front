@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Droplets, AlertTriangle } from 'lucide-react'
 import { formatCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { getPlanetImage } from '@/lib/planetImages'
@@ -21,6 +21,9 @@ import { BuildableItems } from '@/components/construction/BuildableItems'
 import { useGetBuildableItemsQuery } from '@/api/endpoints/planetsApi'
 import { ModeSwitcher, ModeType } from '@/components/navigation/ModeSwitcher'
 import { PlanetBackground } from '@/components/planet/PlanetBackground'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 
 export function PlanetDetail() {
   const { id } = useParams<{ id: string }>()
@@ -36,6 +39,48 @@ export function PlanetDetail() {
     skip: !id,
   })
   const buildableItems = buildableItemsData
+  const { ledger, getMetadata } = useResourcesCatalog({ reserves: planet?.secondary_reserves })
+
+  const ledgerMap = useMemo(() => {
+    const map = new Map<string, typeof ledger[number]>()
+    ledger.forEach((entry) => {
+      map.set(entry.slug, entry)
+    })
+    return map
+  }, [ledger])
+
+  const topVein = useMemo(() => {
+    if (!planet?.secondary_reserves || planet.secondary_reserves.length === 0) {
+      return null
+    }
+    const richest = [...planet.secondary_reserves].sort(
+      (a, b) => (b.remaining ?? 0) - (a.remaining ?? 0),
+    )[0]
+    const metadata = getMetadata(richest.slug)
+    const ledgerEntry = ledgerMap.get(richest.slug)
+    const initial = richest.initial ?? richest.remaining ?? 0
+    const remaining = richest.remaining ?? 0
+    const remainingPercent = initial > 0 ? Math.max(0, Math.round((remaining / initial) * 100)) : 0
+    const richnessMultiplier = richest.richness ?? 1
+    const richnessPercent = Math.round((richnessMultiplier - 1) * 100)
+    const capacityCapped =
+      ledgerEntry?.capacity && ledgerEntry.capacity > 0
+        ? ledgerEntry.quantity >= ledgerEntry.capacity
+        : false
+    const isDepleted = Boolean(richest.depleted_at) || remainingPercent <= 0
+
+    return {
+      reserve: richest,
+      metadata,
+      ledgerEntry,
+      initial,
+      remaining,
+      remainingPercent,
+      richnessPercent,
+      capacityCapped,
+      isDepleted,
+    }
+  }, [planet?.secondary_reserves, ledgerMap, getMetadata])
   
   // Debug logging
   if (buildableItemsData) {
@@ -172,7 +217,7 @@ export function PlanetDetail() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="panel-glass border-cyan/20">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -248,6 +293,40 @@ export function PlanetDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {topVein && (
+          <Card className="panel-glass border-cyan/20">
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Droplets className="w-4 h-4 text-cyan-300" />
+                  <p className="text-sm text-cyan-300">Materials</p>
+                </div>
+                <p className="text-lg font-semibold text-foreground">{topVein.metadata.name}</p>
+                <Badge variant="outline" className="border-cyan-400/40 text-cyan-200">
+                  {topVein.richnessPercent >= 0 ? '+' : ''}
+                  {topVein.richnessPercent}% yield
+                </Badge>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {formatNumber(topVein.remaining)} / {formatNumber(topVein.initial || topVein.remaining)} reserves
+              </div>
+              <Progress value={topVein.remainingPercent} className="h-2 bg-border/60" />
+              {topVein.capacityCapped && topVein.ledgerEntry && (
+                <div className="flex items-start gap-2 text-xs text-amber-300">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    Ledger full ({formatNumber(topVein.ledgerEntry.quantity)} /{' '}
+                    {formatNumber(topVein.ledgerEntry.capacity || 0)}). Expand storage to avoid waste.
+                  </span>
+                </div>
+              )}
+              {topVein.isDepleted && (
+                <div className="text-xs text-destructive">Vein depleted</div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Construction Queue */}
@@ -255,7 +334,7 @@ export function PlanetDetail() {
         planetId={planet.id} 
         onConstructionComplete={() => {
           // Refresh planet data when construction completes
-          window.location.reload()
+          refetchPlanet()
         }}
       />
 

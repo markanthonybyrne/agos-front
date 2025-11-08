@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { useGetTechTreeDefinitionsQuery } from '@/api/endpoints/empiresApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectNode, setHighlightedPath, setFilters } from '@/app/slices/techTreeSlice'
-import { TechNodeType } from '@/types/tech-tree.types'
+import { TechNodeData, TechNodeType } from '@/types/tech-tree.types'
 import { buildGraph } from '@/lib/graphEngine'
 import { calculateHierarchicalLayout } from '@/lib/layoutAlgorithms'
 import { filterBySpecialization, filterByEra, filterByType, findPath } from '@/lib/graphEngine'
@@ -15,11 +15,35 @@ import { NodesLayer } from '@/components/tech-tree/NodesLayer'
 import { NodeDetailsPanel } from '@/components/tech-tree/NodeDetailsPanel'
 import { TechTreeFilterBar } from '@/components/tech-tree/TechTreeFilterBar'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { useWindow } from '@/components/common/WindowManager'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
+import { PlanetSelectorDialog } from '@/components/tech-tree/PlanetSelectorDialog'
+
+function mapNodeTypeToBuildType(
+  nodeType: TechNodeType
+): 'facility' | 'ship' | 'defense' | 'research' | null {
+  switch (nodeType) {
+    case 'facility':
+      return 'facility'
+    case 'ship':
+      return 'ship'
+    case 'research':
+      return 'research'
+    case 'defence':
+      return 'defense'
+    default:
+      return null
+  }
+}
 
 export function TechTreeScreen() {
   const dispatch = useAppDispatch()
   const [searchParams] = useSearchParams()
   const location = useLocation()
+  const { openPanel } = useWindow()
+  const [pendingQueueNode, setPendingQueueNode] = useState<TechNodeData | null>(null)
+  const [isPlanetSelectorOpen, setPlanetSelectorOpen] = useState(false)
   
   // Get filter from URL params or location state (optional - full tree shows all by default)
   const urlNodeType = searchParams.get('type') as TechNodeType | null
@@ -143,6 +167,73 @@ export function TechTreeScreen() {
     
     return nodes
   }, [graphData, layoutPositions, activeFilters])
+
+  const openNodeForPlanet = useCallback(
+    (node: TechNodeData, targetPlanetId: number) => {
+      const buildType = mapNodeTypeToBuildType(node.type)
+      if (!buildType) {
+        toast.error(`Unsupported node type: ${node.type}`)
+        return
+      }
+
+      if (!node.slug) {
+        toast.error('Unable to queue item: missing identifier')
+        return
+      }
+
+      openPanel(PanelType.BUILD_DETAIL, PanelSize.LARGE, {
+        type: buildType,
+        slug: node.slug,
+        planetId: targetPlanetId,
+      })
+      closeDetails()
+    },
+    [closeDetails, openPanel]
+  )
+
+  const handleQueueAction = useCallback(
+    (nodeId: string) => {
+      const node = filteredNodes.find((n) => n.id === nodeId)
+      if (!node) {
+        toast.error('Unable to queue this item right now.')
+        return
+      }
+
+      if (node.status === 'locked') {
+        toast.error('This item is locked. Complete the prerequisites first.')
+        return
+      }
+
+      if (node.status === 'completed' || node.status === 'researched') {
+        toast.info('This item is already completed.')
+        return
+      }
+
+      if (planetId) {
+        openNodeForPlanet(node, planetId)
+        return
+      }
+
+      setPendingQueueNode(node)
+      setPlanetSelectorOpen(true)
+    },
+    [filteredNodes, planetId, openNodeForPlanet]
+  )
+
+  const handlePlanetSelect = useCallback(
+    (selectedPlanetId: number) => {
+      if (!pendingQueueNode) return
+      openNodeForPlanet(pendingQueueNode, selectedPlanetId)
+      setPendingQueueNode(null)
+      setPlanetSelectorOpen(false)
+    },
+    [openNodeForPlanet, pendingQueueNode]
+  )
+
+  const handlePlanetDialogClose = useCallback(() => {
+    setPlanetSelectorOpen(false)
+    setPendingQueueNode(null)
+  }, [])
 
   // Calculate node bounds for zoom/pan (must be after filteredNodes)
   const nodeBounds = useMemo(() => {
@@ -337,6 +428,7 @@ export function TechTreeScreen() {
   }
 
   return (
+    <>
     <div 
       ref={zoomPan.containerRef}
       className="fixed inset-0 overflow-hidden pb-20" 
@@ -398,10 +490,7 @@ export function TechTreeScreen() {
           dispatch(selectNode(null))
           closeDetails()
         }}
-        onQueue={(nodeId) => {
-          // TODO: Implement queue action
-          console.log('Queue node:', nodeId)
-        }}
+        onQueue={handleQueueAction}
         onViewPath={(nodeId) => {
           if (graphData) {
             const path = findPath(graphData, nodeId)
@@ -417,5 +506,13 @@ export function TechTreeScreen() {
       {/* Filter Bar */}
       <TechTreeFilterBar />
     </div>
+    <PlanetSelectorDialog
+      open={isPlanetSelectorOpen}
+      onClose={handlePlanetDialogClose}
+      onSelect={handlePlanetSelect}
+      requiredType={(pendingQueueNode?.type ?? 'facility') as 'facility' | 'ship' | 'defence' | 'research'}
+      nodeName={pendingQueueNode?.name ?? 'Selected item'}
+    />
+    </>
   )
 }

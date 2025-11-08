@@ -7,20 +7,30 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCreateMarketOrderMutation, useGetMarketPricesQuery } from '@/api/endpoints/marketApi'
 import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { apiSlice } from '@/api/apiSlice'
-import { useAppDispatch } from '@/app/hooks'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { toast } from 'sonner'
 import { formatNumber } from '@/lib/formatters'
 import { Coins, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
+import { selectEmpireSecondaryCapacity, selectEmpireSecondaryCapacityUsed } from '@/app/selectors/resourceSelectors'
 
 const orderSchema = z.object({
   planet_id: z.number().min(1, 'Planet is required'),
-  resource_type: z.enum(['tellerium', 'krypton']),
-  quantity: z.number().min(1000, 'Minimum quantity is 1,000').max(100000000, 'Maximum quantity is 100,000,000'),
-  price_limit: z.number().min(0.01, 'Price limit must be positive').optional().nullable(),
+  resource_type: z.string().min(1, 'Resource is required'),
+  quantity: z
+    .number()
+    .min(1000, 'Minimum quantity is 1,000')
+    .max(100000000, 'Maximum quantity is 100,000,000'),
+  price_limit: z
+    .number()
+    .min(0.0001, 'Price limit must be positive')
+    .optional()
+    .nullable(),
 })
 
 type OrderFormData = z.infer<typeof orderSchema>
@@ -35,6 +45,9 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
   const { data: planetsData } = useGetPlanetsQuery()
   const { data: prices } = useGetMarketPricesQuery()
   const [createOrder, { isLoading }] = useCreateMarketOrderMutation()
+  const { primaryResources, secondaryResources, allResources, ledger, getMetadata } = useResourcesCatalog()
+  const secondaryCapacity = useAppSelector(selectEmpireSecondaryCapacity)
+  const secondaryUsed = useAppSelector(selectEmpireSecondaryCapacityUsed)
 
   const planets = planetsData?.planets || []
 
@@ -42,7 +55,7 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
     resolver: zodResolver(orderSchema),
     defaultValues: {
       planet_id: planets[0]?.id || 0,
-      resource_type: 'tellerium',
+      resource_type: allResources[0]?.slug || 'tellerium',
       quantity: 10000,
       price_limit: null,
     },
@@ -52,24 +65,65 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
   const watchResourceType = form.watch('resource_type')
   const watchPlanetId = form.watch('planet_id')
   const watchPriceLimit = form.watch('price_limit')
+  const quantity = Number.isFinite(watchQuantity) ? watchQuantity : 0
+  const priceLimit = Number.isFinite(watchPriceLimit as number) ? watchPriceLimit : null
 
-  const selectedPlanet = planets.find(p => p.id === watchPlanetId)
-  const currentPrice = prices?.[watchResourceType]?.price || 0
-  const effectivePrice = watchPriceLimit || currentPrice
-  const estimatedCost = watchQuantity * effectivePrice
+  useEffect(() => {
+    if (planets.length > 0 && !form.getValues('planet_id')) {
+      form.setValue('planet_id', planets[0].id)
+    }
+  }, [planets, form])
 
-  // Get available resources for validation
-  const availableResource = orderType === 'sell' 
-    ? (watchResourceType === 'tellerium' 
-        ? selectedPlanet?.tellerium_balance || 0 
-        : selectedPlanet?.krypton_balance || 0)
-    : (watchResourceType === 'tellerium' 
-        ? selectedPlanet?.krypton_balance || 0 // Need Krypton to buy Tellerium
-        : selectedPlanet?.tellerium_balance || 0) // Need Tellerium to buy Krypton
+  useEffect(() => {
+    if (!watchResourceType && allResources.length > 0) {
+      form.setValue('resource_type', allResources[0].slug)
+    }
+  }, [watchResourceType, allResources, form])
 
-  const hasInsufficientResources = orderType === 'sell' 
-    ? availableResource < watchQuantity
-    : availableResource < estimatedCost
+  const selectedPlanet = planets.find((p) => p.id === watchPlanetId)
+  const resourceMetadata = watchResourceType ? getMetadata(watchResourceType) : null
+  const isSecondaryResource = resourceMetadata?.category === 'secondary'
+  const ledgerEntry = ledger.find((entry) => entry.slug === watchResourceType)
+  const currentPrice = watchResourceType ? prices?.lookup?.[watchResourceType]?.price ?? 0 : 0
+  const effectivePrice = priceLimit || currentPrice
+  const estimatedCost = quantity * effectivePrice
+  const secondaryCapacityRemaining = Math.max(0, secondaryCapacity - secondaryUsed)
+
+  const availableForSell = useMemo(() => {
+    if (orderType !== 'sell') return 0
+    if (isSecondaryResource) {
+      return ledgerEntry?.quantity ?? 0
+    }
+    if (watchResourceType === 'tellerium') {
+      return selectedPlanet?.tellerium_balance ?? 0
+    }
+    if (watchResourceType === 'krypton') {
+      return selectedPlanet?.krypton_balance ?? 0
+    }
+    return 0
+  }, [orderType, isSecondaryResource, ledgerEntry, watchResourceType, selectedPlanet])
+
+  const fundingAvailable = useMemo(() => {
+    if (orderType !== 'buy') return 0
+    if (isSecondaryResource) {
+      return selectedPlanet?.tellerium_balance ?? 0
+    }
+    if (watchResourceType === 'tellerium') {
+      return selectedPlanet?.krypton_balance ?? 0
+    }
+    if (watchResourceType === 'krypton') {
+      return selectedPlanet?.tellerium_balance ?? 0
+    }
+    return 0
+  }, [orderType, isSecondaryResource, selectedPlanet, watchResourceType])
+
+  const insufficientSellStock = orderType === 'sell' && availableForSell < quantity
+  const insufficientBuyFunds =
+    orderType === 'buy' && !isSecondaryResource && fundingAvailable < estimatedCost
+  const insufficientCapacity =
+    orderType === 'buy' && isSecondaryResource && quantity > secondaryCapacityRemaining
+
+  const disableSubmit = isLoading || insufficientSellStock || insufficientBuyFunds || insufficientCapacity
 
   const onSubmit = async (data: OrderFormData) => {
     try {
@@ -147,16 +201,62 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
             <Label htmlFor="resource_type">Resource Type</Label>
             <Select
               value={watchResourceType}
-              onValueChange={(value) => form.setValue('resource_type', value as 'tellerium' | 'krypton')}
+              onValueChange={(value) => form.setValue('resource_type', value)}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select a resource" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="tellerium">Tellerium (T)</SelectItem>
-                <SelectItem value="krypton">Krypton (K)</SelectItem>
+                <div className="px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                  Primary Resources
+                </div>
+                {primaryResources.map((resource) => (
+                  <SelectItem key={resource.slug} value={resource.slug}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: resource.color }}
+                      />
+                      {resource.name}
+                    </div>
+                  </SelectItem>
+                ))}
+                {secondaryResources.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                      Secondary Materials
+                    </div>
+                    {secondaryResources.map((resource) => (
+                      <SelectItem key={resource.slug} value={resource.slug}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: resource.color }}
+                          />
+                          {resource.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
+            {resourceMetadata && (
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="uppercase"
+                  style={{ borderColor: `${resourceMetadata.color}60`, color: resourceMetadata.color }}
+                >
+                  {resourceMetadata.category === 'primary' ? 'Primary' : resourceMetadata.rarity}
+                </Badge>
+                <span>
+                  {resourceMetadata.category === 'secondary'
+                    ? 'Materials stored in the empire ledger'
+                    : 'Standard strategic resource'}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Quantity */}
@@ -200,7 +300,7 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
           </div>
 
           {/* Current Price Display */}
-          <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
+          <div className="p-4 bg-muted/20 rounded-lg border border-border/50 space-y-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Current Market Price:</span>
               <span className="font-mono font-semibold">{currentPrice.toFixed(4)}</span>
@@ -211,24 +311,49 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
               </span>
               <span className="font-mono font-semibold">{formatNumber(estimatedCost)}</span>
             </div>
-            {selectedPlanet && (
-              <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-                <span>
-                  Available {orderType === 'sell' ? watchResourceType : watchResourceType === 'tellerium' ? 'krypton' : 'tellerium'}:
-                </span>
-                <span className="font-mono">{formatNumber(availableResource)}</span>
-              </div>
-            )}
+              {orderType === 'sell' && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+                  <span>Available to sell:</span>
+                  <span className="font-mono">
+                    {formatNumber(availableForSell)}
+                    {isSecondaryResource && ' (ledger)'}
+                  </span>
+                </div>
+              )}
+              {orderType === 'buy' && isSecondaryResource && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+                  <span>Ledger capacity remaining:</span>
+                  <span className="font-mono">{formatNumber(secondaryCapacityRemaining)}</span>
+                </div>
+              )}
           </div>
 
-          {/* Insufficient Resources Warning */}
-          {hasInsufficientResources && (
+          {insufficientBuyFunds && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Insufficient {orderType === 'sell' ? watchResourceType : watchResourceType === 'tellerium' ? 'krypton' : 'tellerium'}.
-                Required: {formatNumber(orderType === 'sell' ? watchQuantity : estimatedCost)} | 
-                Available: {formatNumber(availableResource)}
+                Insufficient {watchResourceType === 'tellerium' ? 'krypton' : 'tellerium'} to fund this purchase.
+                Required: {formatNumber(estimatedCost)} | Available: {formatNumber(fundingAvailable)}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {insufficientSellStock && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Insufficient {resourceMetadata?.name ?? watchResourceType} to sell.
+                Required: {formatNumber(watchQuantity)} | Available: {formatNumber(availableForSell)}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {insufficientCapacity && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Ledger capacity reached. Free up storage or upgrade your materials vault before buying additional
+                {` ${resourceMetadata?.name ?? 'materials'}.`}
               </AlertDescription>
             </Alert>
           )}
@@ -236,7 +361,7 @@ export function OrderForm({ defaultOrderType = 'buy' }: OrderFormProps) {
           <Button 
             type="submit" 
             className="w-full"
-            disabled={isLoading || hasInsufficientResources}
+            disabled={disableSubmit}
           >
             {isLoading ? 'Placing Order...' : `Place ${orderType === 'buy' ? 'Buy' : 'Sell'} Order`}
           </Button>

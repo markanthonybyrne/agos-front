@@ -1,60 +1,68 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { useGetMarketPricesQuery } from '@/api/endpoints/marketApi'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
 
 interface PriceDisplayProps {
-  resource: 'tellerium' | 'krypton'
+  resource: string
 }
 
 export function PriceDisplay({ resource }: PriceDisplayProps) {
   const { data: prices, isLoading } = useGetMarketPricesQuery()
-  const priceData = prices?.[resource]
+  const { getMetadata } = useResourcesCatalog()
+  const metadata = getMetadata(resource)
+  const priceData = prices?.lookup?.[resource]
   const price = priceData?.price ?? 0
 
-  // For now, we'll show static price (you can add price change tracking later)
-  const priceChange = 0 // TODO: Calculate from price history
-  const priceChangePercent = 0
+  // Placeholder change values until history integration
+  const priceChange = priceData?.change_percent ?? 0
+  const priceChangePercent = priceChange
 
   return (
-    <Card className={cn(
-      'panel-glass border-2',
-      resource === 'tellerium' ? 'border-cyan-500/40' : 'border-purple-500/40'
-    )}>
-      <CardContent className="p-6">
+    <Card
+      className="panel-glass border-2"
+      style={{ borderColor: `${metadata.color}40` }}
+    >
+      <CardContent className="p-6 space-y-3">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-6 w-24" />
             <Skeleton className="h-4 w-32" />
           </div>
         ) : (
-          <div className="space-y-2">
+          <>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold capitalize">
-                {resource === 'tellerium' ? 'Tellerium (T)' : 'Krypton (K)'}
-              </h3>
-              {priceChange !== 0 && (
-                <div className={cn(
-                  'flex items-center gap-1 text-sm',
-                  priceChange > 0 ? 'text-green-400' : 'text-red-400'
-                )}>
-                  {priceChange > 0 ? (
+              <h3 className="text-lg font-semibold">{metadata.name}</h3>
+              <Badge style={{ borderColor: `${metadata.color}80`, color: metadata.color }}>
+                {metadata.category === 'primary' ? 'Primary' : metadata.rarity}
+              </Badge>
+            </div>
+            <div className={cn('text-3xl font-bold font-mono')} style={{ color: metadata.color }}>
+              {price.toFixed(4)}
+            </div>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Current market price</span>
+              {priceChangePercent !== 0 && (
+                <span
+                  className={cn(
+                    'flex items-center gap-1 font-medium',
+                    priceChangePercent > 0 ? 'text-green-400' : 'text-red-400',
+                  )}
+                >
+                  {priceChangePercent > 0 ? (
                     <TrendingUp className="w-4 h-4" />
                   ) : (
                     <TrendingDown className="w-4 h-4" />
                   )}
-                  <span>{priceChange > 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%</span>
-                </div>
+                  {priceChangePercent > 0 ? '+' : ''}
+                  {priceChangePercent.toFixed(2)}%
+                </span>
               )}
             </div>
-            <div className="text-3xl font-bold font-mono">
-              {price.toFixed(4)}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Current market price
-            </p>
-          </div>
+          </>
         )}
       </CardContent>
     </Card>

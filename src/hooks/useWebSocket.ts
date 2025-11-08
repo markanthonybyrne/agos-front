@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
 import { useGetMeQuery } from '@/api/endpoints/authApi'
-import { setTick, setTickProcessing } from '@/app/slices/gameSlice'
+import { setTick, setTickProcessing, setSecondaryResourceDelta } from '@/app/slices/gameSlice'
 import { updateEmpire } from '@/app/slices/authSlice'
 import { 
   handleConstructionCompleted,
@@ -23,6 +23,9 @@ import { initializeEcho, disconnectEcho, getEcho } from '@/lib/websocket'
 import { formatCoordinate } from '@/lib/coordinates'
 import { apiSlice } from '@/api/apiSlice'
 import { notifyWithToast } from '@/lib/notificationHelper'
+import type { Empire } from '@/types/api.types'
+import { getResourceMetadata } from '@/config/resources'
+import { formatNumber } from '@/lib/formatters'
 
 export function useWebSocket() {
   const dispatch = useAppDispatch()
@@ -135,11 +138,69 @@ export function useWebSocket() {
     // Define all handlers BEFORE subscription so they can be called manually
     // Handle empire updated event (enhanced for real-time updates)
     const handleEmpireUpdated = (data: any) => {
-      // Update empire state if data includes empire object
+      let nextEmpire: Empire | null = null
+
       if (data.empire) {
-        dispatch(updateEmpire(data.empire))
+        nextEmpire = data.empire as Empire
+      } else if (
+        (data.secondary_resources || data.secondary_capacity !== undefined || data.secondary_capacity_used !== undefined) &&
+        empire
+      ) {
+        nextEmpire = {
+          ...empire,
+        }
       }
-      
+
+      if (nextEmpire) {
+        if (data.secondary_resources) {
+          nextEmpire.secondary_resources = data.secondary_resources
+        }
+        if (data.secondary_capacity !== undefined) {
+          nextEmpire.secondary_capacity = data.secondary_capacity
+        }
+        if (data.secondary_capacity_used !== undefined) {
+          nextEmpire.secondary_capacity_used = data.secondary_capacity_used
+        }
+        if (data.secondary_capacity_bonus_percent !== undefined) {
+          nextEmpire.secondary_capacity_bonus_percent = data.secondary_capacity_bonus_percent
+        }
+        if (data.active_boosters) {
+          nextEmpire.active_boosters = data.active_boosters
+        }
+
+        dispatch(updateEmpire(nextEmpire))
+      }
+
+      if (data.secondary_resource_delta) {
+        dispatch(
+          setSecondaryResourceDelta({
+            delta: data.secondary_resource_delta,
+            tick: data.tick_number ?? data.tick ?? undefined,
+          }),
+        )
+
+        const deltaEntries = Object.entries(data.secondary_resource_delta as Record<string, number>)
+        if (deltaEntries.length > 0) {
+          const summary = deltaEntries
+            .map(([slug, amount]) => {
+              const sign = amount > 0 ? '+' : amount < 0 ? '-' : ''
+              const magnitude = Math.abs(amount)
+              const label = getResourceMetadata(slug).name
+              return `${sign}${formatNumber(magnitude)} ${label}`
+            })
+            .join(', ')
+
+          const totalDelta = deltaEntries.reduce((sum, [, amount]) => sum + amount, 0)
+
+          notifyWithToast(dispatch, {
+            type: totalDelta >= 0 ? 'success' : 'warning',
+            title: 'Materials Update',
+            message: summary,
+            category: 'general',
+          })
+        }
+      }
+
       // Check for significant changes that warrant notifications
       const changes = data.changes || {}
       if (changes.score || changes.planets_owned || changes.alliance_id) {
@@ -159,7 +220,7 @@ export function useWebSocket() {
       }
       
       // Aggressively invalidate all Empire-related tags for real-time updates
-      const tags: any[] = ['Empire', 'Universe', 'Resource', 'Planet', 'Statistics']
+      const tags: any[] = ['Empire', 'Universe', 'Resource', 'Planet', 'Statistics', 'SecondaryResource']
       
       // Force refetch all active empire queries immediately
       dispatch(apiSlice.util.invalidateTags(tags))
@@ -214,6 +275,14 @@ export function useWebSocket() {
         )
       }
       
+      if (changes.secondary_extraction || changes.secondary_resources || changes.secondary_reserves) {
+        window.dispatchEvent(
+          new CustomEvent('planet:secondary:updated', {
+            detail: { planetId, changes, planet: data.planet || data },
+          }),
+        )
+      }
+
       // Check if construction queue changed
       if (changes.construction_queue || data.planet?.construction_queue !== undefined) {
         // Dispatch custom event for construction queue updates

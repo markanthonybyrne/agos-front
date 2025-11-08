@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { SecondaryResourceDelta } from '@/types/api.types'
 
 interface GameState {
   currentTick: number | null
@@ -6,6 +7,8 @@ interface GameState {
   nextTickAt: string | null // ISO 8601 timestamp (absolute) for tick countdown
   tickIntervalSeconds: number | null // Store the tick interval (e.g., 300 for 5 minutes)
   isTickProcessing: boolean
+  secondaryResourceDelta: SecondaryResourceDelta | null
+  secondaryResourceDeltaTick: number | null
 }
 
 const initialState: GameState = {
@@ -14,6 +17,8 @@ const initialState: GameState = {
   nextTickAt: null,
   tickIntervalSeconds: null,
   isTickProcessing: false,
+  secondaryResourceDelta: null,
+  secondaryResourceDeltaTick: null,
 }
 
 const gameSlice = createSlice({
@@ -36,9 +41,26 @@ const gameSlice = createSlice({
     setTickProcessing: (state, action: PayloadAction<boolean>) => {
       state.isTickProcessing = action.payload
     },
+    setSecondaryResourceDelta: (
+      state,
+      action: PayloadAction<{ delta: SecondaryResourceDelta; tick?: number }>,
+    ) => {
+      state.secondaryResourceDelta = action.payload.delta
+      state.secondaryResourceDeltaTick =
+        action.payload.tick ?? state.currentTick ?? null
+    },
+    clearSecondaryResourceDelta: (state) => {
+      state.secondaryResourceDelta = null
+      state.secondaryResourceDeltaTick = null
+    },
   },
 })
 
-export const { setTick, setTickProcessing } = gameSlice.actions
+export const {
+  setTick,
+  setTickProcessing,
+  setSecondaryResourceDelta,
+  clearSecondaryResourceDelta,
+} = gameSlice.actions
 export default gameSlice.reducer
 

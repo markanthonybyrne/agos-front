@@ -68,7 +68,7 @@ function createIcosahedron(): { vertices: Vertex3[]; faces: number[][] } {
     { x: -t, y: 0, z: -1 },
     { x: -t, y: 0, z: 1 },
   ]
-
+  
   const vertices = rawVertices.map(normalize)
 
   const faces: number[][] = [
@@ -221,18 +221,18 @@ function generateGeodesicSphere(frequency = GEODESIC_FREQUENCY) {
 
     if (uniqueVertices.length < 5) {
       return
-    }
-
-    cells.push({
-      id: cellId++,
+      }
+      
+      cells.push({
+        id: cellId++,
       vertices: uniqueVertices,
-      projected: [],
-      center,
-      projectedCenter: { x: 0, y: 0 },
+        projected: [],
+        center,
+        projectedCenter: { x: 0, y: 0 },
       isPentagon: uniqueVertices.length === 5,
     })
-  })
-
+      })
+  
   return cells
 }
 

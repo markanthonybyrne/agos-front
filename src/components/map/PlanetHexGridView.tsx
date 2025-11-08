@@ -82,7 +82,7 @@ function PlanetImageWithScale({ planet }: { planet: Planet }) {
 
 /**
  * PlanetHexGridView - Shows planet with hex grid overlay for owned planets
- *
+ * 
  * Features:
  * - Planet image with hex grid overlay
  * - Radial action wheel for planetary operations
@@ -156,7 +156,7 @@ export function PlanetHexGridView({ planet, onClose }: PlanetHexGridViewProps) {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+          onClose()
       }
     }
     document.addEventListener('keydown', handleEscape)
@@ -301,7 +301,7 @@ export function PlanetHexGridView({ planet, onClose }: PlanetHexGridViewProps) {
       {/* Planetary action wheel */}
       <PlanetActionWheel
         planet={displayPlanet}
-        className="fixed bottom-6 left-6 z-[10003]"
+        className="fixed bottom-10 left-20 z-[10003]"
         openPanel={openPanel}
       />
       

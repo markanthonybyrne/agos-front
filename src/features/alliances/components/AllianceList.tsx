@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alliance } from '@/types/api.types'
+import { JoinRequestForm } from '@/features/politics/components/JoinRequestForm'
 
 interface AllianceListProps {
   alliances: Alliance[]
@@ -26,6 +28,8 @@ export function AllianceList({
   onSelectAlliance, 
   selectedAlliance 
 }: AllianceListProps) {
+  const [joinAllianceId, setJoinAllianceId] = useState<number | null>(null)
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -67,6 +71,7 @@ export function AllianceList({
   }
 
   return (
+    <>
     <div className="space-y-4">
       {alliances.map((alliance, index) => (
         <Card
@@ -155,7 +160,7 @@ export function AllianceList({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation()
-                      // TODO: Implement join alliance
+                      setJoinAllianceId(alliance.id)
                     }}
                   >
                     <UserPlus className="w-4 h-4 mr-1" />
@@ -190,5 +195,18 @@ export function AllianceList({
         </Card>
       ))}
     </div>
+    <JoinRequestForm
+      allianceId={joinAllianceId ?? 0}
+      open={joinAllianceId !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setJoinAllianceId(null)
+        }
+      }}
+      onSuccess={() => {
+        setJoinAllianceId(null)
+      }}
+    />
+    </>
   )
 }
