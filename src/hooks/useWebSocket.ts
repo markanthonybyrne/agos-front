@@ -612,6 +612,11 @@ export function useWebSocket() {
       if (lower.includes('defence') || lower.includes('defense')) {
         tags.push('Defence')
         if (planetId) tags.push({ type: 'Defence', id: Number(planetId) })
+        window.dispatchEvent(
+          new CustomEvent('planet:defence:updated', {
+            detail: { planetId, itemSlug, quantity },
+          })
+        )
       }
       if (lower.includes('ship')) {
         tags.push('Ship')
@@ -630,6 +635,66 @@ export function useWebSocket() {
       )
       
       dispatch(apiSlice.util.invalidateTags(tags as any))
+    }
+
+    const handlePopulationEvent = (eventName: string, data: any) => {
+      const planet = data.planet || data.colony || {}
+      const planetId = planet.id || data.planet_id
+      const planetName = planet.name || data.planet_name || 'Colony'
+      const lowerEvent = eventName.toLowerCase()
+
+      let title = 'Population Update'
+      let message = data.message || ''
+      let severity: 'info' | 'warning' | 'critical' | 'success' = 'info'
+
+      if (lowerEvent.includes('stage') && lowerEvent.includes('advance')) {
+        title = 'Population Stage Advanced'
+        message = message || `${planetName} has progressed to a new population stage.`
+        severity = 'success'
+      } else if (lowerEvent.includes('overdraft')) {
+        title = 'Draft Overdraft Warning'
+        message = message || `${planetName} has exceeded safe draft capacity.`
+        severity = 'warning'
+      } else if (lowerEvent.includes('unrest')) {
+        title = 'Unrest Alert'
+        message = message || `${planetName} unrest has reached critical levels.`
+        severity = 'critical'
+      } else if (lowerEvent.includes('veteran')) {
+        title = 'Veteran Celebration'
+        message = message || `${planetName} veterans are celebrating recent victories.`
+        severity = 'success'
+      } else if (lowerEvent.includes('specialization')) {
+        title = 'Colony Specialisation Updated'
+        message = message || `${planetName} has adopted a new specialisation.`
+        severity = 'success'
+      }
+
+      notifyWithToast(dispatch, {
+        type: severity === 'critical' ? 'error' : severity === 'warning' ? 'warning' : 'success',
+        title,
+        message,
+        category: 'general',
+        actionUrl: planetId ? `/planets/${planetId}` : '/planets',
+        data: {
+          planetId,
+          planetName,
+          event: eventName,
+        },
+      })
+
+      const tags: any[] = ['Population']
+      if (planetId) {
+        const pid = Number(planetId)
+        tags.push({ type: 'Population', id: pid })
+        tags.push({ type: 'Resource', id: pid })
+      }
+      dispatch(apiSlice.util.invalidateTags(tags))
+
+      window.dispatchEvent(
+        new CustomEvent('population:updated', {
+          detail: { planetId, eventName, data },
+        })
+      )
     }
     
     // Handle fleet launched event (CRITICAL - defender warnings)
@@ -857,6 +922,9 @@ export function useWebSocket() {
             if (eventName === 'research.completed' || eventName.includes('research.completed') || eventName.includes('ResearchCompleted')) {
               handleResearchCompletedEvent(eventData)
             }
+            if (eventName?.toLowerCase?.().includes('population')) {
+              handlePopulationEvent(eventName, eventData)
+            }
             if (eventName === 'fleet.arrived' || eventName.includes('fleet.arrived') || eventName.includes('FleetArrived')) {
               handleFleetArrivedEvent(eventData)
             }
@@ -1014,6 +1082,32 @@ export function useWebSocket() {
       privateChannel.listen('ResearchCompleted', handleResearchCompletedEvent)
       privateChannel.listen('App\\Events\\ResearchCompleted', handleResearchCompletedEvent)
       privateChannel.listen('App.Events.ResearchCompleted', handleResearchCompletedEvent)
+      const populationEvents = [
+        'population.stage.advanced',
+        '.population.stage.advanced',
+        'PopulationStageAdvanced',
+        'App\\Events\\PopulationStageAdvanced',
+        'population.overdrafted',
+        '.population.overdrafted',
+        'PopulationOverdrafted',
+        'App\\Events\\PopulationOverdrafted',
+        'population.unrest.threshold',
+        '.population.unrest.threshold',
+        'PopulationUnrestThresholdReached',
+        'App\\Events\\PopulationUnrestThresholdReached',
+        'population.veteran.celebration',
+        '.population.veteran.celebration',
+        'PopulationVeteranCelebration',
+        'App\\Events\\PopulationVeteranCelebration',
+        'population.specialization.changed',
+        '.population.specialization.changed',
+        'PopulationSpecializationChanged',
+        'App\\Events\\PopulationSpecializationChanged',
+      ]
+
+      populationEvents.forEach((eventName) => {
+        privateChannel.listen(eventName as any, (data: any) => handlePopulationEvent(eventName, data))
+      })
 
       // Tech Tree System Events
       privateChannel.listen('era.progression', handleEraProgressionEvent)

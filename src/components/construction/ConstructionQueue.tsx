@@ -11,7 +11,6 @@ import { ConstructionQueueItem } from '@/types/api.types'
 import { formatResource } from '@/lib/formatters'
 import { Clock, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-import { apiSlice } from '@/api/apiSlice'
 import { useAppSelector } from '@/app/hooks'
 import { ConstructionCard } from './ConstructionCard'
 import { QueueStats } from './QueueStats'
@@ -27,6 +26,7 @@ export function ConstructionQueue({
   onConstructionComplete 
 }: ConstructionQueueProps) {
   const [cancellingId, setCancellingId] = useState<number | null>(null)
+  const [typeFilter, setTypeFilter] = useState<'all' | ConstructionQueueItem['type']>('all')
   const empire = useAppSelector((state) => state.auth.empire)
 
   const { data: constructionData, isLoading, error, refetch } = useGetConstructionQueueQuery(planetId, {
@@ -41,6 +41,26 @@ export function ConstructionQueue({
   const [cancelResearch] = useCancelResearchMutation()
 
   const constructions = constructionData?.construction_queue || []
+  const filteredConstructions = typeFilter === 'all'
+    ? constructions
+    : constructions.filter((construction) => construction.type === typeFilter)
+  const hasFilteredResults = filteredConstructions.length > 0
+  const statsSource = typeFilter === 'all' ? constructions : filteredConstructions
+
+  const filterOptions: Array<{ label: string; value: 'all' | ConstructionQueueItem['type'] }> = [
+    { label: 'All', value: 'all' },
+    { label: 'Facilities', value: 'facility' },
+    { label: 'Defences', value: 'defence' },
+    { label: 'Ships', value: 'ship' },
+    { label: 'Research', value: 'research' },
+  ]
+  const filterLabels: Record<'all' | ConstructionQueueItem['type'], string> = {
+    all: 'construction',
+    facility: 'facility builds',
+    defence: 'defence builds',
+    ship: 'ship builds',
+    research: 'research projects',
+  }
 
   // Subscribe to WebSocket events for real-time construction updates
   useEffect(() => {
@@ -122,13 +142,12 @@ export function ConstructionQueue({
           throw new Error('Unknown construction type')
       }
 
-      toast.success(result.data?.message || 'Construction cancelled successfully')
-      
-      if (result.data?.refund) {
-        toast.info(
-          `Refunded: ${formatResource(result.data.refund.tellerium)} T, ${formatResource(result.data.refund.krypton)} K`
-        )
-      }
+      const refund = (result.data as any)?.refund
+      toast.success('Construction cancelled', {
+        description: refund
+          ? `Refund: ${formatResource(refund.tellerium)} T · ${formatResource(refund.krypton)} K`
+          : result.data?.message,
+      })
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to cancel construction')
     } finally {
@@ -142,7 +161,7 @@ export function ConstructionQueue({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            Construction Queue
+            Orbital Construction
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -162,7 +181,7 @@ export function ConstructionQueue({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-red-400" />
-            Construction Queue
+            Orbital Construction
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -180,7 +199,7 @@ export function ConstructionQueue({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            Construction Queue
+            Orbital Construction
           </CardTitle>
           <CardDescription>
             No ongoing constructions
@@ -220,7 +239,7 @@ export function ConstructionQueue({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <CardTitle>Construction Queue</CardTitle>
+            <CardTitle>Orbital Construction</CardTitle>
           </div>
           <Button
             variant="ghost"
@@ -232,20 +251,43 @@ export function ConstructionQueue({
           </Button>
         </div>
         <div className="mt-3">
-          <QueueStats constructions={constructions} />
+          <QueueStats constructions={statsSource} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {filterOptions.map((option) => (
+            <Button
+              key={option.value}
+              size="sm"
+              variant={typeFilter === option.value ? 'default' : 'outline'}
+              className={
+                typeFilter === option.value
+                  ? 'bg-cyan-500/30 border-cyan-400/60 text-cyan-100'
+                  : 'border-border/50 text-muted-foreground hover:text-cyan-200'
+              }
+              onClick={() => setTypeFilter(option.value)}
+            >
+              {option.label}
+            </Button>
+          ))}
         </div>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
-        <AnimatePresence mode="popLayout">
-          {constructions.map((construction) => (
-            <ConstructionCard
-              key={construction.id}
-              construction={construction}
-              onCancel={handleCancel}
-              isCancelling={cancellingId === construction.id}
-            />
-          ))}
-        </AnimatePresence>
+        {hasFilteredResults ? (
+          <AnimatePresence mode="popLayout">
+            {filteredConstructions.map((construction) => (
+              <ConstructionCard
+                key={construction.id}
+                construction={construction}
+                onCancel={handleCancel}
+                isCancelling={cancellingId === construction.id}
+              />
+            ))}
+          </AnimatePresence>
+        ) : (
+          <div className="rounded-lg border border-border/40 bg-black/30 px-4 py-8 text-center text-sm text-muted-foreground">
+            No {filterLabels[typeFilter]} in the queue.
+          </div>
+        )}
       </CardContent>
     </Card>
   )

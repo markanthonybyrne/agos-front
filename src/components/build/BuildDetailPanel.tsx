@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useGetFacilityDefinitionsQuery, useBuildFacilityMutation } from '@/api/endpoints/facilitiesApi'
 import { useGetShipDefinitionsQuery, useBuildShipsMutation } from '@/api/endpoints/shipsApi'
-import { useGetDefenceDefinitionsQuery, useBuildDefencesMutation } from '@/api/endpoints/defencesApi'
+import { useGetDefenceDefinitionsQuery, useBuildDefencesMutation, useGetAvailableDefencesQuery } from '@/api/endpoints/defencesApi'
 import { useGetResearchDefinitionsQuery, useStartResearchMutation } from '@/api/endpoints/researchApi'
 import { useGetPlanetQuery } from '@/api/endpoints/planetsApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, CheckCircle, Loader2, Zap, TrendingUp } from 'lucide-react'
+import { AlertCircle, CheckCircle, Loader2, Zap, TrendingUp, Info, Clock } from 'lucide-react'
 import { formatResource, formatNumber } from '@/lib/formatters'
-import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { formatPrerequisiteSlug, getDefenceRequirements } from '@/lib/prerequisites'
 import { getFacilityImage } from '@/lib/facilityImages'
 import { getShipImage } from '@/lib/shipImages'
 import { getDefenseImage } from '@/lib/defenseImages'
@@ -17,11 +18,35 @@ import { getTelleriumImage, getKryptonImage } from '@/lib/resourceImages'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType } from '@/app/slices/panelSlice'
+import { toast } from 'sonner'
 
 interface BuildDetailPanelProps {
   type: 'facility' | 'ship' | 'defense' | 'research'
   slug: string
   planetId: number
+}
+
+function extractDefinitions<T = any>(source: any, keys: string[]): T[] {
+  if (!source) return []
+
+  for (const key of keys) {
+    const direct = source?.[key]
+    if (Array.isArray(direct)) {
+      return direct as T[]
+    }
+  }
+
+  const dataWrapper = source?.data
+  if (dataWrapper) {
+    for (const key of keys) {
+      const nested = dataWrapper?.[key]
+      if (Array.isArray(nested)) {
+        return nested as T[]
+      }
+    }
+  }
+
+  return []
 }
 
 export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps) {
@@ -34,36 +59,118 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
   const planet = planetData?.planet
 
   // Get definitions based on type
-  const { data: facilityDefs } = useGetFacilityDefinitionsQuery(undefined, {
+  const { data: facilityDefs, isLoading: isLoadingFacilities } = useGetFacilityDefinitionsQuery(undefined, {
     skip: type !== 'facility',
   })
-  const { data: shipDefs } = useGetShipDefinitionsQuery(undefined, {
+  const { data: shipDefs, isLoading: isLoadingShips } = useGetShipDefinitionsQuery(undefined, {
     skip: type !== 'ship',
   })
-  const { data: defenseDefs } = useGetDefenceDefinitionsQuery(undefined, {
+  const { data: defenseDefs, isLoading: isLoadingDefences } = useGetDefenceDefinitionsQuery(undefined, {
     skip: type !== 'defense',
   })
-  const { data: researchDefs } = useGetResearchDefinitionsQuery(undefined, {
+  const { data: researchDefs, isLoading: isLoadingResearch } = useGetResearchDefinitionsQuery(undefined, {
     skip: type !== 'research',
   })
+  const { data: availableDefences, isLoading: isLoadingAvailableDefences } = useGetAvailableDefencesQuery(planetId, {
+    skip: type !== 'defense',
+  })
 
-  // Get mutations
+  const isLoadingDefinitions =
+    (type === 'facility' && isLoadingFacilities) ||
+    (type === 'ship' && isLoadingShips) ||
+    (type === 'defense' && (isLoadingDefences || isLoadingAvailableDefences)) ||
+    (type === 'research' && isLoadingResearch)
+
+  const defenceAvailability = useMemo(() => {
+    if (type !== 'defense') return undefined
+    return availableDefences?.defences?.find((defence) => defence.slug === slug)
+  }, [availableDefences?.defences, slug, type])
+
+  const defenceCanBuild = type === 'defense' ? defenceAvailability?.can_build !== false : true
+  const missingDefencePrereqs = type === 'defense' ? defenceAvailability?.missing_prerequisites ?? [] : []
+
+  const defenceRequirementConfig = useMemo(() => {
+    if (type !== 'defense') {
+      return { facilities: [], research: [] }
+    }
+    return getDefenceRequirements(slug)
+  }, [slug, type])
+
+  const defenceRequirementBadges = useMemo(() => {
+    if (type !== 'defense') return []
+    const badges: { slug: string; type: 'facility' | 'research' | 'unknown'; met: boolean }[] = []
+    const seen = new Set<string>()
+
+    defenceRequirementConfig.facilities.forEach((facilitySlug) => {
+      badges.push({ slug: facilitySlug, type: 'facility', met: !missingDefencePrereqs.includes(facilitySlug) })
+      seen.add(facilitySlug)
+    })
+
+    defenceRequirementConfig.research.forEach((researchSlug) => {
+      badges.push({ slug: researchSlug, type: 'research', met: !missingDefencePrereqs.includes(researchSlug) })
+      seen.add(researchSlug)
+    })
+
+    missingDefencePrereqs.forEach((missingSlug) => {
+      if (seen.has(missingSlug)) return
+      badges.push({ slug: missingSlug, type: 'unknown', met: false })
+    })
+
+    return badges
+  }, [defenceRequirementConfig, missingDefencePrereqs, type])
+
+  const facilityList = useMemo(
+    () => extractDefinitions(facilityDefs, ['facilities']),
+    [facilityDefs]
+  )
+  const shipList = useMemo(
+    () => extractDefinitions(shipDefs, ['ships']),
+    [shipDefs]
+  )
+  const defenceList = useMemo(
+    () => extractDefinitions(defenseDefs, ['defences', 'defenses']),
+    [defenseDefs]
+  )
+  const researchList = useMemo(
+    () => extractDefinitions(researchDefs, ['research']),
+    [researchDefs]
+  )
+
+  const baseItemDef = useMemo(() => {
+    if (type === 'facility') {
+      return facilityList.find((f: any) => f?.slug === slug)
+    }
+    if (type === 'ship') {
+      return shipList.find((s: any) => s?.slug === slug)
+    }
+    if (type === 'defense') {
+      return defenceList.find((d: any) => d?.slug === slug)
+    }
+    if (type === 'research') {
+      return researchList.find((r: any) => r?.slug === slug)
+    }
+    return undefined
+  }, [type, slug, facilityList, shipList, defenceList, researchList])
+
+  const itemDef = useMemo(() => {
+    if (type === 'defense') {
+      return defenceAvailability || baseItemDef
+    }
+    return baseItemDef
+  }, [baseItemDef, defenceAvailability, type])
+
+  const defenceBuildTimeTicks = type === 'defense'
+    ? defenceAvailability?.build_time_ticks ?? (itemDef as any)?.build_time_ticks ?? 0
+    : 0
+  const totalDefenceBuildTicks = type === 'defense' ? defenceBuildTimeTicks * quantity : 0
+  const quantityControlsDisabled = type === 'defense' && !defenceCanBuild
+
   const [buildFacility, { isLoading: isBuilding }] = useBuildFacilityMutation()
   const [buildDefense, { isLoading: isBuildingDefense }] = useBuildDefencesMutation()
   const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation()
   const [buildShips, { isLoading: isBuildingShips }] = useBuildShipsMutation()
 
-  // Get the item definition
-  const itemDef =
-    type === 'facility'
-      ? facilityDefs?.facilities?.find((f) => f.slug === slug)
-      : type === 'ship'
-        ? shipDefs?.ships?.find((s) => s.slug === slug)
-        : type === 'defense'
-          ? defenseDefs?.defences?.find((d) => d.slug === slug)
-          : researchDefs?.research?.find((r) => r.slug === slug)
-
-  if (!itemDef) {
+  if (isLoadingDefinitions && !itemDef) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-32" />
@@ -72,23 +179,38 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
     )
   }
 
+  if (!itemDef) {
+    return (
+      <div className="space-y-4">
+        <Card className="panel-glass border-destructive/40">
+          <CardHeader>
+            <CardTitle className="text-destructive">Unable to load item details</CardTitle>
+            <CardDescription>
+              We could not find additional data for this {type}. Please try again later or contact support.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
   // Calculate costs
   const telleriumCost =
     type === 'facility'
-      ? (itemDef as any).base_tellerium_cost * level
+      ? ((itemDef as any).base_tellerium_cost ?? (itemDef as any).tellerium_cost ?? 0) * level
       : type === 'ship'
         ? ((itemDef as any).tellerium_cost || (itemDef as any).cost_tellerium || 0) * quantity
         : type === 'defense'
-          ? (itemDef as any).tellerium_cost * quantity
+          ? ((itemDef as any).tellerium_cost || (itemDef as any).cost_tellerium || 0) * quantity
           : (itemDef as any).cost_tellerium
 
   const kryptonCost =
     type === 'facility'
-      ? (itemDef as any).base_krypton_cost * level
+      ? ((itemDef as any).base_krypton_cost ?? (itemDef as any).krypton_cost ?? 0) * level
       : type === 'ship'
         ? ((itemDef as any).krypton_cost || (itemDef as any).cost_krypton || 0) * quantity
         : type === 'defense'
-          ? (itemDef as any).krypton_cost * quantity
+          ? ((itemDef as any).krypton_cost || (itemDef as any).cost_krypton || 0) * quantity
           : (itemDef as any).cost_krypton
 
   const canAfford =
@@ -130,8 +252,8 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
             quantity,
           },
         }).unwrap()
-        toast.success('Defense built successfully!')
-        // Auto-close panel after successful build
+        toast.success('Defence queued for construction!')
+        // Auto-close panel after successful queue
         // Small delay to ensure toast appears before panel closes
         setTimeout(() => {
           closePanelsByType(PanelType.BUILD_DETAIL)
@@ -163,12 +285,37 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
         }, 100)
       }
     } catch (error: any) {
+      const missing = error?.data?.missing_prerequisites
+        || error?.data?.details?.missing_prerequisites
+      if (Array.isArray(missing) && missing.length > 0) {
+        const formatted = missing.map((slug: string) => formatPrerequisiteSlug(slug)).join(', ')
+        toast.error('Missing prerequisites', {
+          description: formatted,
+        })
+        return
+      }
+
+      const errorCode = error?.data?.code
+      if (errorCode === 'MISSING_PREREQUISITES') {
+        toast.error('Prerequisites not met', {
+          description: 'Complete the required research and facilities before queuing this defence.',
+        })
+        return
+      }
+
       toast.error(error?.data?.message || `Failed to build ${type}`)
     }
   }
 
   const isLoading =
     isBuilding || isBuildingDefense || isStartingResearch || isBuildingShips
+
+  const buildButtonDisabled =
+    isLoading ||
+    !canAfford ||
+    (type === 'defense' && !defenceCanBuild)
+  const buildButtonLabel = type === 'defense' ? 'Queue Defence Construction' : 'Build Now'
+  const buildButtonLoadingLabel = type === 'defense' ? 'Queueing…' : 'Building...'
 
   return (
     <div className="space-y-6">
@@ -225,11 +372,17 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
                     : setQuantity(Number(e.target.value))
                 }
                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                disabled={quantityControlsDisabled}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>1</span>
                 <span>{type === 'facility' ? 10 : 999}</span>
               </div>
+              {quantityControlsDisabled && (
+                <p className="text-[11px] text-red-200">
+                  Complete the required facilities and research before queuing this defence.
+                </p>
+              )}
             </div>
 
             {/* Quick buttons */}
@@ -243,6 +396,7 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
                     type === 'facility' ? setLevel(val) : setQuantity(val)
                   }
                   className={type === 'facility' ? (level === val ? 'border-primary' : '') : (quantity === val ? 'border-primary' : '')}
+                  disabled={quantityControlsDisabled}
                 >
                   {val}
                 </Button>
@@ -250,6 +404,41 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {type === 'defense' && defenceRequirementBadges.length > 0 && (
+        <div className="rounded-xl border border-cyan-500/30 bg-black/30 p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-cyan-200">
+            <Info className="h-4 w-4 text-cyan-300" />
+            Prerequisites
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {defenceRequirementBadges.map((badge) => {
+              const met = badge.met
+              const badgeClass = met
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                : 'border-red-500/40 bg-red-500/10 text-red-200'
+              const prefix = badge.type === 'facility' ? 'Facility' : badge.type === 'research' ? 'Research' : 'Requirement'
+              return (
+                <Badge
+                  key={`${badge.type}-${badge.slug}`}
+                  variant="outline"
+                  className={cn('text-[11px]', badgeClass)}
+                  title={`${prefix}: ${formatPrerequisiteSlug(badge.slug)}`}
+                >
+                  {prefix}: {formatPrerequisiteSlug(badge.slug)}
+                </Badge>
+              )
+            })}
+          </div>
+          {missingDefencePrereqs.length > 0 && (
+            <p className="mt-3 text-[11px] text-red-200">
+              {missingDefencePrereqs.length === 1
+                ? 'This defence is locked until the missing requirement is complete.'
+                : 'This defence is locked until all missing requirements are complete.'}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Cost Breakdown */}
@@ -303,6 +492,23 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
             </span>
           </div>
 
+          {type === 'defense' && defenceBuildTimeTicks > 0 && (
+            <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-cyan-300" />
+                <div>
+                  <p className="text-sm font-semibold text-cyan-100">Build Time</p>
+                  <p className="text-xs text-muted-foreground">
+                    Per unit: {defenceBuildTimeTicks.toLocaleString()} ticks
+                  </p>
+                </div>
+              </div>
+              <span className="text-sm font-mono text-cyan-200">
+                Total: {totalDefenceBuildTicks.toLocaleString()} ticks
+              </span>
+            </div>
+          )}
+
           {/* Available Resources */}
           {planet && (
             <div className="pt-4 border-t border-border space-y-2">
@@ -339,19 +545,19 @@ export function BuildDetailPanel({ type, slug, planetId }: BuildDetailPanelProps
       {/* Build Button */}
       <Button
         onClick={handleBuild}
-        disabled={isLoading || !canAfford}
+        disabled={buildButtonDisabled}
         className="w-full text-lg py-6"
         size="lg"
       >
         {isLoading ? (
           <>
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Building...
+            {buildButtonLoadingLabel}
           </>
         ) : (
           <>
             <CheckCircle className="w-5 h-5 mr-2" />
-            Build Now
+            {buildButtonLabel}
           </>
         )}
       </Button>

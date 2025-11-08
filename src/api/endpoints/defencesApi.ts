@@ -4,6 +4,8 @@ import {
   DefenceDefinition,
   Defence,
   BuildDefenceRequest,
+  AvailableDefencesResponse,
+  DefenceConstructionResponse,
 } from '@/types/api.types'
 
 export const defencesApi = apiSlice.injectEndpoints({
@@ -24,8 +26,18 @@ export const defencesApi = apiSlice.injectEndpoints({
         { type: 'Defence', id: planetId },
       ],
     }),
+    getAvailableDefences: builder.query<AvailableDefencesResponse, number>({
+      query: (planetId) => ({
+        url: '/defences/available',
+        params: { planet_id: Number(planetId) },
+      }),
+      providesTags: (result, error, planetId) => [
+        { type: 'Defence', id: planetId },
+        'Buildable',
+      ],
+    }),
     buildDefences: builder.mutation<
-      ApiResponse<{ defence: Defence }>,
+      DefenceConstructionResponse,
       { planetId: number; data: BuildDefenceRequest }
     >({
       query: ({ planetId, data }) => ({
@@ -78,6 +90,7 @@ export const defencesApi = apiSlice.injectEndpoints({
 export const {
   useGetDefenceDefinitionsQuery,
   useGetPlanetDefencesQuery,
+  useGetAvailableDefencesQuery,
   useBuildDefencesMutation,
   useDestroyDefencesMutation,
   useCancelDefenceConstructionMutation,

@@ -9,6 +9,10 @@ import {
   CostBreakdown,
   BuildableItems,
   ConstructionQueueResponse,
+  PopulationProfileResponse,
+  PopulationDraftMetricsResponse,
+  ApplyPopulationEdictRequest,
+  SelectPopulationSpecializationRequest,
 } from '@/types/api.types'
 
 export const planetsApi = apiSlice.injectEndpoints({
@@ -120,6 +124,48 @@ export const planetsApi = apiSlice.injectEndpoints({
         { type: 'ConstructionQueue', id: planetId },
       ],
     }),
+    getPlanetPopulation: builder.query<PopulationProfileResponse, number>({
+      query: (planetId) => `/planets/${Number(planetId)}/population`,
+      providesTags: (result, error, planetId) => [
+        { type: 'Population', id: planetId },
+      ],
+    }),
+    getPopulationDraftMetrics: builder.query<PopulationDraftMetricsResponse, number>({
+      query: (planetId) => `/planets/${Number(planetId)}/population/draft`,
+      providesTags: (result, error, planetId) => [
+        { type: 'Population', id: planetId },
+      ],
+    }),
+    applyPopulationEdict: builder.mutation<
+      ApiResponse<PopulationProfileResponse>,
+      ApplyPopulationEdictRequest
+    >({
+      query: ({ planetId, edict_slug }) => ({
+        url: `/planets/${Number(planetId)}/population/edicts`,
+        method: 'POST',
+        body: { edict_slug },
+      }),
+      invalidatesTags: (result, error, { planetId }) => [
+        { type: 'Population', id: planetId },
+        { type: 'Resource', id: planetId },
+        'Population',
+      ],
+    }),
+    selectPopulationSpecialization: builder.mutation<
+      ApiResponse<PopulationProfileResponse>,
+      SelectPopulationSpecializationRequest
+    >({
+      query: ({ planetId, specialization }) => ({
+        url: `/planets/${Number(planetId)}/population/specialization`,
+        method: 'POST',
+        body: { specialization },
+      }),
+      invalidatesTags: (result, error, { planetId }) => [
+        { type: 'Population', id: planetId },
+        'Population',
+        'Empire',
+      ],
+    }),
   }),
 })
 
@@ -135,5 +181,9 @@ export const {
   useDiscoverGalaxyMutation,
   useGetBuildableItemsQuery,
   useGetConstructionQueueQuery,
+  useGetPlanetPopulationQuery,
+  useGetPopulationDraftMetricsQuery,
+  useApplyPopulationEdictMutation,
+  useSelectPopulationSpecializationMutation,
 } = planetsApi
 

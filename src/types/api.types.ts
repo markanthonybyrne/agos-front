@@ -1220,13 +1220,16 @@ export interface TravelTimeRequest {
 }
 
 export interface ColonizePlanetRequest {
-  quadrant: number
-  sector: number
-  galaxy: number
-  planet: number
+  origin_planet_id: number
+  ships: Record<string, number>
   x: number
   y: number
-  name: string
+  quadrant?: number
+  sector?: number
+  galaxy?: number
+  system?: number
+  planet?: number
+  name?: string
 }
 
 export interface CreateSignalRequest {
@@ -1399,6 +1402,111 @@ export interface StartResearchRequest {
   research_slug: string
 }
 
+export interface PopulationStratum {
+  slug: string
+  name: string
+  population: number
+  percentage: number
+  modifiers: Array<{
+    slug: string
+    name: string
+    description?: string
+    value: number
+  }>
+}
+
+export interface PopulationEdictRequirement {
+  slug: string
+  name?: string
+  description?: string
+  met?: boolean
+}
+
+export interface PopulationEdict {
+  slug: string
+  name: string
+  description: string
+  duration_ticks: number
+  remaining_ticks?: number
+  cooldown_ticks?: number
+  requirements?: Array<PopulationEdictRequirement | string>
+  is_active?: boolean
+  effects?: Array<{
+    slug: string
+    name: string
+    value: number | string
+  }>
+}
+
+export interface PopulationStage {
+  slug: string
+  name: string
+  progress: number
+  progress_cap: number
+  growth_rate: number
+  requirements: Array<{
+    slug: string
+    name: string
+    met: boolean
+    description?: string
+  }>
+}
+
+export interface PopulationEvent {
+  id: string
+  type: string
+  message: string
+  timestamp: string
+  severity: 'info' | 'warning' | 'critical'
+}
+
+export interface PopulationProfileResponse {
+  population: {
+    total: number
+    growth_rate: number
+    unrest: number
+    stage: PopulationStage
+    strata: PopulationStratum[]
+    specialization?: string | null
+    specialization_options?: Array<{
+      slug: string
+      name: string
+      description: string
+      effects?: Array<{ slug: string; value: number | string }>
+    }>
+  }
+  draft: {
+    current: number
+    capacity: number
+    ratio: number
+    overdraft: number
+  }
+  edicts: {
+    active: PopulationEdict[]
+    available: PopulationEdict[]
+  }
+  events?: PopulationEvent[]
+}
+
+export interface PopulationDraftMetricsResponse {
+  draft: {
+    current: number
+    capacity: number
+    ratio: number
+    overdraft: number
+  }
+}
+
+export interface ApplyPopulationEdictRequest {
+  planetId: number
+  edict_slug: string
+}
+
+export interface SelectPopulationSpecializationRequest {
+  planetId: number
+  specialization: string
+}
+
 // Buildable Items Types
 export interface BuildableItem {
   slug: string
@@ -1427,9 +1535,30 @@ export interface BuildableShip extends BuildableItem {
   krypton_cost: number
 }
 
-export interface BuildableDefence extends BuildableItem {
-  // Defences have additional properties
+export interface DefencePrerequisiteStatus {
+  slug: string
+  type: 'facility' | 'research' | 'unknown'
+  met: boolean
 }
+
+export interface BuildableDefence extends BuildableItem {
+  tellerium_cost: number
+  krypton_cost: number
+  build_time_ticks: number
+  can_build?: boolean
+  missing_prerequisites?: string[]
+  prerequisite_status?: DefencePrerequisiteStatus[]
+}
+
+export interface AvailableDefence extends BuildableDefence {
+  unlocked?: boolean
+}
+
+export interface AvailableDefencesResponse {
+  defences: AvailableDefence[]
+}
+
+export interface DefenceConstructionResponse extends ApiResponse<{ construction: ConstructionQueueItem }>{}
 
 export interface BuildableItems {
   facilities: BuildableFacility[]

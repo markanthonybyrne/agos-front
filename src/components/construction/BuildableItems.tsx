@@ -3,16 +3,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BuildableItems as BuildableItemsType, BuildableItem } from '@/types/api.types'
-import { formatResource, formatNumber } from '@/lib/formatters'
-import { 
-  Settings, 
-  Shield, 
-  Ship, 
-  FlaskConical, 
+import { formatResource } from '@/lib/formatters'
+import { cn } from '@/lib/utils'
+import { formatPrerequisiteSlug, getDefenceRequirements } from '@/lib/prerequisites'
+import {
+  Settings,
+  Shield,
+  Ship,
+  FlaskConical,
   Plus,
   CheckCircle,
   Clock,
-  Zap
+  Lock,
 } from 'lucide-react'
 import { VisualItemGrid } from '@/components/planet/VisualItemGrid'
 import { Badge } from '@/components/ui/badge'
@@ -25,13 +27,15 @@ interface BuildableItemsProps {
   buildableItems: BuildableItemsType
   onBuildItem: (type: string, slug: string) => void
   className?: string
+  layout?: 'grid' | 'list'
 }
 
-export function BuildableItems({ 
-  planetId, 
-  buildableItems, 
+export function BuildableItems({
+  planetId,
+  buildableItems,
   onBuildItem,
-  className = ''
+  className = '',
+  layout = 'grid'
 }: BuildableItemsProps) {
   const [activeTab, setActiveTab] = useState('facilities')
 
@@ -72,16 +76,6 @@ export function BuildableItems({
     }
     return []
   }
-
-  // Debug logging
-  console.log('BuildableItems in component:', buildableItems)
-  console.log('Facilities type:', typeof buildableItems?.facilities, Array.isArray(buildableItems?.facilities))
-  
-  // Test safeArray with logging
-  const facilitiesArray = safeArray(buildableItems?.facilities)
-  const shipsArray = safeArray(buildableItems?.ships)
-  console.log('Extracted facilities array:', facilitiesArray.length, facilitiesArray)
-  console.log('Extracted ships array:', shipsArray.length, shipsArray)
 
   const getItemIcon = (type: string) => {
     switch (type) {
@@ -137,7 +131,7 @@ export function BuildableItems({
       id: 'defences',
       label: 'Defences',
       icon: Shield,
-      items: safeArray(buildableItems?.defences),
+      items: safeArray(buildableItems?.defences).filter((defence: any) => defence?.can_build !== false),
     },
     {
       id: 'ships',
@@ -152,6 +146,113 @@ export function BuildableItems({
       items: safeArray(buildableItems?.research),
     },
   ]
+
+  const renderList = (items: BuildableItem[], type: string) => (
+    <div className="space-y-2">
+      {items.map((item) => {
+        const costT = (item as any).tellerium_cost ?? item.base_tellerium_cost ?? 0
+        const costK = (item as any).krypton_cost ?? item.base_krypton_cost ?? 0
+        const image = getItemImage(item, type)
+        const isDefenceTab = type === 'defences'
+        const canBuild = !isDefenceTab || (item as any)?.can_build !== false
+        const missingPrereqs: string[] = isDefenceTab
+          ? Array.isArray((item as any)?.missing_prerequisites)
+            ? ((item as any)?.missing_prerequisites as string[])
+            : []
+          : []
+        const requirementConfig = isDefenceTab ? getDefenceRequirements(item.slug) : { facilities: [], research: [] }
+        const defenceRequirementBadges = isDefenceTab
+          ? (() => {
+              const badges: { slug: string; type: 'facility' | 'research' | 'unknown'; met: boolean }[] = []
+              const seen = new Set<string>()
+              requirementConfig.facilities.forEach((facilitySlug) => {
+                badges.push({ slug: facilitySlug, type: 'facility', met: !missingPrereqs.includes(facilitySlug) })
+                seen.add(facilitySlug)
+              })
+              requirementConfig.research.forEach((researchSlug) => {
+                badges.push({ slug: researchSlug, type: 'research', met: !missingPrereqs.includes(researchSlug) })
+                seen.add(researchSlug)
+              })
+              missingPrereqs.forEach((missingSlug) => {
+                if (seen.has(missingSlug)) return
+                badges.push({ slug: missingSlug, type: 'unknown', met: false })
+              })
+              return badges
+            })()
+          : []
+        const statusBadgeClass = canBuild
+          ? 'border-emerald-500/40 text-emerald-200'
+          : 'border-red-500/40 text-red-200'
+        const buttonLabel = canBuild ? 'Queue' : 'Locked'
+        const StatusIcon = canBuild ? CheckCircle : Lock
+
+        return (
+          <div
+            key={item.slug}
+            className="flex items-center gap-3 rounded-lg border border-cyan-500/20 bg-black/30 p-3 transition hover:border-cyan-400/40 hover:bg-black/40"
+          >
+            {image && (
+              <img
+                src={image}
+                alt={item.name}
+                className="h-12 w-12 rounded-md object-contain"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="truncate font-semibold text-sm text-cyan-100">{item.name}</div>
+                <Badge
+                  variant="outline"
+                  className={cn('text-[11px] flex items-center gap-1', statusBadgeClass)}
+                  title={canBuild ? 'Ready to queue' : 'Missing prerequisites'}
+                >
+                  <StatusIcon className="w-3 h-3" />
+                  {canBuild ? 'Ready' : 'Locked'}
+                </Badge>
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                {formatResource(costT)} T · {formatResource(costK)} K
+              </div>
+              {isDefenceTab && defenceRequirementBadges.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {defenceRequirementBadges.map((badge) => {
+                    const met = badge.met
+                    const badgeClass = met
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                      : 'border-red-500/40 bg-red-500/10 text-red-200'
+                    const prefix = badge.type === 'facility' ? 'Facility' : badge.type === 'research' ? 'Research' : 'Requirement'
+                    return (
+                      <Badge
+                        key={`${badge.type}-${badge.slug}`}
+                        variant="outline"
+                        className={cn('text-[10px] uppercase tracking-[0.2em]', badgeClass)}
+                        title={`${prefix}: ${formatPrerequisiteSlug(badge.slug)}`}
+                      >
+                        {prefix}: {formatPrerequisiteSlug(badge.slug)}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+              {isDefenceTab && missingPrereqs.length > 0 && (
+                <p className="mt-2 text-[11px] text-red-200">
+                  Missing: {missingPrereqs.map((slug) => formatPrerequisiteSlug(slug)).join(', ')}
+                </p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              onClick={() => onBuildItem(type, item.slug)}
+              disabled={!canBuild}
+              className={!canBuild ? 'cursor-not-allowed opacity-60' : undefined}
+            >
+              {buttonLabel}
+            </Button>
+          </div>
+        )
+      })}
+    </div>
+  )
 
   return (
     <Card className={`panel-glass border-cyan/20 ${className}`}>
@@ -177,50 +278,82 @@ export function BuildableItems({
               )
             })}
           </TabsList>
-          {tabs.map((tab) => {
-            return (
-              <TabsContent key={tab.id} value={tab.id} className="mt-4">
-                {tab.items.length > 0 ? (
-                  <VisualItemGrid
-                    items={tab.items
-                      .filter((item) => item != null && typeof item === 'object' && item.slug) // Filter out null/undefined/invalid items
-                      .map((item) => {
-                        // Safely check for cost properties
-                        const costT = item != null && typeof item === 'object' && 'tellerium_cost' in item
-                          ? (item as any).tellerium_cost
-                          : (item?.base_tellerium_cost ?? 0)
-                        const costK = item != null && typeof item === 'object' && 'krypton_cost' in item
-                          ? (item as any).krypton_cost
-                          : (item?.base_krypton_cost ?? 0)
-                        
-                        return {
-                          id: item?.slug || 'unknown',
-                          name: item?.name || 'Unknown',
-                          image: getItemImage(item, tab.id),
-                          imageAlt: item?.name || 'Unknown',
-                          description: `${formatResource(costT)} T, ${formatResource(costK)} K`,
-                          badge: (
-                            <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Ready
-                            </Badge>
-                          ),
-                          onClick: () => item?.slug && onBuildItem(tab.id, item.slug),
+          {tabs.map((tab) => (
+            <TabsContent key={tab.id} value={tab.id} className="mt-4">
+              {tab.items.length > 0 ? (
+                layout === 'list'
+                  ? renderList(
+                      tab.items.filter((item) => item && typeof item === 'object' && item.slug) as BuildableItem[],
+                      tab.id,
+                    )
+                  : (
+                      <VisualItemGrid
+                        items={tab.items
+                          .filter((item) => item != null && typeof item === 'object' && item.slug)
+                          .map((item) => {
+                            const costT =
+                              item != null && typeof item === 'object' && 'tellerium_cost' in item
+                                ? (item as any).tellerium_cost
+                                : item?.base_tellerium_cost ?? 0
+                            const costK =
+                              item != null && typeof item === 'object' && 'krypton_cost' in item
+                                ? (item as any).krypton_cost
+                                : item?.base_krypton_cost ?? 0
+                            const isDefenceTab = tab.id === 'defences'
+                            const canBuild = !isDefenceTab || (item as any)?.can_build !== false
+                            const missingPrereqs: string[] = isDefenceTab
+                              ? Array.isArray((item as any)?.missing_prerequisites)
+                                ? ((item as any)?.missing_prerequisites as string[])
+                                : []
+                              : []
+                            const requirementConfig = isDefenceTab ? getDefenceRequirements(item?.slug || '') : { facilities: [], research: [] }
+                            const badgeClass = canBuild
+                              ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                              : 'bg-red-500/20 text-red-300 border-red-500/30'
+                            const badgeLabel = canBuild ? 'Ready' : 'Locked'
+                            const extraDescription = isDefenceTab && missingPrereqs.length > 0
+                              ? ` — Missing: ${missingPrereqs.map((slug) => formatPrerequisiteSlug(slug)).join(', ')}`
+                              : ''
+                            const StatusIcon = canBuild ? CheckCircle : Lock
+
+                            const handleClick = () => {
+                              if (!item?.slug || !canBuild) return
+                              onBuildItem(tab.id, item.slug)
+                            }
+
+                            return {
+                              id: item?.slug || 'unknown',
+                              name: item?.name || 'Unknown',
+                              image: getItemImage(item, tab.id),
+                              imageAlt: item?.name || 'Unknown',
+                              description: `${formatResource(costT)} T, ${formatResource(costK)} K${extraDescription}`,
+                              badge: (
+                                <Badge
+                                  variant="outline"
+                                  className={cn('flex items-center gap-1', badgeClass)}
+                                  title={canBuild ? 'Ready to queue' : 'Missing prerequisites'}
+                                >
+                                  <StatusIcon className="w-3 h-3" />
+                                  {badgeLabel}
+                                </Badge>
+                              ),
+                              onClick: handleClick,
+                              disabled: !canBuild,
+                            }
+                          })
                         }
-                      })
-                    }
-                    columns={4}
-                  />
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <tab.icon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">No {tab.label.toLowerCase()} available</p>
-                    <p className="text-sm mt-2">Complete prerequisites to unlock more items</p>
-                  </div>
-                )}
-              </TabsContent>
-            )
-          })}
+                        columns={4}
+                      />
+                    )
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <tab.icon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg">No {tab.label.toLowerCase()} available</p>
+                  <p className="text-sm mt-2">Complete prerequisites to unlock more items</p>
+                </div>
+              )}
+            </TabsContent>
+          ))}
         </Tabs>
       </CardContent>
     </Card>

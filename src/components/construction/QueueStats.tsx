@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { ConstructionQueueItem } from '@/types/api.types'
-import { Clock, TrendingUp } from 'lucide-react'
+import { Clock, TrendingUp, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppSelector } from '@/app/hooks'
 
@@ -75,6 +75,11 @@ export function QueueStats({ constructions }: QueueStatsProps) {
     }
   }, [constructions, tickIntervalSeconds])
 
+  const defenceCount = useMemo(
+    () => constructions.filter((construction) => construction.type === 'defence').length,
+    [constructions],
+  )
+
   const formatNextCompletion = () => {
     if (!stats.nextCompletion) return 'N/A'
 
@@ -113,6 +118,14 @@ export function QueueStats({ constructions }: QueueStatsProps) {
         <span className="text-muted-foreground">Avg Progress:</span>
         <span className="font-semibold text-foreground">{stats.avgProgress}%</span>
       </div>
+
+      {defenceCount > 0 && (
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-red-400" />
+          <span className="text-muted-foreground">Defence Builds:</span>
+          <span className="font-semibold text-red-300">{defenceCount}</span>
+        </div>
+      )}
     </div>
   )
 }

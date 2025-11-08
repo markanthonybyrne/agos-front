@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, useState, useCallback } from 'react'
 import { Planet } from '@/types/api.types'
 import { GeodesicGrid } from '@/components/planet/GeodesicGrid'
 import { usePanel } from '@/components/common/PanelManager'
@@ -7,8 +7,8 @@ import { useGetPlanetQuery, useGetPlanetsQuery } from '@/api/endpoints/planetsAp
 import { useAuth } from '@/hooks/useAuth'
 import { formatCoordinate } from '@/lib/coordinates'
 import { usePlanetImageScale } from '@/hooks/usePlanetImageScale'
-import { PlanetActionWheel } from './PlanetActionWheel'
 import { Button } from '@/components/ui/button'
+import { PlanetBuildConsole } from '@/components/planet/PlanetBuildConsole'
 
 interface PlanetHexGridViewProps {
   planet: Planet
@@ -93,6 +93,11 @@ export function PlanetHexGridView({ planet, onClose }: PlanetHexGridViewProps) {
   const { openPanel } = usePanel()
   const { empire } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
+  const [gridRefreshKey, setGridRefreshKey] = useState(0)
+
+  const handleGridRefresh = useCallback(() => {
+    setGridRefreshKey((prev) => prev + 1)
+  }, [])
   
   // Always call hooks unconditionally - use skip to control when they run
   const needsPlanetLookup = !planet.id
@@ -293,16 +298,18 @@ export function PlanetHexGridView({ planet, onClose }: PlanetHexGridViewProps) {
           
           {/* Geodesic grid overlay - wraps around planet in 3D */}
           {displayPlanet.id && (
-            <GeodesicGrid planetId={displayPlanet.id} planetSize={730} />
+            <GeodesicGrid
+              key={`geogrid-${displayPlanet.id}-${gridRefreshKey}`}
+              planetId={displayPlanet.id}
+              planetSize={730}
+            />
           )}
         </div>
       </div>
       
-      {/* Planetary action wheel */}
-      <PlanetActionWheel
+      <PlanetBuildConsole
         planet={displayPlanet}
-        className="fixed bottom-10 left-20 z-[10003]"
-        openPanel={openPanel}
+        onGridRefresh={handleGridRefresh}
       />
       
       {/* CSS animations */}

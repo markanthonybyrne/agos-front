@@ -14,7 +14,7 @@ export const apiSlice = createApi({
       return headers
     },
   }),
-  tagTypes: ['Empire', 'Planet', 'Fleet', 'Signal', 'Alliance', 'Universe', 'Defence', 'Facility', 'Research', 'Ship', 'Mail', 'Resource', 'Buildable', 'ConstructionQueue', 'Fund', 'CombatLog', 'User', 'Tick', 'Statistics', 'Role', 'Announcement', 'QuantumCredits', 'Booster', 'Achievement', 'Chat', 'Market', 'MarketOrder', 'MarketTrade', 'MarketDeal', 'SecondaryResource', 'Deals', 'CombatSimulation', 'TickTest', 'Definition', 'DefinitionVersion', 'Incident'],
+  tagTypes: ['Empire', 'Planet', 'Fleet', 'Signal', 'Alliance', 'Universe', 'Defence', 'Facility', 'Research', 'Ship', 'Mail', 'Resource', 'Buildable', 'ConstructionQueue', 'Population', 'Fund', 'CombatLog', 'User', 'Tick', 'Statistics', 'Role', 'Announcement', 'QuantumCredits', 'Booster', 'Achievement', 'Chat', 'Market', 'MarketOrder', 'MarketTrade', 'MarketDeal', 'SecondaryResource', 'Deals', 'CombatSimulation', 'TickTest', 'Definition', 'DefinitionVersion', 'Incident'],
   // Enable automatic refetching when tags are invalidated
   refetchOnFocus: false, // We handle this via WebSocket
   refetchOnReconnect: true,
