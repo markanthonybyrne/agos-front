@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { MainLayout } from '@/components/layout/MainLayout'
@@ -25,7 +25,7 @@ import { FleetDetail } from '@/features/fleets/FleetDetail'
 import { GalaxyMap } from '@/components/map/GalaxyMap'
 import { SystemViewScreen } from '@/components/map/SystemViewScreen'
 import { MessagingPage } from '@/features/messaging/MessagingPage'
-import { SignalsPage } from '@/features/signals/SignalsPage'
+import { useWindow } from '@/components/common/WindowManager'
 import { AlliancesPage } from '@/features/alliances/AlliancesPage'
 import { PoliticsPage } from '@/features/politics/PoliticsPage'
 import { RankingsPage } from '@/features/rankings/RankingsPage'
@@ -50,6 +50,7 @@ import { GameDefinitionsPage } from '@/features/admin/routes/GameDefinitionsPage
 import { QuantumCreditsPage } from '@/features/admin/routes/QuantumCreditsPage'
 import { BoostersPage } from '@/features/admin/routes/BoostersPage'
 import { AdminPanelWrapper } from '@/features/admin/components/AdminPanelWrapper'
+import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 
 function AppContent() {
   // Initialize achievement notifications
@@ -92,7 +93,7 @@ function AppContent() {
                   <Route path="/planets/:id" element={<PlanetDetail />} />
                   <Route path="/fleets" element={<FleetsPage />} />
                   <Route path="/fleets/:id" element={<FleetDetail />} />
-                  <Route path="/signals" element={<SignalsPage />} />
+                  <Route path="/signals" element={<SignalsPanelRoute />} />
                   <Route path="/alliances" element={<PoliticsPage />} />
                   <Route path="/mail" element={<MessagingPage />} />
                   <Route path="/combat" element={<CombatLogsPage />} />
@@ -138,6 +139,21 @@ function AppContent() {
       </Routes>
     </>
   )
+}
+
+function SignalsPanelRoute() {
+  const navigate = useNavigate()
+  const { openPanel } = useWindow()
+  const openedRef = useRef(false)
+
+  useEffect(() => {
+    if (openedRef.current) return
+    openedRef.current = true
+    openPanel(PanelType.SIGNALS, PanelSize.LARGE)
+    navigate('/map', { replace: true })
+  }, [openPanel, navigate])
+
+  return null
 }
 
 function App() {

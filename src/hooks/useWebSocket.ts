@@ -1416,6 +1416,53 @@ export function useWebSocket() {
       console.error('[WebSocket] Failed to initialize tick countdown:', error)
     })
 
+    const techChannelName = `user.tech.${userId}`
+    console.log(`[WebSocket] 🔐 Subscribing to tech channel: ${techChannelName}`)
+    const techChannel = echo.private(techChannelName)
+    const techChannelEvents: string[] = []
+
+    const invalidateTechPlans = () => {
+      dispatch(apiSlice.util.invalidateTags(['TechPlan']))
+    }
+
+    const invalidateAdvisorState = () => {
+      dispatch(apiSlice.util.invalidateTags([{ type: 'TechAdvisorState', id: 'STATE' }]))
+    }
+
+    const handleTechPlanEvent = (data: any) => {
+      console.log('[WebSocket] 📦 tech-plan event received', data)
+      invalidateTechPlans()
+    }
+
+    const handleAdvisorEvent = (data: any) => {
+      console.log('[WebSocket] 🛰 advisor state event received', data)
+      invalidateAdvisorState()
+    }
+
+    techChannel.listen('.tech-plan.created', handleTechPlanEvent)
+    techChannel.listen('tech-plan.created', handleTechPlanEvent)
+    techChannel.listen('.tech-plan.updated', handleTechPlanEvent)
+    techChannel.listen('tech-plan.updated', handleTechPlanEvent)
+    techChannel.listen('.tech-plan.deleted', handleTechPlanEvent)
+    techChannel.listen('tech-plan.deleted', handleTechPlanEvent)
+    techChannel.listen('.tech-advisor.state.updated', handleAdvisorEvent)
+    techChannel.listen('tech-advisor.state.updated', handleAdvisorEvent)
+    techChannelEvents.push(
+      '.tech-plan.created',
+      'tech-plan.created',
+      '.tech-plan.updated',
+      'tech-plan.updated',
+      '.tech-plan.deleted',
+      'tech-plan.deleted',
+      '.tech-advisor.state.updated',
+      'tech-advisor.state.updated'
+    )
+
+    techChannel.subscribed(() => {
+      console.log(`[WebSocket] ✅ Subscribed to tech channel: ${techChannelName}`)
+      trackSubscription(`private-${techChannelName}`, techChannelEvents)
+    })
+
     // Subscribe to public announcements channel for real-time announcements
     const announcementsChannel = echo.channel('announcements')
     const announcementChannelEvents: string[] = []

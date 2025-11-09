@@ -1,5 +1,20 @@
 import { useState } from 'react'
-import { LayoutDashboard, ListChecks, MessageSquare, Mail, Trophy, Award, Settings, LogOut, ChevronRight } from 'lucide-react'
+import {
+  Bell,
+  Mail,
+  Globe,
+  Building2,
+  Rocket,
+  Coins,
+  Scan,
+  GitBranch,
+  LayoutDashboard,
+  ListChecks,
+  Award,
+  Settings,
+  LogOut,
+  ChevronRight,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
@@ -55,30 +70,59 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
           />
         </div>
 
-        {/* Command Center Button */}
+        {/* Notifications */}
         <div className="relative group pointer-events-auto z-10">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/holopad')}
+            onClick={() => openPanel(PanelType.NOTIFICATIONS, PanelSize.MEDIUM)}
             className={cn(
               "w-12 h-12 transition-all duration-200 rounded-lg",
               "hover:bg-muted/20 hover:scale-110",
               "bg-transparent border border-border/30 hover:border-border/50"
             )}
-            aria-label="Command Center"
+            aria-label="Notifications"
           >
-            <LayoutDashboard className="w-5 h-5 text-foreground" />
+            <Bell className="w-5 h-5 text-foreground" />
           </Button>
-          {/* Tooltip */}
           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             <div className="bg-background/95 backdrop-blur-sm border border-border/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
-              Command Center
+              Notifications
             </div>
           </div>
         </div>
 
-        {/* Construction Queue Button */}
+        {/* Messages */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openPanel(PanelType.MESSAGING, PanelSize.XLARGE)}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-muted/20 hover:scale-110",
+              "bg-transparent border border-border/30 hover:border-border/50"
+            )}
+            aria-label="Messages"
+          >
+            <Mail className="w-5 h-5 text-yellow-400" />
+            {unreadCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Badge>
+            )}
+          </Button>
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-yellow-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Messages
+            </div>
+          </div>
+        </div>
+
+        {/* Construction Queue */}
         <div className="relative group pointer-events-auto z-10">
           <Button
             variant="ghost"
@@ -93,15 +137,14 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
           >
             <ListChecks className="w-5 h-5 text-orange-400" />
             {constructionCount > 0 && (
-              <Badge 
-                variant="destructive" 
+              <Badge
+                variant="destructive"
                 className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
               >
                 {constructionCount > 9 ? '9+' : constructionCount}
               </Badge>
             )}
           </Button>
-          {/* Tooltip */}
           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             <div className="bg-background/95 backdrop-blur-sm border border-orange-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
               Construction Queue
@@ -109,84 +152,161 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
           </div>
         </div>
 
-        {/* Chat Button */}
+        {/* Galaxy Map */}
         <div className="relative group pointer-events-auto z-10">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => openPanel(PanelType.CHAT, PanelSize.XLARGE)}
+            onClick={() => navigate('/map')}
             className={cn(
               "w-12 h-12 transition-all duration-200 rounded-lg",
               "hover:bg-muted/20 hover:scale-110",
               "bg-transparent border border-border/30 hover:border-border/50"
             )}
-            aria-label="Global Chat"
+            aria-label="Galaxy Map"
           >
-            <MessageSquare className="w-5 h-5 text-cyan-400" />
+            <Globe className="w-5 h-5 text-cyan-300" />
           </Button>
-          {/* Tooltip */}
           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             <div className="bg-background/95 backdrop-blur-sm border border-cyan-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
-              Global Chat
+              Galaxy Map
             </div>
           </div>
         </div>
 
-        {/* Mail Button */}
+        {/* Planet Command */}
         <div className="relative group pointer-events-auto z-10">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => openPanel(PanelType.MESSAGING, PanelSize.XLARGE)}
-            className={cn(
-              "w-12 h-12 transition-all duration-200 rounded-lg relative",
-              "hover:bg-muted/20 hover:scale-110",
-              "bg-transparent border border-border/30 hover:border-border/50"
-            )}
-            aria-label="Mail"
-          >
-            <Mail className="w-5 h-5 text-yellow-400" />
-            {unreadCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
-              >
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </Badge>
-            )}
-          </Button>
-          {/* Tooltip */}
-          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-            <div className="bg-background/95 backdrop-blur-sm border border-yellow-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
-              Mail
-            </div>
-          </div>
-        </div>
-
-        {/* Rankings Button */}
-        <div className="relative group pointer-events-auto z-10">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => openPanel(PanelType.RANKINGS, PanelSize.XLARGE)}
+            onClick={() => navigate('/planets')}
             className={cn(
               "w-12 h-12 transition-all duration-200 rounded-lg",
               "hover:bg-muted/20 hover:scale-110",
               "bg-transparent border border-border/30 hover:border-border/50"
             )}
-            aria-label="Rankings"
+            aria-label="Planets & Colonies"
           >
-            <Trophy className="w-5 h-5 text-amber-400" />
+            <Building2 className="w-5 h-5 text-emerald-300" />
           </Button>
-          {/* Tooltip */}
           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-            <div className="bg-background/95 backdrop-blur-sm border border-amber-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
-              Rankings
+            <div className="bg-background/95 backdrop-blur-sm border border-emerald-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Planets & Colonies
             </div>
           </div>
         </div>
 
-        {/* Achievements Button */}
+        {/* Fleet Command */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openPanel(PanelType.FLEET_COMMAND, PanelSize.XLARGE)}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-muted/20 hover:scale-110",
+              "bg-transparent border border-border/30 hover:border-border/50"
+            )}
+            aria-label="Fleet Command"
+          >
+            <Rocket className="w-5 h-5 text-red-400" />
+          </Button>
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-red-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Fleet Command
+            </div>
+          </div>
+        </div>
+
+        {/* Tech Encyclopaedia */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/tech-tree')}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-muted/20 hover:scale-110",
+              "bg-transparent border border-border/30 hover:border-border/50"
+            )}
+            aria-label="Tech Encyclopaedia"
+          >
+            <GitBranch className="w-5 h-5 text-purple-300" />
+          </Button>
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-purple-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Tech Encyclopaedia
+            </div>
+          </div>
+        </div>
+
+        {/* Market */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openPanel(PanelType.MARKET, PanelSize.XLARGE)}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-muted/20 hover:scale-110",
+              "bg-transparent border border-border/30 hover-border-border/50"
+            )}
+            aria-label="Galactic Market"
+          >
+            <Coins className="w-5 h-5 text-amber-300" />
+          </Button>
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-amber-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Galactic Market
+            </div>
+          </div>
+        </div>
+
+        {/* Signals */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openPanel(PanelType.SIGNALS, PanelSize.LARGE)}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-muted/20 hover:scale-110",
+              "bg-transparent border border-border/30 hover:border-border/50"
+            )}
+            aria-label="Signals & Probes"
+          >
+            <Scan className="w-5 h-5 text-sky-300" />
+          </Button>
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-sky-500/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Signals & Probes
+            </div>
+          </div>
+        </div>
+
+        {/* Holopad */}
+        <div className="relative group pointer-events-auto z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/holopad')}
+            className={cn(
+              "w-12 h-12 transition-all duration-200 rounded-lg",
+              "hover:bg-muted/20 hover:scale-110",
+              "bg-transparent border border-border/30 hover:border-border/50"
+            )}
+            aria-label="Holopad Layout"
+          >
+            <LayoutDashboard className="w-5 h-5 text-foreground" />
+          </Button>
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-border/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
+              Holopad Layout
+            </div>
+          </div>
+        </div>
+
+        {/* Achievements */}
         <div className="relative group pointer-events-auto z-10">
           <Button
             variant="ghost"
@@ -195,13 +315,12 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
             className={cn(
               "w-12 h-12 transition-all duration-200 rounded-lg",
               "hover:bg-muted/20 hover:scale-110",
-              "bg-transparent border border-border/30 hover:border-border/50"
+              "bg-transparent border border-border/30 hover-border-border/50"
             )}
             aria-label="Achievements"
           >
             <Award className="w-5 h-5 text-purple-400" />
           </Button>
-          {/* Tooltip */}
           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             <div className="bg-background/95 backdrop-blur-sm border border-border/30 px-3 py-1.5 rounded text-sm whitespace-nowrap shadow-xl">
               Achievements

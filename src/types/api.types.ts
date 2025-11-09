@@ -1137,6 +1137,71 @@ export interface TravelEstimate {
   travel_seconds: number
 }
 
+// Tech Planning Types
+export interface TechPlanDto {
+  id: string
+  name: string
+  node_ids: string[]
+  notes?: string | null
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateTechPlanRequest {
+  name: string
+  node_ids: string[]
+  notes?: string | null
+  metadata?: Record<string, unknown> | null
+}
+
+export interface UpdateTechPlanRequest {
+  id: string
+  name?: string
+  node_ids?: string[]
+  notes?: string | null
+  metadata?: Record<string, unknown> | null
+  updated_at: string
+}
+
+export interface UpdateTechPlanNodesRequest {
+  id: string
+  node_ids: string[]
+  updated_at: string
+}
+
+export interface DeleteTechPlanRequest {
+  id: string
+  updated_at: string
+}
+
+export interface TechAdvisorSuggestionDto {
+  node_id: string
+  advisor_id?: string | null
+  dismissed_at?: string | null
+  pinned_at?: string | null
+}
+
+export interface TechAdvisorStateDto {
+  current_focus_node_id: string | null
+  dismissed_suggestions: TechAdvisorSuggestionDto[]
+  pinned_suggestions: TechAdvisorSuggestionDto[]
+  updated_at: string | null
+}
+
+export interface UpdateTechAdvisorStateRequest {
+  current_focus_node_id: string | null
+  dismissed_suggestions?: TechAdvisorSuggestionDto[]
+  pinned_suggestions?: TechAdvisorSuggestionDto[]
+  updated_at?: string | null
+}
+
+export interface AdvisorSuggestionMutationRequest {
+  node_id: string
+  advisor_id?: string | null
+  updated_at?: string | null
+}
+
 // Updated Fleet Types to match API
 export interface FleetShip {
   definition_id: number

@@ -7,10 +7,12 @@ This document defines the backend support the frontend needs to persist a player
 ### 1. Tech Plans
 
 **Purpose**
+
 - Retain a player's curated research/build plan across sessions and devices.
 - Enable syncing between multiple browser tabs and future native clients.
 
 **Data Model**
+
 - `id` (UUID, generated server-side)
 - `player_id` (UUID; implicit via auth token, but persisted for auditing)
 - `name` (string, 2–60 chars)
@@ -29,15 +31,12 @@ This document defines the backend support the frontend needs to persist a player
 | `DELETE` | `/api/v1/tech-plans/{id}` | Remove plan. |
 
 **Example Payloads**
+
 ```json
 // POST /api/v1/tech-plans
 {
   "name": "Industrial Ramp",
-  "node_ids": [
-    "research-mining_foundations",
-    "facility-mining_station",
-    "facility-ore_refinery"
-  ],
+  "node_ids": ["research-mining_foundations", "facility-mining_station", "facility-ore_refinery"],
   "notes": "Rush production, then pivot to military tier 2."
 }
 ```
@@ -64,6 +63,7 @@ This document defines the backend support the frontend needs to persist a player
 ```
 
 **WebSocket Events**
+
 - `tech-plan.created`, `tech-plan.updated`, `tech-plan.deleted`
   - Payload includes the full plan record.
   - Allows hot reload without polling (frontend will merge into Redux state).
@@ -73,10 +73,12 @@ This document defines the backend support the frontend needs to persist a player
 ### 2. Advisor Suggestions
 
 **Purpose**
+
 - Persist the dynamic advisor context so players resume strategy guidance seamlessly.
 - Track dismissals and priorities to personalise recommendations.
 
 **Data Model**
+
 - `player_id`
 - `current_focus_node_id` (nullable string; last node that populated the advisor)
 - `dismissed_suggestions` (array of `{ node_id, advisor_id?, dismissed_at }`)
@@ -94,6 +96,7 @@ Advisor suggestions themselves can be derived server-side each time (based on em
 | `POST` | `/api/v1/tech-advisor/pin` | (Optional) Pin a suggestion for emphasis. |
 
 **Example Payload**
+
 ```json
 // GET /api/v1/tech-advisor/state
 {
@@ -110,6 +113,7 @@ Advisor suggestions themselves can be derived server-side each time (based on em
 ```
 
 **WebSocket Events**
+
 - `tech-advisor.state.updated`
   - Payload mirrors the `GET` response.
   - Emitted when server-side insights change (e.g. empire state makes new advice available).
@@ -119,6 +123,7 @@ Advisor suggestions themselves can be derived server-side each time (based on em
 ### 3. Supporting Metadata
 
 **Reference Data**
+
 - The frontend already consumes `/api/v1/tech-tree/definitions`.
 - To hydrate imagery and prerequisite tooltips, continue returning:
   - `slug`, `name`, `type`, `specialization`, `era`
@@ -127,6 +132,7 @@ Advisor suggestions themselves can be derived server-side each time (based on em
   - `image_path` (optional string; we derive fallback from slug as `assets/images/{type}s/{slug}.png`)
 
 **Prerequisite Endpoint**
+
 - `/api/v1/prerequisites/{slug}` should remain available to resolve locked content for tooltips when a node is missing from the immediate buildable list.
 
 ---
@@ -156,4 +162,3 @@ Advisor suggestions themselves can be derived server-side each time (based on em
    - Provide fixture data for automated frontend tests (seed a plan and advisor state).
 
 This spec should give the backend team everything required to wire persistent storage for tech plans and advisor context. Let us know if additional fields or constraints are needed as implementation progresses.
-

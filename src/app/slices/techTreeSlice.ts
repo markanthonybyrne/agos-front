@@ -12,6 +12,23 @@ export interface TechTreePlan {
   nodeIds: string[]
   createdAt: string
   updatedAt: string
+  notes?: string | null
+  metadata?: Record<string, unknown> | null
+}
+
+export interface AdvisorSuggestionState {
+  nodeId: string
+  advisorId?: string | null
+  dismissedAt?: string | null
+  pinnedAt?: string | null
+}
+
+export interface TechAdvisorState {
+  currentFocusNodeId: string | null
+  dismissedSuggestions: AdvisorSuggestionState[]
+  pinnedSuggestions: AdvisorSuggestionState[]
+  updatedAt: string | null
+  loaded: boolean
 }
 
 export interface TechTreeState {
@@ -41,6 +58,7 @@ export interface TechTreeState {
   }
   savedPlans: TechTreePlan[]
   activePlanId: string | null
+  advisorState: TechAdvisorState
   empireSnapshot: {
     lastUpdated: number | null
     completedNodes: string[]
@@ -87,6 +105,13 @@ const initialState: TechTreeState = {
   },
   savedPlans: [],
   activePlanId: null,
+  advisorState: {
+    currentFocusNodeId: null,
+    dismissedSuggestions: [],
+    pinnedSuggestions: [],
+    updatedAt: null,
+    loaded: false,
+  },
   empireSnapshot: {
     lastUpdated: null,
     completedNodes: [],
@@ -144,6 +169,26 @@ const techTreeSlice = createSlice({
     },
     hydratePlans: (state, action: PayloadAction<TechTreePlan[]>) => {
       state.savedPlans = action.payload
+      if (state.savedPlans.length === 0) {
+        state.activePlanId = null
+        return
+      }
+      if (!state.activePlanId || !state.savedPlans.some((plan) => plan.id === state.activePlanId)) {
+        state.activePlanId = state.savedPlans[0].id
+      }
+    },
+    receivePlan: (state, action: PayloadAction<TechTreePlan>) => {
+      const index = state.savedPlans.findIndex((plan) => plan.id === action.payload.id)
+      if (index >= 0) {
+        state.savedPlans[index] = action.payload
+        // Only switch active plan if this plan was already selected
+        if (state.activePlanId === action.payload.id) {
+          state.activePlanId = action.payload.id
+        }
+      } else {
+        state.savedPlans.push(action.payload)
+        state.activePlanId = action.payload.id
+      }
     },
     addPlan: (state, action: PayloadAction<TechTreePlan>) => {
       state.savedPlans.push(action.payload)
@@ -171,6 +216,22 @@ const techTreeSlice = createSlice({
     },
     setActivePlan: (state, action: PayloadAction<string | null>) => {
       state.activePlanId = action.payload
+    },
+    setAdvisorState: (state, action: PayloadAction<TechAdvisorState | null>) => {
+      if (action.payload) {
+        state.advisorState = {
+          ...action.payload,
+          loaded: true,
+        }
+      } else {
+        state.advisorState = {
+          currentFocusNodeId: null,
+          dismissedSuggestions: [],
+          pinnedSuggestions: [],
+          updatedAt: null,
+          loaded: false,
+        }
+      }
     },
     updateEmpireSnapshot: (
       state,
@@ -243,10 +304,12 @@ export const {
   setComparisonPlanets,
   setComparisonFocus,
   hydratePlans,
+  receivePlan,
   addPlan,
   updatePlan,
   removePlan,
   setActivePlan,
+  setAdvisorState,
   updateEmpireSnapshot,
   cacheNodeAnalytics,
   resetView,

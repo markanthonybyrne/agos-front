@@ -22,7 +22,7 @@ interface HubSidebarProps {
 
 export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState<string>('activities')
+  const [selectedCategory, setSelectedCategory] = useState<string>('command')
   const [expandedMainMenuItem, setExpandedMainMenuItem] = useState<string | null>(null)
   const [viewportWidth, setViewportWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024)
   const [contextMenuState, setContextMenuState] = useState<{
@@ -248,11 +248,11 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
   // Get notification badges
   const getCategoryBadgeCount = useCallback(
     (categoryId: string): number | undefined => {
-      if (categoryId === 'industry' && constructionCount > 0) {
+      if (categoryId === 'colonies' && constructionCount > 0) {
         return constructionCount
       }
-      if (categoryId === 'social') {
-        return unreadCount > 0 ? unreadCount : undefined
+      if (categoryId === 'command' && unreadCount > 0) {
+        return unreadCount
       }
       return undefined
     },
@@ -281,7 +281,7 @@ export function HubSidebar({ constructionCount = 0 }: HubSidebarProps) {
           {/* Avatar at top - full width, square, at top */}
           <button
             onClick={() => {
-              setSelectedCategory('personal')
+              setSelectedCategory('command')
               setIsCollapsed(false)
             }}
             className="w-full h-[48px] bg-transparent border-0 p-0 cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0 flex items-center justify-center"

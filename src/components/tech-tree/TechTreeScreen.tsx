@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { useGetTechTreeDefinitionsQuery } from '@/api/endpoints/empiresApi'
+import {
+  useCreateTechPlanMutation,
+  useDeleteTechPlanMutation,
+  useGetTechAdvisorStateQuery,
+  useGetTechPlansQuery,
+  useUpdateTechAdvisorStateMutation,
+  useUpdateTechPlanNodesMutation,
+} from '@/api/endpoints/techPlansApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   selectNode,
@@ -9,12 +17,13 @@ import {
   setHoveredNode,
   toggleOverlay,
   setComparisonPlanets,
-  addPlan,
+  hydratePlans,
+  receivePlan,
   removePlan,
   setActivePlan,
-  updatePlan,
+  setAdvisorState,
 } from '@/app/slices/techTreeSlice'
-import type { TechTreePlan, TechTreeState } from '@/app/slices/techTreeSlice'
+import type { TechTreePlan, TechTreeState, TechAdvisorState } from '@/app/slices/techTreeSlice'
 import { TechNodeData, TechNodeType, SpecializationType } from '@/types/tech-tree.types'
 import { buildGraph, filterBySpecialization, filterByEra, filterByType, findPath } from '@/lib/graphEngine'
 import { calculateHierarchicalLayout } from '@/lib/layoutAlgorithms'
@@ -36,6 +45,77 @@ import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { PlanetSelectorDialog } from '@/components/tech-tree/PlanetSelectorDialog'
 import { SlidingPanel } from '@/components/common/SlidingPanel'
 import { cn } from '@/lib/utils'
+
+function mapPlanDtoToState(dto: TechPlanDto): TechTreePlan {
+  return {
+    id: dto.id,
+    name: dto.name,
+    nodeIds: Array.isArray(dto.node_ids) ? dto.node_ids : [],
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+    notes: dto.notes ?? null,
+    metadata: dto.metadata ?? null,
+  }
+}
+
+function mapAdvisorDtoToState(dto: TechAdvisorStateDto): TechAdvisorState {
+  return {
+    currentFocusNodeId: dto.current_focus_node_id,
+    dismissedSuggestions: dto.dismissed_suggestions.map((suggestion) => ({
+      nodeId: suggestion.node_id,
+      advisorId: suggestion.advisor_id ?? null,
+      dismissedAt: suggestion.dismissed_at ?? null,
+      pinnedAt: suggestion.pinned_at ?? null,
+    })),
+    pinnedSuggestions: dto.pinned_suggestions.map((suggestion) => ({
+      nodeId: suggestion.node_id,
+      advisorId: suggestion.advisor_id ?? null,
+      dismissedAt: suggestion.dismissed_at ?? null,
+      pinnedAt: suggestion.pinned_at ?? null,
+    })),
+    updatedAt: dto.updated_at ?? null,
+    loaded: true,
+  }
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (typeof status === 'number') {
+      return status
+    }
+  }
+  return undefined
+}
+
+function extractErrorMessage(error: unknown): string | null {
+  if (typeof error === 'object' && error !== null && 'data' in error) {
+    const data = (error as { data?: unknown }).data
+    if (typeof data === 'string') {
+      return data
+    }
+    if (typeof data === 'object' && data !== null) {
+      const dataObj = data as { message?: unknown; errors?: Record<string, unknown> }
+      if (typeof dataObj.message === 'string') {
+        return dataObj.message
+      }
+      if (dataObj.errors && typeof dataObj.errors === 'object') {
+        for (const value of Object.values(dataObj.errors)) {
+          if (Array.isArray(value) && value.length > 0) {
+            const first = value[0]
+            if (typeof first === 'string') {
+              return first
+            }
+          } else if (typeof value === 'string') {
+            return value
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+import type { TechPlanDto, TechAdvisorStateDto } from '@/types/api.types'
 
 function mapNodeTypeToBuildType(
   nodeType: TechNodeType
@@ -77,6 +157,12 @@ export function TechTreeScreen() {
     type: planetId && filterNodeType ? filterNodeType : undefined, // Only filter by type when coming from planet detail
     planet_id: planetId,
   })
+  const { data: plansData, refetch: refetchPlans } = useGetTechPlansQuery()
+  const { data: advisorApiState, refetch: refetchAdvisorState } = useGetTechAdvisorStateQuery()
+  const [createTechPlan] = useCreateTechPlanMutation()
+  const [updateTechPlanNodes] = useUpdateTechPlanNodesMutation()
+  const [deleteTechPlan] = useDeleteTechPlanMutation()
+  const [updateAdvisorStateMutation] = useUpdateTechAdvisorStateMutation()
   
   const {
     selectedNodeId,
@@ -86,6 +172,7 @@ export function TechTreeScreen() {
     comparison,
     savedPlans,
     activePlanId,
+    advisorState,
   } = useAppSelector((state) => state.techTree)
   const { selectedNode, openDetails, closeDetails } = useTechNodeDetails()
   
@@ -296,6 +383,40 @@ export function TechTreeScreen() {
     }
   }, [filteredNodes])
   
+  const updateAdvisorFocus = useCallback(
+    async (nodeId: string | null) => {
+      if (!nodeId || !advisorState.loaded) {
+        return
+      }
+      if (advisorState.currentFocusNodeId === nodeId) {
+        return
+      }
+      try {
+        const payload: { current_focus_node_id: string; updated_at?: string } = {
+          current_focus_node_id: nodeId,
+        }
+        if (advisorState.updatedAt) {
+          payload.updated_at = advisorState.updatedAt
+        }
+        const response = await updateAdvisorStateMutation(payload).unwrap()
+        dispatch(setAdvisorState(mapAdvisorDtoToState(response)))
+      } catch (error) {
+        const status = getErrorStatus(error)
+        if (status === 409) {
+          toast.warning('Advisor state changed elsewhere. Refreshing.')
+          refetchAdvisorState()
+          return
+        }
+        const message = extractErrorMessage(error)
+        if (message) {
+          toast.error(message)
+        }
+        console.error('Failed to update advisor focus:', error)
+      }
+    },
+    [advisorState, updateAdvisorStateMutation, dispatch, refetchAdvisorState]
+  )
+
   // Handle node click
   const handleNodeClick = useCallback(
     (nodeId: string) => {
@@ -304,9 +425,10 @@ export function TechTreeScreen() {
         dispatch(selectNode(nodeId))
         setAdvisorNode(node)
         openDetails(node)
+        updateAdvisorFocus(node.id)
       }
     },
-    [graphData, dispatch, openDetails]
+    [graphData, dispatch, openDetails, updateAdvisorFocus]
   )
   
   // Handle node hover (show path preview)
@@ -495,25 +617,66 @@ export function TechTreeScreen() {
     [dispatch]
   )
 
+  const generatePlanName = useCallback(() => {
+    const baseName = 'Untitled Plan'
+    if (!savedPlans.some((plan) => plan.name === baseName)) {
+      return baseName
+    }
+    let suffix = 2
+    while (savedPlans.some((plan) => plan.name === `${baseName} ${suffix}`)) {
+      suffix += 1
+    }
+    return `${baseName} ${suffix}`
+  }, [savedPlans])
+
   const handleCreatePlan = useCallback(() => {
     const timestamp = new Date().toISOString()
-    const newPlan: TechTreePlan = {
-      id: `plan-${Date.now()}`,
-      name: 'Untitled Plan',
+    const localPlan: TechTreePlan = {
+      id: `temp-${Date.now()}`,
+      name: generatePlanName(),
       nodeIds: [],
       createdAt: timestamp,
       updatedAt: timestamp,
+      metadata: {
+        local: true,
+      },
     }
-    dispatch(addPlan(newPlan))
-    toast.success('Created new research plan.')
-  }, [dispatch])
+    dispatch(addPlan(localPlan))
+    dispatch(setActivePlan(localPlan.id))
+    toast.success('Draft plan created. Add a tech node to save it.')
+  }, [dispatch, generatePlanName])
 
   const handleRemovePlan = useCallback(
-    (planId: string) => {
-      dispatch(removePlan(planId))
-      toast.success('Plan removed.')
+    async (planId: string) => {
+      const plan = savedPlans.find((p) => p.id === planId)
+      if (!plan) {
+        toast.error('Unable to find the selected plan.')
+        return
+      }
+
+      if ((plan.metadata as any)?.local) {
+        dispatch(removePlan(planId))
+        toast.success('Draft plan discarded.')
+        return
+      }
+
+      try {
+        await deleteTechPlan({ id: planId, updated_at: plan.updatedAt }).unwrap()
+        dispatch(removePlan(planId))
+        toast.success('Plan removed.')
+      } catch (error) {
+        const status = getErrorStatus(error)
+        if (status === 409) {
+          toast.warning('Plan was updated elsewhere. Refreshing latest data.')
+          refetchPlans()
+          return
+        }
+        const message = extractErrorMessage(error)
+        toast.error(message ?? 'Unable to remove this plan right now.')
+        console.error('Failed to delete tech plan:', error)
+      }
     },
-    [dispatch]
+    [savedPlans, deleteTechPlan, dispatch, refetchPlans]
   )
 
   const handleSetActivePlan = useCallback(
@@ -523,8 +686,42 @@ export function TechTreeScreen() {
     [dispatch]
   )
 
+  const normalizedPlans = useMemo(() => {
+    if (!plansData) return []
+    if (Array.isArray(plansData)) {
+      return plansData
+    }
+    if (typeof plansData === 'object' && plansData !== null) {
+      const maybePlans = (plansData as { plans?: unknown }).plans
+      if (Array.isArray(maybePlans)) {
+        return maybePlans as TechPlanDto[]
+      }
+    }
+    console.warn('[TechTree] Unexpected tech plan payload shape:', plansData)
+    return []
+  }, [plansData])
+
+  useEffect(() => {
+    dispatch(hydratePlans(normalizedPlans.map(mapPlanDtoToState)))
+  }, [normalizedPlans, dispatch])
+
+  useEffect(() => {
+    if (advisorApiState) {
+      dispatch(setAdvisorState(mapAdvisorDtoToState(advisorApiState)))
+    }
+  }, [advisorApiState, dispatch])
+
+  useEffect(() => {
+    if (advisorApiState?.current_focus_node_id && graphData) {
+      const focusNode = graphData.nodes.find((node) => node.id === advisorApiState.current_focus_node_id)
+      if (focusNode) {
+        setAdvisorNode(focusNode)
+      }
+    }
+  }, [advisorApiState?.current_focus_node_id, graphData])
+
   const handleAddNodeToPlan = useCallback(
-    (nodeId: string) => {
+    async (nodeId: string) => {
       if (!activePlanId) {
         toast.info('Select or create a plan to store this node.')
         return
@@ -538,10 +735,41 @@ export function TechTreeScreen() {
         toast.info('This node is already present in the active plan.')
         return
       }
-      dispatch(updatePlan({ id: activePlanId, nodeIds: [...plan.nodeIds, nodeId] }))
-      toast.success('Node added to active plan.')
+
+      const isLocalPlan = Boolean((plan.metadata as any)?.local)
+
+      try {
+        if (isLocalPlan) {
+          const response = await createTechPlan({
+            name: plan.name,
+            node_ids: [...plan.nodeIds, nodeId],
+          }).unwrap()
+          dispatch(removePlan(plan.id))
+          dispatch(receivePlan(mapPlanDtoToState(response)))
+          dispatch(setActivePlan(response.id))
+          toast.success('Plan saved and node added.')
+        } else {
+          const response = await updateTechPlanNodes({
+            id: plan.id,
+            node_ids: [...plan.nodeIds, nodeId],
+            updated_at: plan.updatedAt,
+          }).unwrap()
+          dispatch(receivePlan(mapPlanDtoToState(response)))
+          toast.success('Node added to active plan.')
+        }
+      } catch (error) {
+        const status = getErrorStatus(error)
+        if (status === 409) {
+          toast.warning('Plan was updated elsewhere. Refreshing latest data.')
+          refetchPlans()
+          return
+        }
+        const message = extractErrorMessage(error)
+        toast.error(message ?? 'Unable to add this node to the plan right now.')
+        console.error('Failed to update plan nodes:', error)
+      }
     },
-    [activePlanId, savedPlans, dispatch]
+    [activePlanId, savedPlans, createTechPlan, updateTechPlanNodes, dispatch, refetchPlans]
   )
   
   // Debug: Log filtered nodes count
@@ -559,11 +787,12 @@ export function TechTreeScreen() {
       if (node) {
         openDetails(node)
         setAdvisorNode(node)
+        updateAdvisorFocus(node.id)
       }
     } else if (!selectedNodeId) {
       closeDetails()
     }
-  }, [selectedNodeId, graphData, openDetails, closeDetails])
+  }, [selectedNodeId, graphData, openDetails, closeDetails, updateAdvisorFocus])
   
   if (isLoading) {
     return (
@@ -774,8 +1003,8 @@ interface StrategySidebarProps {
   onToggleShowCompleted: () => void
   onClearAllFilters: () => void
   onToggleOverlay: (overlay: 'dependencyHeatmap' | 'planetComparison' | 'empireProgress' | 'advisorHints') => void
-  onCreatePlan: () => void
-  onRemovePlan: (planId: string) => void
+  onCreatePlan: () => void | Promise<void>
+  onRemovePlan: (planId: string) => void | Promise<void>
   onSelectPlan: (planId: string | null) => void
   onSetComparisonPlanets: (planetIds: number[]) => void
 }
