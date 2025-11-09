@@ -17,6 +17,7 @@
   - Login/Register pages with form validation (React Hook Form + Zod)
   - AuthGuard component for protected routes
   - Token persistence in localStorage
+  - Email verification gating with resend UX and detailed validation messaging
 - Layout components:
   - Header with empire info and logout
   - Sidebar navigation with collapsible menu

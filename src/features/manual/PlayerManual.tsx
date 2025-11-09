@@ -30,20 +30,24 @@ export function PlayerManual({ variant = 'standalone' }: PlayerManualProps) {
     // Parse markdown to extract sections
     const lines = manualContent.split('\n')
     const parsedSections: Section[] = []
-    
-    lines.forEach((line, index) => {
+    const slugCounts = new Map<string, number>()
+
+    lines.forEach((line) => {
       const headingMatch = line.match(/^(#{1,3})\s+(.+)$/)
       if (headingMatch) {
         const level = headingMatch[1].length
         const title = headingMatch[2].trim()
-        const id = title
+        const baseSlug = title
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '')
+          .replace(/^-|-$/g, '') || 'section'
+        const count = slugCounts.get(baseSlug) ?? 0
+        slugCounts.set(baseSlug, count + 1)
+        const id = count === 0 ? baseSlug : `${baseSlug}-${count + 1}`
         parsedSections.push({ id, title, level })
       }
     })
-    
+
     setSections(parsedSections)
     if (parsedSections.length > 0) {
       setActiveSection(parsedSections[0].id)
@@ -98,6 +102,17 @@ export function PlayerManual({ variant = 'standalone' }: PlayerManualProps) {
     let listLevel = 0
     let listKey = 0
     let tableKey = 0
+    const slugCounts = new Map<string, number>()
+
+    const getUniqueSlug = (title: string) => {
+      const base = title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'section'
+      const count = slugCounts.get(base) ?? 0
+      slugCounts.set(base, count + 1)
+      return count === 0 ? base : `${base}-${count + 1}`
+    }
 
     const pushElement = (element: React.ReactNode) => {
       if (inSection) {
@@ -229,21 +244,18 @@ export function PlayerManual({ variant = 'standalone' }: PlayerManualProps) {
         flushList()
         const level = headingMatch[1].length
         const title = headingMatch[2].trim()
-        const id = title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '')
+        const uniqueSlug = getUniqueSlug(title)
 
         if (level === 2) {
           flushSection()
           inSection = true
         }
 
-        const HeadingTag = `h${Math.min(level, 3)}` as keyof JSX.IntrinsicElements
+        const HeadingTag = `h${Math.min(level, 3)}` as 'h1' | 'h2' | 'h3'
         const headingElement = (
           <HeadingTag
             key={`heading-${i}`}
-            id={id}
+            id={uniqueSlug}
             className={cn(
               'font-heading scroll-mt-28 transition-colors',
               level === 1 && 'text-4xl md:text-5xl font-bold tracking-tight text-white mt-16 mb-6 border-b border-white/10 pb-4',

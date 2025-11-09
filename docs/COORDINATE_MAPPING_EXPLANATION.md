@@ -1,145 +1,101 @@
-# X/Y Coordinate to Hierarchical Mapping Explanation
+# Region/System Coordinate Mapping Explanation
 
 ## Overview
 
-The universe uses a **1000×1000 grid** where each planet has X/Y coordinates (0-999). These coordinates are **converted** to hierarchical labels (Quadrant:Sector:Galaxy:System:Planet) for game mechanics and user display.
+Astralus now exposes planetary locations using the `region:system:planet` triplet. These identifiers are derived from the canonical X/Y grid (`grid_width = 2000`, `grid_height = 1000`) using a deterministic slice calculation. The backend still stores and returns X/Y values; the hierarchical triplet is generated on demand and persisted on planet records for convenience.
 
-**Note:** This document describes the **5-level hierarchy** (v2). For the old 4-level system, see archived documentation.
+Default universe constants (overridable in configuration):
 
-## Grid Structure
+| Constant             | Value | Notes                                            |
+| -------------------- | ----- | ------------------------------------------------ |
+| `grid_width`         | 2000  | Total width of the playable grid                 |
+| `grid_height`        | 1000  | Total height of the playable grid                |
+| `region_count`       | 20    | Number of regions along the X axis               |
+| `systems_per_region` | 125   | Systems partition each region into narrow slices |
+| `planets_per_system` | 17    | Deterministic hash assigns planet indices        |
 
-### Quadrants (4 total)
-- **Quadrant 1**: X = 0-249
-- **Quadrant 2**: X = 250-499
-- **Quadrant 3**: X = 500-749
-- **Quadrant 4**: X = 750-999
+Geometry records (`region_geometries`, `system_geometries`) can override the simple slices to snap to artist-authored polygons. When those tables contain entries the CoordinateService honours them; otherwise it falls back to the math below.
 
-**Formula**: `quadrant = floor(X / 250) + 1`
+---
 
-### Sectors (4 per quadrant)
-Within each quadrant, sectors are divided horizontally:
+## Mapping X/Y → Region/System/Planet
 
-- **Sector 1**: X = 0-62 (within quadrant)
-- **Sector 2**: X = 62-125
-- **Sector 3**: X = 125-187
-- **Sector 4**: X = 187-250
+Given an integer X/Y pair inside the configured grid:
 
-**Formula**: `sector = floor((X % 250) / 62.5) + 1`
+1. **Region calculation**
 
-### Galaxies (10 per sector)
-Galaxies are distributed both horizontally (X) and vertically (Y) within a sector:
+   ```text
+   region_width = grid_width / region_count
+   region = floor(x / region_width) + 1
+   region_min_x = (region - 1) * region_width
+   ```
 
-- X component: Divides the sector width (62.5) by 10
-- Y component: Divides sector height by 10
+2. **System calculation**
 
-**Note**: The Y-axis is used to create a 2D distribution of galaxies within sectors.
+   ```text
+   system_width = region_width / systems_per_region
+   system = floor((x - region_min_x) / system_width) + 1
+   ```
 
-### Systems (10 per galaxy)
-Systems are subdivisions within galaxies, distributed horizontally:
+3. **Planet calculation**
+   ```text
+   planet = (abs(crc32("${round(x)}-${round(y)}")) % planets_per_system) + 1
+   ```
 
-- **X component**: System 1-10 within galaxy width
-- **Y component**: Same as galaxy height
+The CRC32 hash guarantees that the same X/Y pair always resolves to the same planet index. Geometry overrides can snap the point to polygon bounds but the final identifiers remain identical.
 
-**Formula**: `system = floor((X within galaxy) / SYSTEM_SIZE_X) + 1`
+---
 
-### Planets (15 per system)
-Planet numbers are **deterministically assigned** using a hash function:
+## Mapping Region/System/Planet → X/Y
 
-```php
-hash = CRC32("X-Y")
-planet = (abs(hash) % 15) + 1
+To produce a representative X/Y for rendering (centre of polygon when available, otherwise slice centre):
+
+```text
+region_min_x = (region - 1) * region_width
+system_min_x = region_min_x + (system - 1) * system_width
+x = round(system_min_x + system_width / 2)
+
+planet_band_height = grid_height / planets_per_system
+y = round((planet - 0.5) * planet_band_height)
 ```
 
-This means multiple X/Y positions within a system can map to the same planet number, and the mapping is **many-to-one**.
+When geometry overrides exist, the CoordinateService returns the centroid of the polygon for the requested region/system instead of the slice centre. The fallback logic implemented in `regionSystemToXy` mirrors the calculation above and is sufficient for front-end usage.
 
-## Important Notes
+---
 
-### 1. One-Way Conversion
-- **X/Y → Hierarchical**: Always works (deterministic)
-- **Hierarchical → X/Y**: Approximate only (used for migration from old system)
+## Helper Functions (Frontend)
 
-The `hierarchicalToXy()` method provides an **approximate** X/Y location for a given hierarchical coordinate, but converting that X/Y back may not yield the exact same hierarchical coordinate.
+`src/lib/coordinateUtils.ts` exposes utility helpers that mirror the backend service:
 
-### 2. Planet Number Assignment
-Planet numbers (1-15) within a system are assigned using a hash function, meaning:
-- **Multiple X/Y positions** in the same system can have the **same planet number**
-- There's no unique mapping from hierarchical → X/Y for planets
-- Planet numbers are mainly for display/naming purposes
+- `xyToRegionSystem(x, y)` → `{ region, system, planet }`
+- `regionSystemToXy(region, system, planet)` → `{ x, y }`
+- `xyToHierarchical(x, y)` → legacy + new fields for backwards compatibility
 
-### 3. Example Mappings
+`src/lib/coordinates.ts` provides higher-level helpers used throughout the UI:
 
-| X | Y | Quadrant | Sector | Galaxy | System | Planet |
-|---|---|----------|--------|--------|--------|--------|
-| 0 | 0 | 1 | 1 | 1 | 1-10 | (varies by hash) |
-| 31 | 31 | 1 | 1 | 10 | 3-7 | (varies by hash) |
-| 62 | 62 | 1 | 2 | 1 | 1-10 | (varies by hash) |
-| 125 | 125 | 1 | 3 | 1 | 1-10 | (varies by hash) |
-| 250 | 250 | 2 | 1 | 1 | 1-10 | (varies by hash) |
+- `normalizeCoordinate(input)` ensures any string/object resolves to `{ region, system, planet }`
+- `resolveCoordinateToXY(input)` returns the hierarchy triplet plus a representative X/Y pair
+- `formatCoordinate(input)` always emits `region:system:planet`
+- `calculateDistance(origin, destination)` prefers X/Y when available and falls back to the helpers above
 
-### 4. Range Examples
-
-For **System 1:1:7:3** (Quadrant 1, Sector 1, Galaxy 7, System 3):
-
-```
-X range: ~31-37 (approximate, depends on Y)
-Y range: ~37-43 (approximate, depends on sector Y base)
-```
-
-To get exact ranges:
-- `CoordinateService::getSystemXyRange(1, 1, 7, 3)` - System bounds
-- `CoordinateService::getGalaxyXyRange(1, 1, 7)` - Galaxy bounds
-- `CoordinateService::getSectorXyRange(1, 1)` - Sector bounds
-- `CoordinateService::getQuadrantXyRange(1)` - Quadrant bounds
+---
 
 ## Practical Usage
 
-### For Frontend Development
+- **Forms & Inputs**: Accept both `X:123:456` and `region:system:planet` strings. Normalise inputs with `normalizeCoordinate` so legacy values are converted seamlessly.
+- **API Requests**: Send both `target_region`, `target_system`, `target_planet` and the corresponding `target_x`, `target_y`. The backend derives the hierarchy from X/Y but having both ensures migrations remain deterministic.
+- **Rendering**: Use `regionSystemToXy` for quick approximations when geometry data is unavailable. When geometry endpoints are cached locally, prefer their centroids for higher fidelity.
+- **Display**: Use `formatCoordinate` to show `region:system:planet` consistently in the UI.
 
-1. **Display coordinates**: Use hierarchical labels (`1:1:6:3`) for user-friendly display
-2. **Map rendering**: Use X/Y coordinates for precise grid positioning
-3. **Distance calculations**: Use X/Y coordinates (Euclidean distance)
-4. **Querying**: Use X/Y ranges for filtering planets by hierarchical areas
+---
 
-### For Game Logic
+## Legacy Notes
 
-- **Visibility**: Stored as hierarchical keys (`"1:1:6"`) but calculated from X/Y
-- **Travel**: Uses X/Y coordinates for distance and routing
-- **Spatial queries**: Convert hierarchical filters to X/Y ranges using `getGalaxyXyRange()`, `getSectorXyRange()`, or `getQuadrantXyRange()`
+The legacy 4-level `quadrant:sector:galaxy:planet` format has been retired. If you encounter historical data:
 
-## Coordinate Service Methods
+- Treat `quadrant` as `region`
+- Treat `sector` as `system`
+- Ignore the `galaxy` slot (no longer used)
+- Convert using `normalizeCoordinate` to ensure consistent behaviour
 
-### Converting X/Y → Hierarchical
-```php
-$coordinateService = app(CoordinateService::class);
-$hierarchical = $coordinateService->xyToHierarchical(33, 31);
-// Returns: ['quadrant' => 1, 'sector' => 1, 'galaxy' => 10, 'system' => 3, 'planet' => 6]
-```
-
-### Converting Hierarchical → X/Y Range
-```php
-$xyRange = $coordinateService->getGalaxyXyRange(1, 1, 6);
-// Returns: ['x_min' => 31, 'x_max' => 37, 'y_min' => 37, 'y_max' => 43]
-```
-
-### Converting Hierarchical → Approximate X/Y (Migration)
-```php
-// 5-level format (new)
-$xy = $coordinateService->hierarchicalToXy(1, 1, 7, 3, 6);
-// Returns: ['x' => 33, 'y' => 31] (approximate)
-
-// 4-level format (legacy, backwards compatible)
-$xy = $coordinateService->hierarchicalToXy(1, 1, 7, 6);
-// Returns: ['x' => ~33, 'y' => ~31] (approximate, system inferred)
-```
-
-## Summary
-
-- **X/Y coordinates** are the **source of truth** (stored in database)
-- **Hierarchical labels** are **computed on-the-fly** from X/Y in 5-level format
-- The mapping is **deterministic** but **not perfectly reversible**
-- Use hierarchical labels for **display** and **game mechanics** (Q:S:G:Sy:P)
-- Use X/Y coordinates for **spatial queries** and **map rendering**
-- **System level** provides better zoom navigation and discovery mechanics
-
-For detailed implementation guide, see `docs/UNIVERSE_STRUCTURE_V2.md`
-
+Any new UI or API changes should operate exclusively on the Region/System hierarchy.

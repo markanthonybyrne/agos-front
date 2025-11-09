@@ -70,6 +70,8 @@ Game logic advances on **server-driven ticks** (default: 30 minutes; test cluste
 
 **Visibility**: A multi-tier fog-of-war system. Operational Briefings highlight new reveal radii, adjacency buffers, and discoverable systems matching the latest galaxy map update.
 
+**Coordinates**: Planetary locations are communicated as `region:system:planet`. Regions partition the galactic grid along the X axis; systems are narrow slices within a region (125 per region), and planets are deterministically assigned via hash. The UI still displays supporting X/Y values when precise positioning is needed.
+
 ---
 
 ## Portal & Support Channels
@@ -114,10 +116,11 @@ Within the same page you’ll find:
 
 ### Registration & First Login
 
-1. **Register**: Create an account with username, email, password, and empire name
-2. **Homeworld Assignment**: Your empire starts with one homeworld planet in Region 1-3
-3. **Initial Resources**: Start with minimal resources - must build infrastructure
-4. **Initial Visibility**: Small square area around homeworld is visible (fog of war)
+1. **Register**: Create an account with username, email, password, and empire name.
+2. **Verify Email**: Confirm your address via the verification link before logging in. Use the login screen’s resend option if the message does not arrive within a minute.
+3. **Homeworld Assignment**: Your empire starts with one homeworld planet in Region 1-3.
+4. **Initial Resources**: Start with minimal resources - must build infrastructure.
+5. **Initial Visibility**: Small square area around homeworld is visible (fog of war).
 
 ### First Hour Checklist
 

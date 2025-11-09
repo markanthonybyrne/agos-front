@@ -18,22 +18,32 @@ function OnboardingContent({ autoStart = true }: { autoStart?: boolean }) {
 
   // Keep loading progress in sync with data loader slice
   useEffect(() => {
+    const loaderComplete =
+      planetsState.isLoaded ||
+      (!planetsState.isLoading && (planetsState.loadingProgress ?? 0) >= 99)
+
     dispatch({
       type: 'UPDATE_LOADING',
       payload: {
         progress: planetsState.loadingProgress ?? 0,
         phaseLabel: planetsState.loadingPhase ?? undefined,
-        dataReady: planetsState.isLoaded,
+        dataReady: loaderComplete,
       },
     })
-  }, [dispatch, planetsState.isLoaded, planetsState.loadingPhase, planetsState.loadingProgress])
+  }, [
+    dispatch,
+    planetsState.isLoaded,
+    planetsState.isLoading,
+    planetsState.loadingPhase,
+    planetsState.loadingProgress,
+  ])
 
   // Auto start intro when onboarding opens
   useEffect(() => {
-    if (autoStart && state.phase === 'idle') {
+    if (autoStart && !state.intro.started) {
       dispatch({ type: 'START_INTRO' })
     }
-  }, [autoStart, dispatch, state.phase])
+  }, [autoStart, dispatch, state.intro.started])
 
   // Toggle body attribute to signal onboarding overlay
   useEffect(() => {
@@ -49,7 +59,7 @@ function OnboardingContent({ autoStart = true }: { autoStart?: boolean }) {
 
   useEffect(() => {
     if (state.phase === 'completed') {
-      fadeTheme({ durationMs: 800 }).catch(() => undefined)
+      fadeTheme({ durationMs: 45000 }).catch(() => undefined)
     }
   }, [fadeTheme, state.phase])
 
@@ -101,6 +111,12 @@ function OnboardingContent({ autoStart = true }: { autoStart?: boolean }) {
   const currentTourStep = state.phase === 'tour' ? tour.steps[state.tour.currentIndex] : null
   const totalTourSteps = tour.steps.length
 
+  const handleSkipAll = useCallback(() => {
+    dispatch({ type: 'SKIP_INTRO' })
+    dispatch({ type: 'SKIP_TOUR' })
+    closeOnboarding({ markComplete: true }).catch(() => undefined)
+  }, [closeOnboarding, dispatch])
+
   useEffect(() => {
     if (state.phase !== 'tour' || !currentTourStep) return
     window.dispatchEvent(
@@ -120,7 +136,7 @@ function OnboardingContent({ autoStart = true }: { autoStart?: boolean }) {
     }
 
     fadeTimeoutRef.current = window.setTimeout(() => {
-      fadeTheme({ durationMs: 20000 }).catch(() => undefined)
+      fadeTheme({ durationMs: 45000 }).catch(() => undefined)
       fadeTimeoutRef.current = null
     }, 5000)
 
@@ -147,7 +163,7 @@ function OnboardingContent({ autoStart = true }: { autoStart?: boolean }) {
             <CinematicIntro
               config={cinematic}
               onComplete={() => dispatch({ type: 'COMPLETE_INTRO' })}
-              onSkip={() => dispatch({ type: 'SKIP_INTRO' })}
+              onSkip={handleSkipAll}
             />
           </motion.div>
         )}
@@ -197,7 +213,7 @@ function OnboardingContent({ autoStart = true }: { autoStart?: boolean }) {
               <button
                 type="button"
                 className="rounded-full border border-white/20 px-5 py-2 text-xs font-medium uppercase tracking-[0.35em] text-white/70 transition hover:border-white/40 hover:text-white"
-                onClick={() => dispatch({ type: 'SKIP_TOUR' })}
+                onClick={handleSkipAll}
               >
                 Skip Remaining Onboarding
               </button>
@@ -239,7 +255,7 @@ export function OnboardingExperience({ isOpen, onClose, cinematic, tour, autoSta
   }, [])
 
   const playTheme = useCallback(
-    async ({ volume = 0.16 }: PlayThemeOptions = {}) => {
+    async ({ volume = 0.22 }: PlayThemeOptions = {}) => {
       const audio = themeAudioRef.current
       if (!audio) return false
 
@@ -325,7 +341,7 @@ export function OnboardingExperience({ isOpen, onClose, cinematic, tour, autoSta
 
   useEffect(() => {
     if (!isOpen) {
-      fadeTheme({ durationMs: 600 })
+      fadeTheme({ durationMs: 45000 })
         .catch(() => undefined)
         .finally(() => {
           stopTheme()

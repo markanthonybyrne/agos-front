@@ -3,6 +3,7 @@ import { FleetDetails } from '@/types/api.types'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useMoveFleetMutation } from '@/api/endpoints/fleetsApi'
@@ -10,7 +11,7 @@ import { useValidateFleetRangeMutation } from '@/api/endpoints/universeApi'
 import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
 import { useTick } from '@/hooks/useTick'
-import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
+import { formatCoordinate, normalizeCoordinate } from '@/lib/coordinates'
 import { formatTicksToTime } from '@/lib/formatters'
 import { Rocket, Clock, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,12 +23,48 @@ interface MoveFleetDialogProps {
   onClose: () => void
 }
 
+type NormalizedCoordinate = {
+  region: number
+  system: number
+  planet: number
+}
+
 export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps) {
-  const [destinationCoord, setDestinationCoord] = useState({
-    quadrant: fleet.destination_coordinate?.quadrant || 1,
-    sector: fleet.destination_coordinate?.sector || 1,
-    galaxy: fleet.destination_coordinate?.galaxy || 1,
-    planet: fleet.destination_coordinate?.planet || 1,
+  const normalizeCandidate = (value: unknown): NormalizedCoordinate | null => {
+    if (!value) {
+      return null
+    }
+
+    if (typeof value === 'object' && value !== null && 'coordinate' in (value as Record<string, unknown>)) {
+      const nested = normalizeCoordinate((value as Record<string, unknown>).coordinate as any)
+      if (nested) {
+        return nested
+      }
+    }
+
+    const normalized = normalizeCoordinate(value as any)
+    return normalized
+  }
+
+  const [destinationCoord, setDestinationCoord] = useState<NormalizedCoordinate>(() => {
+    const fromRegion =
+      normalizeCandidate(
+        fleet.destination_region !== undefined && fleet.destination_system !== undefined
+          ? {
+              region: fleet.destination_region,
+              system: fleet.destination_system,
+              planet:
+                (fleet as any).destination_planet ??
+                fleet.destination_coordinate?.planet ??
+                1,
+            }
+          : null,
+      ) ??
+      normalizeCandidate(fleet.destination_coordinate) ??
+      normalizeCandidate((fleet as any).destination?.coordinate) ??
+      normalizeCandidate((fleet as any).destination)
+
+    return fromRegion ?? { region: 1, system: 1, planet: 1 }
   })
   const [selectedPlanetId, setSelectedPlanetId] = useState<number | null>(null)
   const [orderType, setOrderType] = useState<'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'>(
@@ -42,50 +79,54 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
   const { data: planetsData, isLoading: isLoadingPlanets } = useGetPlanetsQuery()
   const { data: shipDefinitionsData } = useGetShipDefinitionsQuery()
   const { currentTick } = useTick()
-  const ownedPlanets = planetsData?.planets || []
+  const ownedPlanets = (planetsData?.planets || []).filter((planet) => {
+    if (!planet || !planet.id || !planet.coordinate) {
+      return false
+    }
+    return normalizeCandidate(planet.coordinate) !== null
+  })
   const shipDefinitions = shipDefinitionsData?.ships || []
+
+  const originCoordinate =
+    normalizeCandidate(
+      (fleet as any).origin_region !== undefined && (fleet as any).origin_system !== undefined
+        ? {
+            region: (fleet as any).origin_region,
+            system: (fleet as any).origin_system,
+            planet:
+              (fleet as any).origin_planet ??
+              fleet.origin_coordinate?.planet ??
+              1,
+          }
+        : null,
+    ) ??
+    normalizeCandidate(fleet.origin_coordinate) ??
+    normalizeCandidate((fleet as any).origin?.coordinate) ??
+    normalizeCandidate((fleet as any).origin)
 
   // Validate fleet range when destination changes
   useEffect(() => {
-    const validateDestination = async () => {
-      // Get origin coordinate from fleet
-      let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
-      
-      if (fleet.origin_coordinate) {
-        originCoord = fleet.origin_coordinate
-      } else if ((fleet as any).origin?.coordinate) {
-        const parsed = parseCoordinate((fleet as any).origin.coordinate)
-        if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
-            parsed.galaxy !== undefined && parsed.planet !== undefined) {
-          originCoord = {
-            quadrant: parsed.quadrant,
-            sector: parsed.sector,
-            galaxy: parsed.galaxy,
-            planet: parsed.planet
-          }
-        }
-      }
-      
-      if (originCoord && destinationCoord && 
-          originCoord.quadrant !== undefined && originCoord.sector !== undefined && 
-          originCoord.galaxy !== undefined && destinationCoord.quadrant !== undefined && 
-          destinationCoord.sector !== undefined && destinationCoord.galaxy !== undefined) {
-        validateRange({
-          origin_quadrant: originCoord.quadrant,
-          origin_sector: originCoord.sector,
-          origin_galaxy: originCoord.galaxy,
-          destination_quadrant: destinationCoord.quadrant,
-          destination_sector: destinationCoord.sector,
-          destination_galaxy: destinationCoord.galaxy,
-        })
-      }
+    if (!originCoordinate) {
+      return
     }
-    
-    if (destinationCoord.quadrant !== undefined && destinationCoord.sector !== undefined && 
-        destinationCoord.galaxy !== undefined) {
-      validateDestination()
+
+    if (!destinationCoord) {
+      return
     }
-  }, [destinationCoord, fleet, validateRange])
+
+    validateRange({
+      origin_region: originCoordinate.region,
+      origin_system: originCoordinate.system,
+      destination_region: destinationCoord.region,
+      destination_system: destinationCoord.system,
+    })
+  }, [
+    destinationCoord.region,
+    destinationCoord.system,
+    originCoordinate?.region,
+    originCoordinate?.system,
+    validateRange,
+  ])
 
   const handlePlanetSelect = (value: string) => {
     if (value === 'manual') {
@@ -94,18 +135,12 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
     }
 
     const planetId = parseInt(value)
-    const planet = ownedPlanets.find(p => p.id === planetId)
-    
+    const planet = ownedPlanets.find((p) => p.id === planetId)
+
     if (planet) {
-      const coord = parseCoordinate(planet.coordinate)
-      if (coord && coord.quadrant !== undefined && coord.sector !== undefined && 
-          coord.galaxy !== undefined && coord.planet !== undefined) {
-        setDestinationCoord({
-          quadrant: coord.quadrant,
-          sector: coord.sector,
-          galaxy: coord.galaxy,
-          planet: coord.planet,
-        })
+      const coord = normalizeCandidate(planet.coordinate)
+      if (coord) {
+        setDestinationCoord(coord)
         setSelectedPlanetId(planetId)
         setTravelTime(null) // Reset travel time when destination changes
       }
@@ -113,52 +148,12 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
   }
 
   const handleCalculateTravelTime = async () => {
-    // Try to get origin coordinate from different possible locations
-    // For stationed fleets, origin might be the current location
-    let originCoord: { quadrant: number; sector: number; galaxy: number; planet: number } | null = null
-    
-    if (fleet.origin_coordinate) {
-      originCoord = fleet.origin_coordinate
-    } else if ((fleet as any).origin?.coordinate) {
-      const parsed = parseCoordinate((fleet as any).origin.coordinate)
-      if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
-          parsed.galaxy !== undefined && parsed.planet !== undefined) {
-        originCoord = {
-          quadrant: parsed.quadrant,
-          sector: parsed.sector,
-          galaxy: parsed.galaxy,
-          planet: parsed.planet
-        }
-      }
-    }
-    
-    // If still no origin, try to construct from origin planet data
-    if (!originCoord && (fleet as any).origin) {
-      const origin = (fleet as any).origin
-      if (origin.coordinate) {
-        const parsed = parseCoordinate(origin.coordinate)
-        if (parsed && parsed.quadrant !== undefined && parsed.sector !== undefined && 
-            parsed.galaxy !== undefined && parsed.planet !== undefined) {
-          originCoord = {
-            quadrant: parsed.quadrant,
-            sector: parsed.sector,
-            galaxy: parsed.galaxy,
-            planet: parsed.planet
-          }
-        }
-      } else if (origin.quadrant !== undefined && origin.sector !== undefined && 
-                 origin.galaxy !== undefined && origin.planet !== undefined) {
-        originCoord = {
-          quadrant: origin.quadrant,
-          sector: origin.sector,
-          galaxy: origin.galaxy,
-          planet: origin.planet
-        }
-      }
-    }
-    
-    if (!originCoord) {
+    if (!originCoordinate) {
       toast.error('Unable to calculate travel time: missing origin coordinates')
+      return
+    }
+    if (!destinationCoord) {
+      toast.error('Select a destination coordinate first')
       return
     }
 
@@ -181,7 +176,8 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
         }
       }
       
-      const formattedShips = shipsArray.map((ship: { definition_id?: number; quantity?: number; id?: number; count?: number } | number) => {
+      const formattedShips = shipsArray
+        .map((ship: { definition_id?: number; quantity?: number; id?: number; count?: number } | number) => {
         if (typeof ship === 'number') {
           // If ship is just a number (definition_id), assume quantity of 1
           return { definition_id: ship, quantity: 1 }
@@ -197,7 +193,8 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
           definition_id: Number(ship.id || ship.definition_id || 0),
           quantity: Number(ship.quantity || ship.count || 1)
         }
-      }).filter((ship: { definition_id: number; quantity: number }) => ship.definition_id && ship.quantity > 0)
+        })
+        .filter((ship: { definition_id: number; quantity: number }) => ship.definition_id && ship.quantity > 0)
       
       if (formattedShips.length === 0) {
         toast.error('No valid ships found in fleet')
@@ -205,21 +202,13 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
         return
       }
 
-      console.log('Formatted ships for travel time:', JSON.stringify(formattedShips, null, 2))
-      console.log('Fleet ships (raw):', JSON.stringify(fleet.ships, null, 2))
-
       if (shipDefinitions.length === 0) {
         toast.error('Ship definitions not loaded. Please wait and try again.')
         setIsCalculatingTravelTime(false)
         return
       }
 
-      const result = await calculateTravelTime(
-        { coordinate: originCoord } as any,
-        { coordinate: destinationCoord } as any,
-        formattedShips,
-        shipDefinitions
-      )
+      const result = await calculateTravelTime(originCoordinate, destinationCoord, formattedShips, shipDefinitions)
       setTravelTime(result)
     } catch (error: unknown) {
       console.error('Travel time calculation error:', error)
@@ -236,9 +225,8 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
       await moveFleet({
         id: fleet.id,
         data: {
-          destination_quadrant: destinationCoord.quadrant,
-          destination_sector: destinationCoord.sector,
-          destination_galaxy: destinationCoord.galaxy,
+          destination_region: destinationCoord.region,
+          destination_system: destinationCoord.system,
           destination_planet: destinationCoord.planet,
           order_type: orderType,
           auto_return_on_failure: (fleet as any).auto_return_on_failure || false,
@@ -253,32 +241,6 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
       toast.error(apiError?.data?.message || errorMessage)
     }
   }
-
-  // Determine origin coordinate - try multiple possible locations
-  const getOriginCoord = () => {
-    if (fleet.origin_coordinate) {
-      return fleet.origin_coordinate
-    }
-    
-    const origin = (fleet as any).origin
-    if (origin?.coordinate) {
-      const parsed = parseCoordinate(origin.coordinate)
-      if (parsed) return parsed
-    }
-    
-    if (origin?.quadrant && origin?.sector && origin?.galaxy && origin?.planet) {
-      return {
-        quadrant: origin.quadrant,
-        sector: origin.sector,
-        galaxy: origin.galaxy,
-        planet: origin.planet
-      }
-    }
-    
-    return null
-  }
-  
-  const originCoord = getOriginCoord()
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -298,9 +260,9 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
           <div className="space-y-2">
             <Label className="text-sm font-medium">Current Location</Label>
             <div className="p-3 bg-muted/20 rounded-lg">
-              {originCoord ? (
+              {originCoordinate ? (
                 <div className="font-mono text-sm">
-                  {formatCoordinate(originCoord)}
+                  {formatCoordinate(originCoordinate)}
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">Unknown</div>
@@ -327,11 +289,11 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
                   <SelectItem value="manual">Enter coordinates manually</SelectItem>
                   {ownedPlanets.length > 0 ? (
                     ownedPlanets.map((planet) => {
-                      const coord = parseCoordinate(planet.coordinate)
+                      const coord = normalizeCandidate(planet.coordinate)
                       if (!coord) return null
                       return (
                         <SelectItem key={planet.id} value={planet.id.toString()}>
-                          {planet.name || `Planet ${formatCoordinate(planet.coordinate)}`} ({formatCoordinate(planet.coordinate)})
+                          {planet.name || `Planet ${formatCoordinate(coord)}`} ({formatCoordinate(coord)})
                         </SelectItem>
                       )
                     }).filter(Boolean)
@@ -344,89 +306,59 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
           </div>
 
           {/* Destination Coordinates */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="dest-quadrant">Quadrant</Label>
-              <Select
-                value={destinationCoord.quadrant.toString()}
-                onValueChange={(value) => {
-                  setDestinationCoord(prev => ({ ...prev, quadrant: parseInt(value) }))
-                  setSelectedPlanetId(null) // Clear planet selection when manually editing
+              <Label htmlFor="dest-region">Region</Label>
+              <Input
+                id="dest-region"
+                type="number"
+                min={1}
+                max={20}
+                value={destinationCoord.region}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  const clamped = Number.isFinite(value) ? Math.min(Math.max(Math.floor(value), 1), 20) : 1
+                  setDestinationCoord((prev) => ({ ...prev, region: clamped }))
+                  setSelectedPlanetId(null)
                   setTravelTime(null)
                 }}
-              >
-                <SelectTrigger id="dest-quadrant">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4].map(q => (
-                    <SelectItem key={q} value={q.toString()}>{q}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dest-sector">Sector</Label>
-              <Select
-                value={destinationCoord.sector.toString()}
-                onValueChange={(value) => {
-                  setDestinationCoord(prev => ({ ...prev, sector: parseInt(value) }))
-                  setSelectedPlanetId(null) // Clear planet selection when manually editing
+              <Label htmlFor="dest-system">System</Label>
+              <Input
+                id="dest-system"
+                type="number"
+                min={1}
+                max={125}
+                value={destinationCoord.system}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  const clamped = Number.isFinite(value) ? Math.min(Math.max(Math.floor(value), 1), 125) : 1
+                  setDestinationCoord((prev) => ({ ...prev, system: clamped }))
+                  setSelectedPlanetId(null)
                   setTravelTime(null)
                 }}
-              >
-                <SelectTrigger id="dest-sector">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
-                    <SelectItem key={s} value={s.toString()}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dest-galaxy">Galaxy</Label>
-              <Select
-                value={destinationCoord.galaxy.toString()}
-                onValueChange={(value) => {
-                  setDestinationCoord(prev => ({ ...prev, galaxy: parseInt(value) }))
-                  setSelectedPlanetId(null) // Clear planet selection when manually editing
-                  setTravelTime(null)
-                }}
-              >
-                <SelectTrigger id="dest-galaxy">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(g => (
-                    <SelectItem key={g} value={g.toString()}>{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="dest-planet">Planet</Label>
-              <Select
-                value={destinationCoord.planet.toString()}
-                onValueChange={(value) => {
-                  setDestinationCoord(prev => ({ ...prev, planet: parseInt(value) }))
-                  setSelectedPlanetId(null) // Clear planet selection when manually editing
+              <Input
+                id="dest-planet"
+                type="number"
+                min={1}
+                max={17}
+                value={destinationCoord.planet}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  const clamped = Number.isFinite(value) ? Math.min(Math.max(Math.floor(value), 1), 17) : 1
+                  setDestinationCoord((prev) => ({ ...prev, planet: clamped }))
+                  setSelectedPlanetId(null)
                   setTravelTime(null)
                 }}
-              >
-                <SelectTrigger id="dest-planet">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(p => (
-                    <SelectItem key={p} value={p.toString()}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
 
@@ -485,7 +417,7 @@ export function MoveFleetDialog({ fleet, isOpen, onClose }: MoveFleetDialogProps
                 variant="outline"
                 size="sm"
                 onClick={handleCalculateTravelTime}
-                disabled={isCalculatingTravelTime || !originCoord}
+                disabled={isCalculatingTravelTime || !originCoordinate}
               >
                 {isCalculatingTravelTime ? (
                   <>

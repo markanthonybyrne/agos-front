@@ -36,19 +36,29 @@ export function AnnouncementForm({ announcement, onSuccess, onCancel }: Announce
 
   const form = useForm<AnnouncementFormData>({
     resolver: zodResolver(announcementSchema),
-    defaultValues: isEditing ? {
-      title: announcement.title,
-      message: announcement.message,
-      priority: announcement.priority,
-      is_pinned: announcement.is_pinned,
-      is_active: announcement.is_active,
-      starts_at: announcement.starts_at || '',
-      expires_at: announcement.expires_at || '',
-    } : {
-      priority: 'info',
-      is_pinned: false,
-      is_active: true,
-    },
+    defaultValues: isEditing
+      ? {
+          title: announcement.title,
+          message: announcement.message ?? announcement.content ?? announcement.body ?? '',
+          priority: (['info', 'warning', 'alert', 'success'] as const).includes(
+            (announcement.priority ?? '') as AnnouncementFormData['priority'],
+          )
+            ? (announcement.priority as AnnouncementFormData['priority'])
+            : 'info',
+          is_pinned: announcement.is_pinned ?? false,
+          is_active: announcement.is_active ?? true,
+          starts_at: announcement.starts_at ?? '',
+          expires_at: announcement.expires_at ?? '',
+        }
+      : {
+          title: '',
+          message: '',
+          priority: 'info',
+          is_pinned: false,
+          is_active: true,
+          starts_at: '',
+          expires_at: '',
+        },
   })
 
   const handleSubmit = async (data: AnnouncementFormData) => {
@@ -110,7 +120,7 @@ export function AnnouncementForm({ announcement, onSuccess, onCancel }: Announce
         <Label htmlFor="priority">Priority *</Label>
         <Select
           value={form.watch('priority')}
-          onValueChange={(value) => form.setValue('priority', value as any)}
+          onValueChange={(value) => form.setValue('priority', value as AnnouncementFormData['priority'])}
           disabled={isLoading}
         >
           <SelectTrigger>

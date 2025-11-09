@@ -1,30 +1,12 @@
 /**
  * Coordinate Conversion Utilities
- * 
- * Converts between X/Y coordinates (0-1999 x 0-999 grid) and hierarchical coordinates
- * (Quadrant:Sector:Galaxy:Planet). X/Y coordinates are the source of truth.
- * 
- * Grid dimensions: 2000 x 1000 (rectangular)
- * 
- * Hierarchy:
- * - Quadrants: 2x2 grid layout (each 1000x500)
- *   * Q1: Top-left (X: 0-999, Y: 0-499)
- *   * Q2: Top-right (X: 1000-1999, Y: 0-499)
- *   * Q3: Bottom-left (X: 0-999, Y: 500-999)
- *   * Q4: Bottom-right (X: 1000-1999, Y: 500-999)
- * 
- * - Sectors: 2x2 grid within each quadrant (each 500x250)
- *   * Sector 1: Top-left within quadrant
- *   * Sector 2: Top-right within quadrant
- *   * Sector 3: Bottom-left within quadrant
- *   * Sector 4: Bottom-right within quadrant
- * 
- * - Galaxies: 5x2 grid within each sector (10 galaxies per sector, each ~100x125)
- *   * Galaxies 1-5: Top row (5 columns)
- *   * Galaxies 6-10: Bottom row (5 columns)
- * 
- * - Systems: 10 systems per galaxy (5x2 grid)
- * - Planets: 15 planets per system
+ *
+ * Provides helper utilities to convert between the raw X/Y universe grid and hierarchical
+ * coordinate representations used throughout the client. The legacy implementation operated
+ * on a 4×4 quadrant/sector layout; the updated universe uses Region:System:Planet identifiers.
+ * To minimise migration pain we expose both sets of helpers. Consumers that work with the new
+ * hierarchy should prefer the `regionSystem*` exports while older code continues to rely on
+ * the quadrant-centric functions until it is refactored.
  */
 
 export interface XYCoordinate {
@@ -33,11 +15,16 @@ export interface XYCoordinate {
 }
 
 export interface HierarchicalCoordinate {
-  quadrant: number
-  sector: number
-  galaxy: number
-  system?: number  // System level (5-level hierarchy)
+  // New hierarchy
+  region: number
+  system: number
   planet: number
+  // Legacy aliases (kept optional for backwards compatibility)
+  quadrant?: number
+  sector?: number
+  galaxy?: number
+  legacySystem?: number
+  legacyPlanet?: number
 }
 
 export interface XYRanges {
@@ -47,9 +34,24 @@ export interface XYRanges {
   y_max: number
 }
 
-// Constants for grid dimensions
-const GRID_WIDTH = 2000
-const GRID_HEIGHT = 1000
+// Universe defaults (overridable via Vite env vars)
+const DEFAULT_GRID_WIDTH = 2000
+const DEFAULT_GRID_HEIGHT = 1000
+const DEFAULT_REGION_COUNT = 20
+const DEFAULT_SYSTEMS_PER_REGION = 125
+const DEFAULT_PLANETS_PER_SYSTEM = 17
+
+const GRID_WIDTH = getNumberEnv('VITE_UNIVERSE_GRID_WIDTH', DEFAULT_GRID_WIDTH)
+const GRID_HEIGHT = getNumberEnv('VITE_UNIVERSE_GRID_HEIGHT', DEFAULT_GRID_HEIGHT)
+const REGION_COUNT = getNumberEnv('VITE_UNIVERSE_REGION_COUNT', DEFAULT_REGION_COUNT)
+const SYSTEMS_PER_REGION = getNumberEnv('VITE_UNIVERSE_SYSTEMS_PER_REGION', DEFAULT_SYSTEMS_PER_REGION)
+const PLANETS_PER_SYSTEM = getNumberEnv('VITE_UNIVERSE_PLANETS_PER_SYSTEM', DEFAULT_PLANETS_PER_SYSTEM)
+
+const REGION_WIDTH = GRID_WIDTH / REGION_COUNT
+const SYSTEM_WIDTH_WITHIN_REGION = REGION_WIDTH / SYSTEMS_PER_REGION
+const PLANET_BAND_HEIGHT = GRID_HEIGHT / PLANETS_PER_SYSTEM // fallback when no geometry data is available
+
+// Legacy constants retained for backward compatibility (old quadrant/sector layout)
 const QUADRANT_WIDTH = 1000  // 2000 / 2 (quadrants are 2x2 grid)
 const QUADRANT_HEIGHT = 500  // 1000 / 2
 const SECTOR_WIDTH = 500     // 1000 / 2 (sectors are 2x2 within quadrant)
@@ -70,6 +72,84 @@ function crc32(str: string): number {
   return (crc ^ 0xFFFFFFFF) >>> 0
 }
 
+function getNumberEnv(key: string, fallback: number): number {
+  const value = (import.meta as any)?.env?.[key]
+  if (value === undefined || value === null || value === '') {
+    return fallback
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+/**
+ * NEW COORDINATE HELPERS (Region:System:Planet hierarchy)
+ */
+
+function clampRegion(region: number): number {
+  return Math.min(Math.max(1, Math.floor(region)), REGION_COUNT)
+}
+
+function clampSystem(system: number): number {
+  return Math.min(Math.max(1, Math.floor(system)), SYSTEMS_PER_REGION)
+}
+
+function clampPlanet(planet: number): number {
+  return Math.min(Math.max(1, Math.floor(planet)), PLANETS_PER_SYSTEM)
+}
+
+function stabiliseY(y: number): number {
+  const clamped = Math.max(0, Math.min(GRID_HEIGHT - 1, Math.round(y)))
+  return clamped
+}
+
+/**
+ * Convert raw X/Y coordinates to Region/System/Planet identifiers using the fallback slice logic
+ * described in the backend CoordinateService. Geometry overrides (region_geometries / system_geometries)
+ * are not available client-side, so this produces the deterministic slice mapping.
+ */
+export function xyToRegionSystem(x: number, y: number): { region: number; system: number; planet: number } {
+  const clampedX = Math.max(0, Math.min(GRID_WIDTH - 1, Math.round(x)))
+  const clampedY = stabiliseY(y)
+
+  const region = clampRegion(Math.floor(clampedX / REGION_WIDTH) + 1)
+  const regionMinX = (region - 1) * REGION_WIDTH
+  const system = clampSystem(Math.floor((clampedX - regionMinX) / SYSTEM_WIDTH_WITHIN_REGION) + 1)
+  const planetHash = Math.abs(crc32(`${clampedX}-${clampedY}`))
+  const planet = clampPlanet((planetHash % PLANETS_PER_SYSTEM) + 1)
+
+  return { region, system, planet }
+}
+
+/**
+ * Convert Region/System/Planet identifiers into a representative X/Y coordinate. When precise
+ * geometry polygons are unavailable we fall back to the centre of the deterministic slice.
+ */
+export function regionSystemToXy(
+  region: number,
+  system: number,
+  planet: number = Math.ceil(PLANETS_PER_SYSTEM / 2)
+): XYCoordinate {
+  const safeRegion = clampRegion(region)
+  const safeSystem = clampSystem(system)
+  const safePlanet = clampPlanet(planet)
+
+  const regionMinX = (safeRegion - 1) * REGION_WIDTH
+  const systemMinX = regionMinX + (safeSystem - 1) * SYSTEM_WIDTH_WITHIN_REGION
+  const x = Math.round(systemMinX + SYSTEM_WIDTH_WITHIN_REGION / 2)
+
+  const bandCenter = (safePlanet - 0.5) * PLANET_BAND_HEIGHT
+  const y = stabiliseY(bandCenter)
+
+  return { x, y }
+}
+
+/**
+ * Helper to generate a system key (`region:system`) used across map and visibility helpers.
+ */
+export function getRegionSystemKey(region: number, system: number): string {
+  return `${clampRegion(region)}:${clampSystem(system)}`
+}
+
 /**
  * Convert X/Y coordinates to hierarchical coordinates
  * 
@@ -83,19 +163,11 @@ export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
   const clampedY = Math.max(0, Math.min(GRID_HEIGHT - 1, Math.floor(y)))
 
   // Quadrant: 2x2 grid layout
-  // Q1: Top-left (X: 0-999, Y: 0-499)
-  // Q2: Top-right (X: 1000-1999, Y: 0-499)
-  // Q3: Bottom-left (X: 0-999, Y: 500-999)
-  // Q4: Bottom-right (X: 1000-1999, Y: 500-999)
   const quadrantCol = Math.floor(clampedX / QUADRANT_WIDTH)  // 0 or 1
   const quadrantRow = Math.floor(clampedY / QUADRANT_HEIGHT) // 0 or 1
   const quadrant = (quadrantRow * 2) + quadrantCol + 1  // 1-4
 
   // Sector: 2x2 grid within quadrant
-  // Sector 1: Top-left (X: 0-499, Y: 0-249)
-  // Sector 2: Top-right (X: 500-999, Y: 0-249)
-  // Sector 3: Bottom-left (X: 0-499, Y: 250-499)
-  // Sector 4: Bottom-right (X: 500-999, Y: 250-499)
   const xWithinQuadrant = clampedX % QUADRANT_WIDTH
   const yWithinQuadrant = clampedY % QUADRANT_HEIGHT
   
@@ -112,7 +184,6 @@ export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
   const yWithinSector = yWithinQuadrant % SECTOR_HEIGHT_ACTUAL
 
   // Galaxy: 10 galaxies per sector in a 5x2 grid (5 columns, 2 rows)
-  // This gives us a logical arrangement: 5 galaxies per row
   const GALAXIES_PER_ROW = 5
   const GALAXIES_PER_COL = 2
   
@@ -122,48 +193,40 @@ export function xyToHierarchical(x: number, y: number): HierarchicalCoordinate {
   const galaxyXComponent = Math.min(GALAXIES_PER_ROW - 1, Math.floor(xWithinSector / galaxyWidth))  // 0-4
   const galaxyYComponent = Math.min(GALAXIES_PER_COL - 1, Math.floor(yWithinSector / galaxyHeight)) // 0-1
   
-  // Galaxy number: 1-10, calculated as a 2D position (row-major order)
-  // Galaxy 1: row 0, col 0
-  // Galaxy 2: row 0, col 1
-  // ...
-  // Galaxy 5: row 0, col 4
-  // Galaxy 6: row 1, col 0
-  // ...
-  // Galaxy 10: row 1, col 4
   const galaxy = (galaxyYComponent * GALAXIES_PER_ROW) + galaxyXComponent + 1
   const galaxyClamped = Math.max(1, Math.min(10, galaxy))
 
   // System: Calculate which system (1-10) within the galaxy
-  // Get galaxy range to determine system position
   const galaxyRange = getGalaxyXyRange(quadrant, sector, galaxyClamped)
   const galaxyWidthForSystem = galaxyRange.x_max - galaxyRange.x_min
   const galaxyHeightForSystem = galaxyRange.y_max - galaxyRange.y_min
   const systemWidth = galaxyWidthForSystem / 10
   const systemHeight = galaxyHeightForSystem / 10
   
-  // Calculate which system cell the X/Y falls into
   const xWithinGalaxy = clampedX - galaxyRange.x_min
   const yWithinGalaxy = clampedY - galaxyRange.y_min
   const systemXComponent = Math.min(9, Math.floor(xWithinGalaxy / systemWidth))
   const systemYComponent = Math.min(9, Math.floor(yWithinGalaxy / systemHeight))
   
-  // Convert 2D system position to linear system number (1-10)
-  const system = (systemYComponent * 10) + systemXComponent + 1
-  const systemClamped = Math.max(1, Math.min(10, system))
+  const systemLegacy = (systemYComponent * 10) + systemXComponent + 1
+  const systemClamped = Math.max(1, Math.min(10, systemLegacy))
 
-  // Planet: Deterministic hash-based assignment
-  // hash = CRC32("X-Y")
-  // planet = (abs(hash) % 15) + 1
   const hashInput = `${clampedX}-${clampedY}`
   const hash = crc32(hashInput)
-  const planet = (Math.abs(hash) % 15) + 1
+  const planetLegacy = (Math.abs(hash) % 15) + 1
+
+  // Derive new Region:System:Planet identifiers using fallback slices
+  const newest = xyToRegionSystem(clampedX, clampedY)
 
   return {
+    region: newest.region,
+    system: newest.system,
+    planet: newest.planet,
     quadrant,
     sector,
     galaxy: galaxyClamped,
-    system: systemClamped,
-    planet
+    legacySystem: systemClamped,
+    legacyPlanet: planetLegacy,
   }
 }
 

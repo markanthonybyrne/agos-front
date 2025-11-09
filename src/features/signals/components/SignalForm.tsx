@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { getSystemXyRange, hierarchicalToXy, xyToHierarchical } from '@/lib/coordinateUtils'
+import { regionSystemToXy, xyToRegionSystem } from '@/lib/coordinateUtils'
+import { normalizeCoordinate, resolveCoordinateToXY, formatCoordinate } from '@/lib/coordinates'
 import { useAuth } from '@/hooks/useAuth'
 import { 
   Send, 
@@ -20,11 +21,6 @@ import {
 import { toast } from 'sonner'
 
 const signalFormSchema = z.object({
-  target_quadrant: z.number().min(1, 'Quadrant must be at least 1'),
-  target_sector: z.number().min(1, 'Sector must be at least 1'),
-  target_galaxy: z.number().min(1, 'Galaxy must be at least 1'),
-  target_system: z.number().min(1, 'System must be at least 1'),
-  target_planet: z.number().min(1, 'Planet must be at least 1'),
   type: z.enum(['fleet', 'orbital_defence', 'planetary', 'all_frequency', 'events']),
 })
 
@@ -36,16 +32,25 @@ interface InitialTarget {
   coordinate?: string
   x?: number
   y?: number
+  region?: number
+  system?: number
+  planet?: number
   quadrant?: number
   sector?: number
   galaxy?: number
-  system?: number
-  planet?: number
   type?: SignalType
 }
 
 interface SignalFormProps {
-  onLaunch: (data: { origin_planet_id: number; target_quadrant: number; target_sector: number; target_galaxy: number; target_system: number; target_planet: number; target_x: number; target_y: number; type: string }) => void | Promise<void>
+  onLaunch: (data: {
+    origin_planet_id: number
+    target_region: number
+    target_system: number
+    target_planet: number
+    target_x: number
+    target_y: number
+    type: string
+  }) => void | Promise<void>
   isLoading: boolean
   initialTarget?: InitialTarget
 }
@@ -89,13 +94,11 @@ const signalTypes = [
 ]
 
 type ParsedCoordinate = {
-  x: number
-  y: number
-  quadrant: number
-  sector: number
-  galaxy: number
+  region: number
   system: number
   planet: number
+  x: number
+  y: number
 }
 
 export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormProps) {
@@ -109,21 +112,11 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
   const [parsedCoordinate, setParsedCoordinate] = useState<ParsedCoordinate | null>(null)
 
   const {
-    register,
     handleSubmit,
     setValue,
     watch,
-    formState: { errors }
   } = useForm<SignalFormData>({
     resolver: zodResolver(signalFormSchema),
-    defaultValues: {
-      type: initialTarget?.type ?? 'fleet',
-      target_quadrant: initialTarget?.quadrant ?? 1,
-      target_sector: initialTarget?.sector ?? 1,
-      target_galaxy: initialTarget?.galaxy ?? 1,
-      target_system: initialTarget?.system ?? 1,
-      target_planet: initialTarget?.planet ?? 1
-    }
   })
 
   const selectedType = watch('type')
@@ -135,72 +128,35 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
       return null
     }
 
-    const xyWithPrefix = trimmed.match(/^X\s*:\s*(\d{1,4})\s*:\s*(\d{1,4})$/i)
-    if (xyWithPrefix) {
-      const x = Number(xyWithPrefix[1])
-      const y = Number(xyWithPrefix[2])
-      if (Number.isNaN(x) || Number.isNaN(y)) return null
-      if (x < 0 || x > 1999 || y < 0 || y > 999) return null
-      const hier = xyToHierarchical(x, y)
+    // Accept explicit X:Y inputs (optionally prefixed with X:)
+    const xyMatch = trimmed.match(/^X\s*:\s*(\d{1,4})\s*:\s*(\d{1,4})$/i) || trimmed.match(/^(\d{1,4})\s*:\s*(\d{1,4})$/)
+    if (xyMatch) {
+      const x = Number(xyMatch[1])
+      const y = Number(xyMatch[2])
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+      if (x < 0 || x > 2000 || y < 0 || y > 1000) return null
+      const hierarchical = xyToRegionSystem(x, y)
       return {
         x,
         y,
-        quadrant: hier.quadrant,
-        sector: hier.sector,
-        galaxy: hier.galaxy,
-        system: hier.system ?? 1,
-        planet: hier.planet,
+        region: hierarchical.region,
+        system: hierarchical.system,
+        planet: hierarchical.planet,
       }
     }
 
-    const xySimple = trimmed.match(/^(\d{1,4})\s*:\s*(\d{1,4})$/)
-    if (xySimple) {
-      const x = Number(xySimple[1])
-      const y = Number(xySimple[2])
-      if (Number.isNaN(x) || Number.isNaN(y)) return null
-      if (x < 0 || x > 1999 || y < 0 || y > 999) return null
-      const hier = xyToHierarchical(x, y)
-      return {
-        x,
-        y,
-        quadrant: hier.quadrant,
-        sector: hier.sector,
-        galaxy: hier.galaxy,
-        system: hier.system ?? 1,
-        planet: hier.planet,
-      }
-    }
-
-    const parts = trimmed.split(':').map((segment) => parseInt(segment.trim(), 10))
-
-    if (parts.length === 5 && parts.every((part) => !Number.isNaN(part) && part > 0)) {
-      const [quadrant, sector, galaxy, system, planet] = parts
-      const range = getSystemXyRange(quadrant, sector, galaxy, system)
-      const x = Math.floor((range.x_min + range.x_max) / 2)
-      const y = Math.floor((range.y_min + range.y_max) / 2)
-      return {
-        x,
-        y,
-        quadrant,
-        sector,
-        galaxy,
-        system,
-        planet,
-      }
-    }
-
-    if (parts.length === 4 && parts.every((part) => !Number.isNaN(part) && part > 0)) {
-      const [quadrant, sector, galaxy, planet] = parts
-      const xy = hierarchicalToXy(quadrant, sector, galaxy, planet)
-      const hier = xyToHierarchical(xy.x, xy.y)
-      return {
-        x: Math.round(xy.x),
-        y: Math.round(xy.y),
-        quadrant,
-        sector,
-        galaxy,
-        system: hier.system ?? 1,
-        planet,
+    // Normalise Region:System:Planet strings (and legacy formats) via helper
+    const normalized = normalizeCoordinate(trimmed)
+    if (normalized) {
+      const resolved = resolveCoordinateToXY(normalized)
+      if (resolved) {
+        return {
+          region: normalized.region,
+          system: normalized.system,
+          planet: normalized.planet,
+          x: resolved.x,
+          y: resolved.y,
+        }
       }
     }
 
@@ -211,15 +167,7 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
     setCoordinateInput(value)
     const parsed = parseCoordinate(value)
     setParsedCoordinate(parsed)
-
-    if (parsed) {
-      setValue('target_quadrant', parsed.quadrant)
-      setValue('target_sector', parsed.sector)
-      setValue('target_galaxy', parsed.galaxy)
-      setValue('target_system', parsed.system)
-      setValue('target_planet', parsed.planet)
-    }
-  }, [parseCoordinate, setValue])
+  }, [parseCoordinate])
 
   const onSubmit = (data: SignalFormData) => {
     if (!parsedCoordinate) {
@@ -233,9 +181,7 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
 
     onLaunch({
       origin_planet_id: empire.homeworld_planet_id,
-      target_quadrant: parsedCoordinate.quadrant,
-      target_sector: parsedCoordinate.sector,
-      target_galaxy: parsedCoordinate.galaxy,
+      target_region: parsedCoordinate.region,
       target_system: parsedCoordinate.system,
       target_planet: parsedCoordinate.planet,
       target_x: parsedCoordinate.x,
@@ -257,8 +203,12 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
       return
     }
 
-    if (initialTarget.coordinate) {
-      handleCoordinateChange(initialTarget.coordinate)
+    if (
+      typeof initialTarget.region === 'number' &&
+      typeof initialTarget.system === 'number' &&
+      typeof initialTarget.planet === 'number'
+    ) {
+      handleCoordinateChange(`${initialTarget.region}:${initialTarget.system}:${initialTarget.planet}`)
       return
     }
 
@@ -288,15 +238,20 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
             onChange={(e) => handleCoordinateChange(e.target.value)}
           />
           {parsedCoordinate && (
-            <div className="flex items-center gap-2 text-sm text-green-400">
-              <MapPin className="w-4 h-4" />
-              <span>Valid coordinate: X:{parsedCoordinate.x}:{parsedCoordinate.y}</span>
+            <div className="flex flex-col gap-1 text-sm text-green-400">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                <span>Region:System:Planet — {formatCoordinate(parsedCoordinate)}</span>
+              </div>
+              <div className="ml-6 text-xs text-green-200">
+                Approx. Position: X:{parsedCoordinate.x} Y:{parsedCoordinate.y}
+              </div>
             </div>
           )}
           {coordinateInput && !parsedCoordinate && (
             <div className="flex items-center gap-2 text-sm text-destructive">
               <AlertCircle className="w-4 h-4" />
-              <span>Invalid format. Use X:123:456</span>
+              <span>Invalid format. Use X:123:456 or Region:System:Planet (e.g. 1:42:3)</span>
             </div>
           )}
         </div>
@@ -359,7 +314,7 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
               <div>
                 <span className="text-muted-foreground">Target:</span>
                 <span className="ml-2 font-medium font-mono">
-                  {parsedCoordinate ? `${parsedCoordinate.quadrant}:${parsedCoordinate.sector}:${parsedCoordinate.galaxy}:${parsedCoordinate.system}:${parsedCoordinate.planet}` : 'Invalid coordinate'}
+                  {parsedCoordinate ? `${parsedCoordinate.region}:${parsedCoordinate.system}:${parsedCoordinate.planet}` : 'Invalid coordinate'}
                 </span>
               </div>
               <div>

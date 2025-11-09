@@ -9,19 +9,17 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
   const token = useAppSelector((state) => state.auth.token)
-  const user = useAppSelector((state) => state.auth.user)
+  const verificationRequired = useAppSelector((state) => state.auth.verificationRequired)
   const location = useLocation()
 
-  console.log('AuthGuard check:', { isAuthenticated, token: !!token, user: !!user, location: location.pathname })
+  if (verificationRequired) {
+    return <Navigate to="/login" state={{ from: location, reason: 'EMAIL_NOT_VERIFIED' }} replace />
+  }
 
-  // If no token or not authenticated, redirect to login
   if (!token || !isAuthenticated) {
-    console.log('Not authenticated, redirecting to login')
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // If we have a token and are authenticated, render the children
-  console.log('Authenticated, rendering children')
   return <>{children}</>
 }
 

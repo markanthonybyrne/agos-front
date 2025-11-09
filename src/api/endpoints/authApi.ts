@@ -8,8 +8,16 @@ import {
   SocialAuthCallbackRequest,
   SocialAuthResponse,
   SocialAuthResponseMeta,
+  ResendVerificationEmailRequest,
+  ResendVerificationEmailResponse,
 } from '@/types/api.types'
-import { updateUser, setSocialProviders, clearSocialProviders } from '@/app/slices/authSlice'
+import {
+  updateUser,
+  setSocialProviders,
+  clearSocialProviders,
+  setVerificationPending,
+  clearVerificationPending,
+} from '@/app/slices/authSlice'
 import type { RootState } from '@/app/store'
 
 export const authApi = apiSlice.injectEndpoints({
@@ -97,10 +105,19 @@ export const authApi = apiSlice.injectEndpoints({
             defence_grid: response.data.defence_grid || response.defence_grid,
           }
         }
+        const fallback = response as unknown as {
+          user: User
+          empire: Empire
+          planets?: Planet[]
+          current_tick?: number
+          next_tick_eta?: string
+          facilities?: Array<{ slug: string; name: string; level: number; is_active: boolean; built_on?: string | null; description?: string }>
+          defence_grid?: Array<{ slug: string; name: string; quantity: number; active: boolean; built_on?: string | null }>
+        }
         return {
-          ...(response as unknown as { user: User; empire: Empire; planets?: Planet[]; current_tick?: number; next_tick_eta?: string }),
-          facilities: (response as any).facilities,
-          defence_grid: (response as any).defence_grid,
+          ...fallback,
+          facilities: fallback.facilities,
+          defence_grid: fallback.defence_grid,
         }
       },
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
@@ -108,10 +125,27 @@ export const authApi = apiSlice.injectEndpoints({
           const { data } = await queryFulfilled
           // Update auth state with latest user data (including roles)
           if (data.user) {
+            dispatch(clearVerificationPending())
             dispatch(updateUser(data.user))
           }
-        } catch {
-          // Error handling is done by the query itself
+        } catch (error) {
+          const apiError = (error ?? {}) as {
+            error?: { status?: number; data?: { code?: string; email?: string; pending_email?: string } }
+            status?: number
+            data?: { code?: string; email?: string; pending_email?: string }
+          }
+          const status = apiError.error?.status ?? apiError.status
+          const code = apiError.error?.data?.code ?? apiError.data?.code
+
+          if (status === 403 && code === 'EMAIL_NOT_VERIFIED') {
+            const email =
+              apiError.error?.data?.email ??
+              apiError.error?.data?.pending_email ??
+              apiError.data?.email ??
+              apiError.data?.pending_email
+
+            dispatch(setVerificationPending({ email }))
+          }
         }
       },
       providesTags: (result) => [
@@ -142,7 +176,7 @@ export const authApi = apiSlice.injectEndpoints({
         }
         return { onboarding_completed: true }
       },
-      async onQueryStarted({ completed }, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(_args, { dispatch, queryFulfilled, getState }) {
         try {
           const { data } = await queryFulfilled
           const state = getState() as RootState
@@ -190,6 +224,26 @@ export const authApi = apiSlice.injectEndpoints({
           return { message: response.data.message }
         }
         return { message: 'Password changed successfully' }
+      },
+    }),
+    resendVerificationEmail: builder.mutation<
+      ResendVerificationEmailResponse,
+      ResendVerificationEmailRequest
+    >({
+      query: (data) => ({
+        url: '/auth/email/resend',
+        method: 'POST',
+        body: data,
+      }),
+      transformResponse: (response: ResendVerificationEmailResponse) => {
+        if (response.status === 'ok') {
+          return response
+        }
+        return {
+          status: response.status ?? 'error',
+          message: response.message ?? 'Unable to resend verification email.',
+          code: response.code,
+        }
       },
     }),
     uploadAvatar: builder.mutation<
@@ -395,19 +449,16 @@ export const authApi = apiSlice.injectEndpoints({
     }),
     getSocialProviders: builder.query<string[], void>({
       query: () => '/auth/social/providers',
-      transformResponse: (response: { status?: string; data?: string[] } | string[]) => {
+      transformResponse: (response: { providers?: string[]; data?: { providers?: string[] } } | string[]) => {
         if (Array.isArray(response)) {
           return response
         }
         if (response && typeof response === 'object') {
-          if (Array.isArray((response as any).providers)) {
-            return (response as any).providers
+          if (Array.isArray(response.providers)) {
+            return response.providers
           }
-          if (Array.isArray(response.data)) {
-            return response.data
-          }
-          if (Array.isArray((response as any).data?.providers)) {
-            return (response as any).data.providers
+          if (Array.isArray(response.data?.providers)) {
+            return response.data.providers || []
           }
         }
         return []
@@ -416,7 +467,7 @@ export const authApi = apiSlice.injectEndpoints({
         try {
           const { data } = await queryFulfilled
           dispatch(setSocialProviders(data))
-        } catch (error: any) {
+        } catch {
           // If provider endpoint disabled (404), clear providers
           dispatch(clearSocialProviders())
         }
@@ -499,5 +550,6 @@ export const {
   useGetSocialProvidersQuery,
   useGetSocialRedirectMutation,
   useSocialCallbackMutation,
+  useResendVerificationEmailMutation,
 } = authApi
 

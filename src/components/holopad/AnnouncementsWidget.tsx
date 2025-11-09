@@ -19,7 +19,7 @@ export function AnnouncementsWidget({
   })
   
   // Map API announcement to widget format
-  const rawAnnouncements = data?.announcements || []
+  const rawAnnouncements = data ?? []
   
   const filtered = rawAnnouncements.filter((a: Announcement) => {
     // If is_active is not provided in the response, default to true (show the announcement)
@@ -39,10 +39,10 @@ export function AnnouncementsWidget({
       return {
         id: a.id,
         title: a.title,
-        content: a.message,
-        published_at: a.created_at,
+        content: a.message ?? a.content ?? a.body ?? '',
+        published_at: a.created_at ?? a.published_at ?? '',
         is_important: (a.is_pinned ?? false) || a.priority === 'alert' || a.priority === 'warning',
-        priority: a.priority,
+        priority: typeof a.priority === 'string' ? a.priority : undefined,
       }
     })
     .sort((a, b) => {
@@ -77,6 +77,11 @@ export function AnnouncementsWidget({
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">Loading announcements...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <Megaphone className="w-12 h-12 text-destructive/60 mb-3" />
+            <p className="text-sm text-destructive">Failed to load announcements.</p>
           </div>
         ) : announcements.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">

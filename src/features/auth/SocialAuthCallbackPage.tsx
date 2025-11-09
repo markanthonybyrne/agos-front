@@ -4,7 +4,7 @@ import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSocialCallbackMutation } from '@/api/endpoints/authApi'
 import { useAppDispatch } from '@/app/hooks'
-import { setCredentials } from '@/app/slices/authSlice'
+import { setCredentials, setVerificationPending } from '@/app/slices/authSlice'
 import { SocialAuthCallbackRequest, SocialAuthResponse } from '@/types/api.types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -142,8 +142,19 @@ export function SocialAuthCallbackPage() {
   }
 
   const handleCallbackError = (error: any) => {
-    const statusCode = error?.status
+    const statusCode = error?.status ?? error?.error?.status
+    const errorCode = error?.data?.code ?? error?.error?.data?.code
     let message = 'We could not complete your sign-in. Please try again.'
+
+    if (errorCode === 'EMAIL_NOT_VERIFIED') {
+      const email = error?.data?.email ?? error?.data?.pending_email
+      dispatch(setVerificationPending({ email }))
+      message = error?.data?.message || 'Please verify your email before logging in.'
+      setErrorMessage(message)
+      setStatus('error')
+      toast.warning(message)
+      return
+    }
 
     if (statusCode === 404) {
       message = 'This sign-in provider is currently disabled. Please choose another option.'

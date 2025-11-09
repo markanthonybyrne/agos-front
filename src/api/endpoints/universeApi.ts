@@ -47,12 +47,10 @@ export const universeApi = apiSlice.injectEndpoints({
       providesTags: ['Universe'],
     }),
     validateFleetRange: builder.mutation<FleetRangeValidation, {
-      origin_quadrant: number
-      origin_sector: number
-      origin_galaxy: number
-      destination_quadrant: number
-      destination_sector: number
-      destination_galaxy: number
+      origin_region: number
+      origin_system: number
+      destination_region: number
+      destination_system: number
     }>({
       query: (data) => ({
         url: '/universe/can-reach',

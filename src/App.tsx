@@ -25,7 +25,6 @@ import { PlayerManual } from '@/features/manual/PlayerManual'
 import { Holopad } from '@/features/holopad/Holopad'
 import { PlanetsList } from '@/features/planets/PlanetsList'
 import { PlanetDetail } from '@/features/planets/PlanetDetail'
-import { FleetsPage } from '@/features/fleets/FleetsPage'
 import { FleetDetail } from '@/features/fleets/FleetDetail'
 import { GalaxyMap } from '@/components/map/GalaxyMap'
 import { SystemViewScreen } from '@/components/map/SystemViewScreen'
@@ -109,7 +108,7 @@ function AppContent() {
                   <Route path="/map/system/:region/:system" element={<SystemViewScreen />} />
                   <Route path="/planets" element={<PlanetsList />} />
                   <Route path="/planets/:id" element={<PlanetDetail />} />
-                  <Route path="/fleets" element={<FleetsPage />} />
+                  <Route path="/fleets" element={<FleetsPanelRoute />} />
                   <Route path="/fleets/:id" element={<FleetDetail />} />
                   <Route path="/signals" element={<SignalsPanelRoute />} />
                   <Route path="/alliances" element={<PoliticsPage />} />
@@ -158,6 +157,22 @@ function AppContent() {
       </Routes>
     </>
   )
+}
+
+function FleetsPanelRoute() {
+  const navigate = useNavigate()
+  const { openPanel, closePanelsByType } = useWindow()
+  const openedRef = useRef(false)
+
+  useEffect(() => {
+    if (openedRef.current) return
+    openedRef.current = true
+    closePanelsByType(PanelType.FLEETS)
+    openPanel(PanelType.FLEETS, PanelSize.XLARGE)
+    navigate('/map', { replace: true })
+  }, [closePanelsByType, navigate, openPanel])
+
+  return null
 }
 
 function SignalsPanelRoute() {

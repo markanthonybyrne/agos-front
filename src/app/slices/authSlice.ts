@@ -8,6 +8,8 @@ interface AuthState {
   isAuthenticated: boolean
   socialProviders: string[]
   socialProvidersLoaded: boolean
+  verificationRequired: boolean
+  pendingVerificationEmail: string | null
 }
 
 const getInitialState = (): AuthState => {
@@ -41,6 +43,8 @@ const getInitialState = (): AuthState => {
     isAuthenticated: !!(token && user),
     socialProviders,
     socialProvidersLoaded: socialProviders.length > 0,
+    verificationRequired: false,
+    pendingVerificationEmail: null,
   }
 }
 
@@ -55,6 +59,8 @@ const authSlice = createSlice({
       state.empire = action.payload.empire
       state.token = action.payload.token
       state.isAuthenticated = true
+      state.verificationRequired = false
+      state.pendingVerificationEmail = null
       localStorage.setItem('token', action.payload.token)
       localStorage.setItem('user', JSON.stringify(action.payload.user))
       localStorage.setItem('empire', JSON.stringify(action.payload.empire))
@@ -68,6 +74,8 @@ const authSlice = createSlice({
       state.isAuthenticated = false
       state.socialProviders = []
       state.socialProvidersLoaded = false
+      state.verificationRequired = false
+      state.pendingVerificationEmail = null
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('empire')
@@ -99,6 +107,21 @@ const authSlice = createSlice({
       state.socialProvidersLoaded = false
       localStorage.removeItem('social_providers')
     },
+    setVerificationPending: (state, action: PayloadAction<{ email?: string }>) => {
+      state.verificationRequired = true
+      state.pendingVerificationEmail = action.payload.email ?? null
+      state.isAuthenticated = false
+      state.user = null
+      state.empire = null
+      state.token = null
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('empire')
+    },
+    clearVerificationPending: (state) => {
+      state.verificationRequired = false
+      state.pendingVerificationEmail = null
+    },
   },
 })
 
@@ -109,6 +132,8 @@ export const {
   updateUser,
   setSocialProviders,
   clearSocialProviders,
+  setVerificationPending,
+  clearVerificationPending,
 } = authSlice.actions
 export default authSlice.reducer
 

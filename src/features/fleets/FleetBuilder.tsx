@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { formatCoordinate, parseCoordinate } from '@/lib/coordinates'
+import { formatCoordinate, normalizeCoordinate, resolveCoordinateToXY, parseCoordinate } from '@/lib/coordinates'
 import { formatNumber, formatResource } from '@/lib/formatters'
 import { calculateDistance } from '@/lib/coordinates'
 import { hierarchicalToXy } from '@/lib/coordinateUtils'
@@ -45,29 +45,8 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
   const [createFleet, { isLoading }] = useCreateFleetMutation()
   const [validateRange, { data: rangeValidation, isLoading: isValidating }] = useValidateFleetRangeMutation()
   const { data: planetsData } = useGetPlanetsQuery()
-  const { data: planetShipsData } = useGetPlanetShipsQuery(planetId || 0, { skip: !planetId })
   const { data: shipDefinitions } = useGetShipDefinitionsQuery()
   
-  // Get ships available on the planet if planetId is provided
-  const availableShips = useMemo(() => {
-    if (!planetId || !planetShipsData) return []
-    
-    const ps: any = planetShipsData as any
-    const shipsFromResponse: any[] = ps?.ships || ps?.data?.ships || []
-    
-    // Map to ship definitions with quantities
-    return shipsFromResponse.map((ship: any) => {
-      const shipDef = shipDefinitions?.ships?.find(s => s.id === ship.definition_id)
-      return {
-        definition_id: ship.definition_id,
-        slug: shipDef?.slug || `ship_${ship.definition_id}`,
-        name: shipDef?.name || ship.definition?.name || `Ship #${ship.definition_id}`,
-        quantity: ship.quantity || 0,
-        description: shipDef?.description || ship.definition?.description || '',
-      }
-    }).filter(ship => ship.quantity > 0) // Only show ships that are available
-  }, [planetId, planetShipsData, shipDefinitions])
-
   const form = useForm<FleetFormData>({
     resolver: zodResolver(fleetSchema),
     defaultValues: {
@@ -94,30 +73,55 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
 
   const watchedOrigin = form.watch('origin_planet_id')
   const watchedDestination = form.watch('destination_coordinate')
-  const originPlanet = planets?.find((p: any) => p.id === watchedOrigin)
+  const selectedOriginId = planetId || watchedOrigin || 0
+  const { data: planetShipsData } = useGetPlanetShipsQuery(selectedOriginId, {
+    skip: !selectedOriginId,
+  })
+  const originPlanet = planets?.find((p: any) => p.id === selectedOriginId)
+
+  const availableShips = useMemo(() => {
+    if (!selectedOriginId || !planetShipsData) return []
+
+    const ps: any = planetShipsData as any
+    const shipsFromResponse: any[] = ps?.ships || ps?.data?.ships || []
+
+    return shipsFromResponse
+      .map((ship: any) => {
+        const shipDef = shipDefinitions?.ships?.find((s) => s.id === ship.definition_id)
+        return {
+          definition_id: ship.definition_id,
+          slug: shipDef?.slug || ship.definition?.slug || `ship_${ship.definition_id}`,
+          name: shipDef?.name || ship.definition?.name || `Ship #${ship.definition_id}`,
+          quantity: ship.quantity || 0,
+          description: shipDef?.description || ship.definition?.description || '',
+        }
+      })
+      .filter((ship) => ship.quantity > 0)
+  }, [planetShipsData, selectedOriginId, shipDefinitions])
 
   // Validate fleet range when destination changes
   useEffect(() => {
-    if (watchedDestination && watchedOrigin) {
-      const originPlanetForValidation = planets?.find((p: any) => p.id === watchedOrigin)
-      if (originPlanetForValidation) {
-        const origin = parseCoordinate(originPlanetForValidation.coordinate)
-        const destination = parseCoordinate(watchedDestination)
-        if (origin && destination && 
-            origin.quadrant !== undefined && origin.sector !== undefined && origin.galaxy !== undefined &&
-            destination.quadrant !== undefined && destination.sector !== undefined && destination.galaxy !== undefined) {
-          validateRange({
-            origin_quadrant: origin.quadrant,
-            origin_sector: origin.sector,
-            origin_galaxy: origin.galaxy,
-            destination_quadrant: destination.quadrant,
-            destination_sector: destination.sector,
-            destination_galaxy: destination.galaxy,
-          })
-        }
-      }
+    if (!watchedDestination || !selectedOriginId) {
+      return
     }
-  }, [watchedDestination, watchedOrigin, planets, validateRange])
+
+    const originPlanetForValidation = planets?.find((p: any) => p.id === selectedOriginId)
+    if (!originPlanetForValidation) {
+      return
+    }
+
+    const origin = normalizeCoordinate(originPlanetForValidation.coordinate)
+    const destination = normalizeCoordinate(watchedDestination)
+
+    if (origin && destination) {
+      validateRange({
+        origin_region: origin.region,
+        origin_system: origin.system,
+        destination_region: destination.region,
+        destination_system: destination.system,
+      })
+    }
+  }, [watchedDestination, selectedOriginId, planets, validateRange])
   const destinationCoord = watchedDestination
 
   // Calculate travel time and costs
@@ -142,11 +146,55 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
 
   const totalShips = Object.values(ships).reduce((total, count) => total + count, 0)
 
-  const updateShipCount = (shipType: string, count: number) => {
-    setShips(prev => ({
-      ...prev,
-      [shipType]: Math.max(0, count)
-    }))
+  useEffect(() => {
+    setShips((prev) => {
+      const next: Record<string, number> = {}
+      let changed = false
+
+      availableShips.forEach((ship) => {
+        const prevQty = prev[ship.slug] || 0
+        if (prevQty > 0) {
+          const clamped = Math.min(prevQty, ship.quantity)
+          if (clamped > 0) {
+            next[ship.slug] = clamped
+          }
+          if (clamped !== prevQty) {
+            changed = true
+          }
+        }
+      })
+
+      if (!changed && Object.keys(prev).length === Object.keys(next).length) {
+        return prev
+      }
+
+      return next
+    })
+  }, [availableShips])
+
+  const updateShipCount = (shipType: string, desiredCount: number) => {
+    const shipEntry = availableShips.find((ship) => ship.slug === shipType)
+    const maxAvailable = shipEntry?.quantity ?? 0
+    const clamped = Math.max(0, Math.min(maxAvailable, desiredCount))
+
+    setShips((prev) => {
+      if (clamped === 0) {
+        if (!(shipType in prev)) {
+          return prev
+        }
+        const { [shipType]: _removed, ...rest } = prev
+        return rest
+      }
+
+      if (prev[shipType] === clamped) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [shipType]: clamped,
+      }
+    })
   }
 
   const onSubmit = async (data: FleetFormData) => {
@@ -175,23 +223,24 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
         return
       }
 
-      // Parse destination coordinate
-      const coordParts = data.destination_coordinate.split(':').map(Number)
-      if (coordParts.length !== 4 || coordParts.some(isNaN)) {
+      const normalizedDestination = normalizeCoordinate(data.destination_coordinate)
+      if (!normalizedDestination) {
         toast.error('Invalid destination coordinate format')
         return
       }
 
-      // Calculate x, y coordinates from hierarchical coordinates
-      const destinationXY = hierarchicalToXy(coordParts[0], coordParts[1], coordParts[2], coordParts[3])
+      const destinationXY = resolveCoordinateToXY(normalizedDestination)
+      if (!destinationXY) {
+        toast.error('Unable to resolve destination coordinate')
+        return
+      }
 
       await createFleet({
         ships: fleetShips,
         origin_planet_id: data.origin_planet_id,
-        destination_quadrant: coordParts[0],
-        destination_sector: coordParts[1],
-        destination_galaxy: coordParts[2],
-        destination_planet: coordParts[3],
+        destination_region: normalizedDestination.region,
+        destination_system: normalizedDestination.system,
+        destination_planet: normalizedDestination.planet,
         destination_x: destinationXY.x,
         destination_y: destinationXY.y,
         order_type: data.order_type,
@@ -253,7 +302,7 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
               <Label htmlFor="destination">Destination Coordinate</Label>
               <Input
                 id="destination"
-                placeholder="1:1:2:1"
+                placeholder="1:42:3"
                 {...form.register('destination_coordinate')}
               />
               {form.formState.errors.destination_coordinate && (
@@ -371,95 +420,28 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
             {/* Ship Selection */}
             <div className="space-y-4">
               <h4 className="font-semibold">Ship Selection</h4>
-              {planetId ? (
-                // Show only ships available on this planet
-                availableShips.length > 0 ? (
-                  availableShips.map((ship: any) => {
-                    const shipDef = shipDefinitions?.ships?.find(s => s.id === ship.definition_id)
-                    const telleriumCost = (shipDef as any)?.tellerium_cost || (shipDef as any)?.cost_tellerium || 0
-                    const kryptonCost = (shipDef as any)?.krypton_cost || (shipDef as any)?.cost_krypton || 0
-                    const maxAvailable = ship.quantity
-                    const selected = ships[ship.slug] || 0
-                    
-                    const shipImage = ship.slug ? getShipImage(ship.slug) : null
-                    
-                    return (
-                      <div key={ship.definition_id} className="flex items-center justify-between p-4 bg-muted/20 rounded-lg gap-4">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {shipImage ? (
-                            <img
-                              src={shipImage}
-                              alt={ship.name}
-                              className="w-16 h-16 object-contain flex-shrink-0"
-                              style={{ imageRendering: 'auto' }}
-                            />
-                          ) : (
-                            <Ship className="w-16 h-16 text-blue-400 flex-shrink-0 opacity-50" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h5 className="font-medium truncate">{ship.name}</h5>
-                              {(telleriumCost > 0 || kryptonCost > 0) && (
-                                <Badge variant="outline">
-                                  {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
-                                </Badge>
-                              )}
-                              <Badge variant="secondary">
-                                Available: {maxAvailable}
-                              </Badge>
-                            </div>
-                            {ship.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-2">{ship.description}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateShipCount(ship.slug, Math.max(0, selected - 1))}
-                            disabled={selected === 0}
-                          >
-                            -
-                          </Button>
-                          <span className="w-8 text-center font-mono">
-                            {selected}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateShipCount(ship.slug, Math.min(maxAvailable, selected + 1))}
-                            disabled={selected >= maxAvailable}
-                          >
-                            +
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No ships available on this planet. Build ships first.
-                  </p>
-                )
-              ) : (
-                // Show all ship definitions (for main fleet builder)
-                shipDefinitions?.ships?.map((shipDef: any) => {
-                  const telleriumCost = shipDef.tellerium_cost || shipDef.cost_tellerium || 0
-                  const kryptonCost = shipDef.krypton_cost || shipDef.cost_krypton || 0
-                  const slug = shipDef.slug || `ship_${shipDef.id}`
-                  
-                  const shipImage = slug ? getShipImage(slug) : null
-                  
+              {availableShips.length > 0 ? (
+                availableShips.map((ship: any) => {
+                  const shipDef = shipDefinitions?.ships?.find((s) => s.id === ship.definition_id)
+                  const telleriumCost =
+                    (shipDef as any)?.tellerium_cost || (shipDef as any)?.cost_tellerium || 0
+                  const kryptonCost =
+                    (shipDef as any)?.krypton_cost || (shipDef as any)?.cost_krypton || 0
+                  const maxAvailable = ship.quantity
+                  const selected = ships[ship.slug] || 0
+
+                  const shipImage = ship.slug ? getShipImage(ship.slug) : null
+
                   return (
-                    <div key={shipDef.id} className="flex items-center justify-between p-4 bg-muted/20 rounded-lg gap-4">
+                    <div
+                      key={ship.definition_id}
+                      className="flex items-center justify-between p-4 bg-muted/20 rounded-lg gap-4"
+                    >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {shipImage ? (
                           <img
                             src={shipImage}
-                            alt={shipDef.name}
+                            alt={ship.name}
                             className="w-16 h-16 object-contain flex-shrink-0"
                             style={{ imageRendering: 'auto' }}
                           />
@@ -468,15 +450,16 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h5 className="font-medium truncate">{shipDef.name}</h5>
+                            <h5 className="font-medium truncate">{ship.name}</h5>
                             {(telleriumCost > 0 || kryptonCost > 0) && (
                               <Badge variant="outline">
                                 {formatResource(telleriumCost)}T / {formatResource(kryptonCost)}K
                               </Badge>
                             )}
+                            <Badge variant="secondary">Available: {maxAvailable}</Badge>
                           </div>
-                          {shipDef.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">{shipDef.description}</p>
+                          {ship.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">{ship.description}</p>
                           )}
                         </div>
                       </div>
@@ -485,28 +468,31 @@ export function FleetBuilder({ planetId, onSuccess }: FleetBuilderProps) {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => updateShipCount(slug, (ships[slug] || 0) - 1)}
-                          disabled={!ships[slug]}
+                          onClick={() => updateShipCount(ship.slug, selected - 1)}
+                          disabled={selected === 0}
                         >
                           -
                         </Button>
-                        <span className="w-8 text-center font-mono">
-                          {ships[slug] || 0}
-                        </span>
+                        <span className="w-8 text-center font-mono">{selected}</span>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => updateShipCount(slug, (ships[slug] || 0) + 1)}
+                          onClick={() => updateShipCount(ship.slug, selected + 1)}
+                          disabled={selected >= maxAvailable}
                         >
                           +
                         </Button>
                       </div>
                     </div>
                   )
-                }) || (
-                  <p className="text-muted-foreground text-sm">Loading ship definitions...</p>
-                )
+                })
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  {selectedOriginId
+                    ? 'No ships available on this planet. Build ships first.'
+                    : 'Select an origin planet to view available ships.'}
+                </p>
               )}
             </div>
 

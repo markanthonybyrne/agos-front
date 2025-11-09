@@ -1,10 +1,10 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useEffect, useState } from 'react'
-import { useLoginMutation, useRegisterMutation, useGetSocialRedirectMutation } from '@/api/endpoints/authApi'
+import { useEffect, useState, useRef } from 'react'
+import { useLoginMutation, useRegisterMutation, useGetSocialRedirectMutation, useResendVerificationEmailMutation } from '@/api/endpoints/authApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { setCredentials } from '@/app/slices/authSlice'
+import { setCredentials, setVerificationPending, clearVerificationPending } from '@/app/slices/authSlice'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -63,8 +63,13 @@ export function LoginPage() {
   const [login, { isLoading: isLoggingIn }] = useLoginMutation()
   const [register, { isLoading: isRegistering }] = useRegisterMutation()
   const [getSocialRedirect] = useGetSocialRedirectMutation()
+  const [resendVerificationEmail, { isLoading: isResendingVerification }] = useResendVerificationEmailMutation()
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [activeSocialProvider, setActiveSocialProvider] = useState<SocialProviderKey | null>(null)
+  const verificationRequired = useAppSelector((state) => state.auth.verificationRequired)
+  const pendingVerificationEmail = useAppSelector((state) => state.auth.pendingVerificationEmail)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const resendCooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   
   // Check if user is already authenticated
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
@@ -173,12 +178,17 @@ export function LoginPage() {
 
   // Set register mode if coming from /register route
   useEffect(() => {
+    if (verificationRequired) {
+      setAuthMode('login')
+      return
+    }
+
     if (location.pathname === '/register') {
       setAuthMode('register')
     } else {
       setAuthMode('login')
     }
-  }, [location.pathname])
+  }, [location.pathname, verificationRequired])
 
   // Redirect to map if already authenticated
   useEffect(() => {
@@ -199,10 +209,19 @@ export function LoginPage() {
       if (result.token && result.user) {
         const credentials = {
           user: result.user,
-          empire: result.empire || { id: 0, name: 'Unknown Empire', score: 0, planets_owned: 0, homeworld_planet_id: 0, created_at: new Date().toISOString() },
-          token: result.token
+          empire:
+            result.empire || {
+              id: 0,
+              name: 'Unknown Empire',
+              score: 0,
+              planets_owned: 0,
+              homeworld_planet_id: 0,
+              created_at: new Date().toISOString(),
+            },
+          token: result.token,
         }
         
+        dispatch(clearVerificationPending())
         dispatch(setCredentials(credentials))
         toast.success('Welcome back, Commander!')
         
@@ -227,32 +246,44 @@ export function LoginPage() {
         toast.error('Login failed - invalid response')
       }
     } catch (error: any) {
-      if (error?.data?.status === 'error') {
-        toast.error(error.data.message || 'Login failed')
-      } else {
-        toast.error(error?.data?.message || 'Login failed')
+      if (error?.data?.code === 'EMAIL_NOT_VERIFIED') {
+        dispatch(setVerificationPending({ email: data.email }))
+        setAuthMode('login')
+        if (resendCooldown <= 0) {
+          setResendCooldown(60)
+        }
+        toast.warning(error?.data?.message || 'Please verify your email before logging in.')
+        return
       }
+
+      const validationMessages = extractValidationMessages(error)
+      if (validationMessages.length > 0) {
+        toast.error(validationMessages.join('\n'))
+        return
+      }
+
+      toast.error(error?.data?.message || 'Login failed')
     }
   }
 
   const onRegister = async (data: RegisterFormData) => {
     try {
-      const result = await register(data).unwrap()
-      if (result.user && result.empire && result.token) {
-        dispatch(setCredentials({
-          user: result.user,
-          empire: result.empire,
-          token: result.token
-        }))
-        toast.success(`Welcome, ${result.empire.name}!`)
-        // Small delay to allow blur overlay to appear
-        setTimeout(() => {
-          navigate('/map', { replace: true })
-        }, 100)
-      } else {
-        toast.error('Registration failed - invalid response')
-      }
+      await register(data).unwrap()
+      dispatch(setVerificationPending({ email: data.email }))
+      setAuthMode('login')
+      loginForm.setValue('email', data.email)
+      loginForm.setValue('password', '')
+      registerForm.reset()
+      toast.success('Account created! Check your inbox to verify your email before logging in.')
+      setResendCooldown(60)
+      navigate('/login', { replace: true })
     } catch (error: unknown) {
+      const validationMessages = extractValidationMessages(error)
+      if (validationMessages.length > 0) {
+        toast.error(validationMessages.join('\n'))
+        return
+      }
+
       if (error && typeof error === 'object' && 'data' in error) {
         const apiError = error as { data?: { status?: string; message?: string } }
         if (apiError.data?.status === 'error') {
@@ -265,6 +296,95 @@ export function LoginPage() {
       }
     }
   }
+
+  const extractValidationMessages = (error: unknown): string[] => {
+    if (!error || typeof error !== 'object') return []
+    const apiError = error as { data?: { code?: string; message?: string; details?: Record<string, string[]> } }
+    if (apiError.data?.code !== 'VALIDATION_ERROR' || !apiError.data.details) {
+      return []
+    }
+
+    return Object.values(apiError.data.details)
+      .flat()
+      .filter((message): message is string => Boolean(message))
+  }
+
+  const handleResendVerification = async () => {
+    if (!pendingVerificationEmail || resendCooldown > 0) return
+
+    try {
+      await resendVerificationEmail({ email: pendingVerificationEmail }).unwrap()
+      toast.success(`Verification email resent to ${pendingVerificationEmail}.`)
+      setResendCooldown(60)
+    } catch (error: any) {
+      const messages = extractValidationMessages(error)
+      if (messages.length > 0) {
+        toast.error(messages.join('\n'))
+        return
+      }
+      toast.error(error?.data?.message || 'Unable to resend verification email. Please try again shortly.')
+    }
+  }
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      if (resendCooldownRef.current) {
+        clearInterval(resendCooldownRef.current)
+        resendCooldownRef.current = null
+      }
+      return
+    }
+
+    if (resendCooldownRef.current) {
+      return
+    }
+
+    resendCooldownRef.current = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+
+    return () => {
+      if (resendCooldownRef.current) {
+        clearInterval(resendCooldownRef.current)
+        resendCooldownRef.current = null
+      }
+    }
+  }, [resendCooldown])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const verifiedParam = params.get('verified')
+    const messageParam = params.get('message')
+
+    if (verifiedParam === '1') {
+      toast.success(messageParam || 'Email verified – you can log in now.')
+      dispatch(clearVerificationPending())
+      setResendCooldown(0)
+      loginForm.reset()
+      params.delete('verified')
+      params.delete('message')
+      navigate(`${location.pathname}${params.toString() ? `?${params.toString()}` : ''}`, { replace: true })
+    } else if (verifiedParam === '0') {
+      toast.error(messageParam || 'Email verification failed. Please try again or resend the email.')
+      params.delete('verified')
+      params.delete('message')
+      navigate(`${location.pathname}${params.toString() ? `?${params.toString()}` : ''}`, { replace: true })
+    }
+  }, [dispatch, location.pathname, location.search, navigate, loginForm])
+
+  useEffect(() => {
+    if (verificationRequired && pendingVerificationEmail) {
+      loginForm.setValue('email', pendingVerificationEmail)
+    }
+  }, [verificationRequired, pendingVerificationEmail, loginForm])
+
+  useEffect(() => {
+    const state = location.state as { reason?: string; message?: string } | null
+    if (state?.reason === 'EMAIL_NOT_VERIFIED') {
+      toast.warning(state.message || 'Please verify your email before logging in.')
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location, navigate])
 
   return (
     <div
@@ -389,6 +509,51 @@ export function LoginPage() {
                         <div className="space-y-3">
                           {renderSocialButtons('login')}
                           {renderDivider('Or continue with email')}
+                        </div>
+                      )}
+                      {verificationRequired && (
+                        <div className="space-y-3 rounded-lg border border-amber-400/40 bg-amber-950/20 p-4 text-sm text-amber-100">
+                          <div className="font-semibold text-amber-200">Email verification required</div>
+                          <p className="leading-relaxed text-amber-100/90">
+                            We sent a verification link to{' '}
+                            <span className="font-mono font-semibold text-amber-200">
+                              {pendingVerificationEmail || 'your email address'}
+                            </span>.
+                            Please confirm your email to continue.
+                          </p>
+                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                            <div className="text-xs text-amber-200/80">
+                              {resendCooldown > 0
+                                ? `You can resend another email in ${resendCooldown}s.`
+                                : 'Didn’t receive it? Resend the verification email.'}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isResendingVerification || resendCooldown > 0}
+                                onClick={handleResendVerification}
+                                className="border-amber-400/40 text-amber-100 hover:bg-amber-500/10"
+                              >
+                                {isResendingVerification
+                                  ? 'Sending…'
+                                  : resendCooldown > 0
+                                    ? `Resend in ${resendCooldown}s`
+                                    : 'Resend verification email'}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="text-amber-200 hover:text-amber-50"
+                                onClick={() => {
+                                  dispatch(clearVerificationPending())
+                                  setResendCooldown(0)
+                                }}
+                              >
+                                Use a different email
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       )}
                       <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-5">

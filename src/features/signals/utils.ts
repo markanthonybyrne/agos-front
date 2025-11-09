@@ -1,5 +1,5 @@
 import { TachyonSignal } from '@/types/api.types'
-import { getSystemXyRange, hierarchicalToXy } from '@/lib/coordinateUtils'
+import { regionSystemToXy } from '@/lib/coordinateUtils'
 
 interface XYCoordinate {
   x: number
@@ -15,35 +15,12 @@ export function getSignalXY(signal: TachyonSignal): XYCoordinate | null {
   }
 
   if (
-    typeof signal.target_quadrant === 'number' &&
-    typeof signal.target_sector === 'number' &&
-    typeof signal.target_galaxy === 'number'
+    typeof signal.target_region === 'number' &&
+    typeof signal.target_system === 'number' &&
+    typeof signal.target_planet === 'number'
   ) {
-    if (typeof signal.target_system === 'number' && signal.target_system > 0) {
-      const systemRange = getSystemXyRange(
-        signal.target_quadrant,
-        signal.target_sector,
-        signal.target_galaxy,
-        signal.target_system,
-      )
-      return {
-        x: Math.floor((systemRange.x_min + systemRange.x_max) / 2),
-        y: Math.floor((systemRange.y_min + systemRange.y_max) / 2),
-      }
-    }
-
-    if (typeof signal.target_planet === 'number' && signal.target_planet > 0) {
-      const xy = hierarchicalToXy(
-        signal.target_quadrant,
-        signal.target_sector,
-        signal.target_galaxy,
-        signal.target_planet,
-      )
-      return {
-        x: Math.round(xy.x),
-        y: Math.round(xy.y),
-      }
-    }
+    const xy = regionSystemToXy(signal.target_region, signal.target_system, signal.target_planet)
+    return { x: Math.round(xy.x), y: Math.round(xy.y) }
   }
 
   return null

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGetFleetsQuery, useCancelFleetMutation } from '@/api/endpoints/fleetsApi'
 import { useGetShipDefinitionsQuery } from '@/api/endpoints/shipsApi'
+import { useGetPlanetsQuery } from '@/api/endpoints/planetsApi'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -24,11 +25,30 @@ export function FleetsPanel({ onClose }: FleetsPanelProps) {
   const [selectedFleetForMove, setSelectedFleetForMove] = useState<FleetDetails | null>(null)
   const { data: fleets, isLoading, error } = useGetFleetsQuery()
   const { data: shipDefinitions } = useGetShipDefinitionsQuery()
+  const { data: planetsData } = useGetPlanetsQuery()
   const [cancelFleet] = useCancelFleetMutation()
+  const [planetFilter, setPlanetFilter] = useState<string>('all')
 
   const getShipName = (definitionId: number) => {
     const shipDef = shipDefinitions?.ships?.find(s => s.id === definitionId)
     return shipDef?.name || `Ship #${definitionId}`
+  }
+
+  const planets: any[] = Array.isArray(planetsData)
+    ? planetsData
+    : (planetsData as any)?.planets || []
+  const selectedPlanetId = planetFilter === 'all' ? null : Number(planetFilter)
+  const extractOriginPlanetId = (fleet: any) => {
+    if (typeof fleet?.origin_planet_id === 'number') {
+      return fleet.origin_planet_id
+    }
+    if (typeof fleet?.origin?.id === 'number') {
+      return fleet.origin.id
+    }
+    if (typeof fleet?.origin?.planet_id === 'number') {
+      return fleet.origin.planet_id
+    }
+    return undefined
   }
 
   // Handle different possible API response structures
@@ -42,6 +62,11 @@ export function FleetsPanel({ onClose }: FleetsPanelProps) {
       fleetList = (fleets as any).data.fleets
     }
   }
+
+  const filteredFleetList =
+    selectedPlanetId !== null
+      ? fleetList.filter((fleet: any) => extractOriginPlanetId(fleet) === selectedPlanetId)
+      : fleetList
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -80,15 +105,20 @@ export function FleetsPanel({ onClose }: FleetsPanelProps) {
     return Object.values(normalized).reduce((total, count) => total + Number(count || 0), 0)
   }
 
-  const getFleetSummary = () => {
-    const stationed = fleetList.filter((f: any) => f.status === 'stationed').length
-    const inTransit = fleetList.filter((f: any) => f.status === 'in_transit').length
-    const totalShips = fleetList.reduce((total: number, fleet: any) => total + getTotalShips(fleet.ships), 0)
-    
+  const getFleetSummary = (list: any[]) => {
+    const stationed = list.filter((f: any) => f.status === 'stationed').length
+    const inTransit = list.filter((f: any) => f.status === 'in_transit').length
+    const totalShips = list.reduce(
+      (total: number, fleet: any) => total + getTotalShips(fleet.ships),
+      0
+    )
+
     return { stationed, inTransit, totalShips }
   }
 
-  const summary = getFleetSummary()
+  const totalFleetCount = fleetList.length
+  const filteredFleetCount = filteredFleetList.length
+  const summary = getFleetSummary(filteredFleetList)
 
   if (isLoading) {
     return (
@@ -206,13 +236,37 @@ export function FleetsPanel({ onClose }: FleetsPanelProps) {
         {/* Fleet List */}
         <Card className="panel-glass border-cyan/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Ship className="w-5 h-5 text-cyan-400" />
-              <h3 className="font-semibold">Your Fleets</h3>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Ship className="w-5 h-5 text-cyan-400" />
+                <h3 className="font-semibold">Your Fleets</h3>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Origin Filter
+                </span>
+                <select
+                  value={planetFilter}
+                  onChange={(event) => setPlanetFilter(event.target.value)}
+                  className="min-w-[220px] rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                >
+                  <option value="all">All planets ({totalFleetCount})</option>
+                  {planets.map((planet: any) => (
+                    <option key={planet.id} value={planet.id}>
+                      {planet.name} ({formatCoordinate(planet.coordinate)})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            {fleetList.length > 0 ? (
+            {selectedPlanetId !== null && (
+              <p className="text-xs text-muted-foreground mb-4">
+                Showing {filteredFleetCount} of {totalFleetCount} fleets
+              </p>
+            )}
+            {filteredFleetList.length > 0 ? (
               <div className="space-y-4">
-                {fleetList.map((fleet: any) => {
+                {filteredFleetList.map((fleet: any) => {
                   const StatusIcon = getStatusIcon(fleet.status)
                   const totalShips = getTotalShips(fleet.ships)
                   
@@ -321,12 +375,20 @@ export function FleetsPanel({ onClose }: FleetsPanelProps) {
                 <Ship className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Fleets</h3>
                 <p className="text-muted-foreground mb-4">
-                  You don't have any fleets yet. Build your first fleet to start exploring the galaxy.
+                  {selectedPlanetId
+                    ? 'No fleets originate from this planet yet. Clear the filter or build a new fleet.'
+                    : "You don't have any fleets yet. Build your first fleet to start exploring the galaxy."}
                 </p>
-                <Button onClick={() => setActiveView('builder')}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Build Your First Fleet
-                </Button>
+                {selectedPlanetId ? (
+                  <Button variant="outline" onClick={() => setPlanetFilter('all')}>
+                    Clear Planet Filter
+                  </Button>
+                ) : (
+                  <Button onClick={() => setActiveView('builder')}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Build Your First Fleet
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>

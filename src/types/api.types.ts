@@ -247,13 +247,24 @@ export interface Announcement {
   summary?: string | null
   body?: string | null
   content?: string | null
+  message?: string | null
   slug?: string | null
-  priority?: 'info' | 'warning' | 'critical' | string | null
+  priority?: 'info' | 'warning' | 'alert' | 'success' | 'critical' | string | null
   is_pinned?: boolean
-  published_at?: string
+  is_active?: boolean
+  starts_at?: string | null
+  expires_at?: string | null
+  published_at?: string | null
+  created_at?: string
   updated_at?: string
+  created_by?: string | null
   link_url?: string | null
   metadata?: Record<string, any>
+  creator?: {
+    id: number
+    username: string
+    email?: string
+  } | null
 }
 
 export interface AnnouncementListResponse {
@@ -928,6 +939,16 @@ export interface LoginRequest {
   password: string
 }
 
+export interface ResendVerificationEmailRequest {
+  email: string
+}
+
+export interface ResendVerificationEmailResponse {
+  status: 'ok' | 'error'
+  message?: string
+  code?: string
+}
+
 export interface SocialAuthCallbackRequest {
   code?: string
   redirect_uri?: string
@@ -1199,10 +1220,8 @@ export interface TachyonSignal {
     id: number
     name: string
   }
-  target_quadrant: number
-  target_sector: number
-  target_galaxy: number
-  target_system?: number  // System level (5-level hierarchy)
+  target_region: number
+  target_system: number
   target_planet: number
   target_x?: number  // X coordinate (source of truth)
   target_y?: number  // Y coordinate (source of truth)
@@ -1382,9 +1401,8 @@ export interface CreateFleetRequest {
 }
 
 export interface MoveFleetRequest {
-  destination_quadrant: number
-  destination_sector: number
-  destination_galaxy: number
+  destination_region: number
+  destination_system: number
   destination_planet: number
   order_type?: 'attack' | 'defend' | 'station' | 'return' | 'colonize' | 'transport'
   auto_return_on_failure?: boolean
@@ -1396,13 +1414,11 @@ export interface MoveFleetRequest {
 
 export interface TravelTimeRequest {
   ships: Array<{ definition_id: number; quantity: number }>
-  origin_quadrant: number
-  origin_sector: number
-  origin_galaxy: number
+  origin_region: number
+  origin_system: number
   origin_planet: number
-  destination_quadrant: number
-  destination_sector: number
-  destination_galaxy: number
+  destination_region: number
+  destination_system: number
   destination_planet: number
 }
 
@@ -1421,9 +1437,7 @@ export interface ColonizePlanetRequest {
 
 export interface CreateSignalRequest {
   origin_planet_id: number
-  target_quadrant: number
-  target_sector: number
-  target_galaxy: number
+  target_region: number
   target_system: number
   target_planet: number
   target_x: number
@@ -2332,26 +2346,6 @@ export interface AdminCombatListResponse {
   }
 }
 
-// Announcement Types
-export interface Announcement {
-  id: number
-  title: string
-  message: string
-  priority: 'info' | 'warning' | 'alert' | 'success'
-  is_pinned: boolean
-  is_active: boolean
-  starts_at: string | null
-  expires_at: string | null
-  created_by: string // Username string, not number
-  created_at: string
-  updated_at: string
-  creator?: {
-    id: number
-    username: string
-    email: string
-  }
-}
-
 export interface CreateAnnouncementRequest {
   title: string
   message: string
@@ -2370,10 +2364,6 @@ export interface UpdateAnnouncementRequest {
   is_active?: boolean
   starts_at?: string
   expires_at?: string
-}
-
-export interface AnnouncementListResponse {
-  announcements: Announcement[]
 }
 
 export interface AnnouncementListPaginatedResponse {

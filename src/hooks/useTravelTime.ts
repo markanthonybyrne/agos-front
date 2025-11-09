@@ -1,23 +1,47 @@
 import { useGetTravelTimeMutation } from '@/api/endpoints/fleetsApi'
-import { parseCoordinate, formatCoordinate } from '@/lib/coordinates'
+import { normalizeCoordinate } from '@/lib/coordinates'
 import { TravelTimeRequest, Planet, ShipDefinition } from '@/types/api.types'
 import { Coordinate } from '@/types/game.types'
+
+type CoordinateInput = Planet | { coordinate: Coordinate | string } | Coordinate | string
+
+interface NormalizedCoordinate {
+  region: number
+  system: number
+  planet: number
+}
 
 export function useTravelTime() {
   const [getTravelTime, { isLoading }] = useGetTravelTimeMutation()
 
+  const extractCoordinate = (input: CoordinateInput): NormalizedCoordinate => {
+    if (!input) {
+      throw new Error('Coordinate is required')
+    }
+
+    if (typeof input === 'object' && input !== null && 'coordinate' in (input as Record<string, unknown>)) {
+      const normalized = normalizeCoordinate((input as Record<string, unknown>).coordinate as any)
+      if (normalized) {
+        return normalized
+      }
+    }
+
+    const normalized = normalizeCoordinate(input as any)
+    if (!normalized) {
+      throw new Error('Invalid coordinate')
+    }
+
+    return normalized
+  }
+
   const calculateTravelTime = async (
-    originPlanet: Planet,
-    destinationPlanet: Planet,
+    originPlanet: CoordinateInput,
+    destinationPlanet: CoordinateInput,
     ships: Array<{ definition_id: number; quantity: number }>,
     shipDefinitions?: ShipDefinition[]
   ) => {
-    const originCoord = parseCoordinate(originPlanet.coordinate)
-    const destCoord = parseCoordinate(destinationPlanet.coordinate)
-
-    if (!originCoord || !destCoord) {
-      throw new Error('Invalid coordinates')
-    }
+    const originCoord = extractCoordinate(originPlanet)
+    const destCoord = extractCoordinate(destinationPlanet)
 
     if (!shipDefinitions || shipDefinitions.length === 0) {
       throw new Error('Ship definitions are required to calculate travel time')
@@ -42,23 +66,21 @@ export function useTravelTime() {
       throw new Error('No valid ships found')
     }
 
-    // Validate planet numbers (API expects 1-10)
-    if (originCoord.planet === undefined || originCoord.planet < 1 || originCoord.planet > 10) {
-      throw new Error(`Invalid origin planet number: ${originCoord.planet}. Must be between 1-10.`)
+    // Validate planet numbers (API expects 1-17)
+    if (originCoord.planet === undefined || originCoord.planet < 1 || originCoord.planet > 17) {
+      throw new Error(`Invalid origin planet number: ${originCoord.planet}. Must be between 1-17.`)
     }
-    if (destCoord.planet === undefined || destCoord.planet < 1 || destCoord.planet > 10) {
-      throw new Error(`Invalid destination planet number: ${destCoord.planet}. Must be between 1-10.`)
+    if (destCoord.planet === undefined || destCoord.planet < 1 || destCoord.planet > 17) {
+      throw new Error(`Invalid destination planet number: ${destCoord.planet}. Must be between 1-17.`)
     }
 
     const request: TravelTimeRequest = {
       ships: shipsArray,
-      origin_quadrant: Number(originCoord.quadrant),
-      origin_sector: Number(originCoord.sector),
-      origin_galaxy: Number(originCoord.galaxy),
+      origin_region: Number(originCoord.region),
+      origin_system: Number(originCoord.system),
       origin_planet: Number(originCoord.planet),
-      destination_quadrant: Number(destCoord.quadrant),
-      destination_sector: Number(destCoord.sector),
-      destination_galaxy: Number(destCoord.galaxy),
+      destination_region: Number(destCoord.region),
+      destination_system: Number(destCoord.system),
       destination_planet: Number(destCoord.planet),
     }
 

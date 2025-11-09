@@ -6,6 +6,13 @@ export interface Coordinate {
   galaxy?: number
   system?: number  // System level (5-level hierarchy)
   planet?: number
+  // Legacy aliases that sometimes appear in API payloads
+  quadrant_number?: number
+  sector_number?: number
+  galaxy_number?: number
+  system_number?: number
+  planet_number?: number
+  planet_id?: number
   // New Region:System:Planet coordinates
   region?: number
   // X/Y coordinates (0-1999 x 0-999 grid) - source of truth for positioning

@@ -41,6 +41,7 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
   const [hasCompleted, setHasCompleted] = useState(false)
   const [totalDurationMs, setTotalDurationMs] = useState(1)
   const [mediaError, setMediaError] = useState<string | null>(null)
+  const themeStartedRef = useRef(false)
 
   const activeSegment = useMemo(
     () => resolveActiveSegment(currentTimeMs, config.copy),
@@ -101,6 +102,7 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
     setPlayback('preparing')
     setHasInteracted(true)
     setMediaError(null)
+    themeStartedRef.current = false
 
     if (themeLeadTimeoutRef.current !== null) {
       window.clearTimeout(themeLeadTimeoutRef.current)
@@ -117,6 +119,15 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
         await Promise.all(playPromises)
         setPlayback('playing')
         setCurrentTimeMs(0)
+        if (!themeStartedRef.current) {
+          playTheme({ volume: 0.22 })
+            .then((started) => {
+              themeStartedRef.current = started
+            })
+            .catch((err) => {
+              console.warn('[Onboarding] Unable to start intro theme after voice playback began.', err)
+            })
+        }
       } catch (error) {
         console.warn('[Onboarding] Unable to autoplay cinematic intro. Awaiting user interaction.', error)
         setPlayback('blocked')
@@ -130,7 +141,8 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
     }
 
     try {
-      await playTheme({ volume: 0.16 })
+      const started = await playTheme({ volume: 0.22 })
+      themeStartedRef.current = started
     } catch (error) {
       console.warn('[Onboarding] Intro theme could not be started automatically.', error)
     }
@@ -138,7 +150,7 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
     themeLeadTimeoutRef.current = window.setTimeout(() => {
       themeLeadTimeoutRef.current = null
       void startVoicePlayback()
-    }, 6500)
+    }, 6000)
   }
 
   const handlePrimaryAction = async () => {
@@ -161,7 +173,7 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
       window.clearTimeout(themeLeadTimeoutRef.current)
       themeLeadTimeoutRef.current = null
     }
-    void fadeTheme({ durationMs: 800 })
+    void fadeTheme({ durationMs: 45000 })
     setPlayback('completed')
     setHasCompleted(true)
     onSkip()
@@ -189,7 +201,7 @@ export function CinematicIntro({ config, onComplete, onSkip }: CinematicIntroPro
         window.clearTimeout(themeLeadTimeoutRef.current)
         themeLeadTimeoutRef.current = null
       }
-      void fadeTheme({ durationMs: 600 })
+      void fadeTheme({ durationMs: 45000 })
     }
   }, [fadeTheme])
 

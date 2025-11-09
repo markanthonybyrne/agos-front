@@ -1,7 +1,9 @@
 import { apiSlice } from '../apiSlice'
 import { Announcement, AnnouncementListResponse, AnnouncementResponse } from '@/types/api.types'
 
-const transformAnnouncementList = (response: Announcement[] | AnnouncementListResponse | undefined): Announcement[] => {
+const transformAnnouncementList = (
+  response: Announcement[] | AnnouncementListResponse | undefined
+): Announcement[] => {
   if (!response) {
     return []
   }
@@ -53,7 +55,3 @@ export const announcementsApi = apiSlice.injectEndpoints({
 })
 
 export const { useGetAnnouncementsQuery, useGetAnnouncementQuery } = announcementsApi
-
-import { apiSlice } from '../apiSlice'
-import { AnnouncementListResponse } from '@/types/api.types'
-

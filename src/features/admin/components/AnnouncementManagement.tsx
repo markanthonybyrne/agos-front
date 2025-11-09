@@ -46,8 +46,9 @@ export function AnnouncementManagement() {
     }
   }
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
+  const getPriorityBadge = (priority?: Announcement['priority']) => {
+    const value = String(priority ?? 'info').toLowerCase()
+    switch (value) {
       case 'alert':
         return <Badge variant="destructive">Alert</Badge>
       case 'warning':
@@ -72,7 +73,9 @@ export function AnnouncementManagement() {
       accessor: (a) => (
         <div>
           <div className="font-medium">{a.title}</div>
-          <div className="text-xs text-muted-foreground line-clamp-2">{a.message.substring(0, 100)}...</div>
+          <div className="text-xs text-muted-foreground line-clamp-2">
+            {(a.message ?? a.content ?? a.body ?? '').substring(0, 100)}...
+          </div>
         </div>
       ),
     },
@@ -119,7 +122,9 @@ export function AnnouncementManagement() {
     {
       key: 'created',
       header: 'Created',
-      accessor: (a) => <span className="text-sm">{formatDateTime(a.created_at)}</span>,
+      accessor: (a) => (
+        <span className="text-sm">{a.created_at ? formatDateTime(a.created_at) : 'Unknown'}</span>
+      ),
     },
   ]
 

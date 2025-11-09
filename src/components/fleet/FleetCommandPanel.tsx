@@ -5,9 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Ship, MapPin, Clock, Shield, Target, ArrowLeftRight, Zap, Send, CheckCircle } from 'lucide-react'
-import { formatCoordinate, calculateDistance, parseCoordinate } from '@/lib/coordinates'
-import { convertToLegacyCoordinate } from '@/lib/coordinateConversion'
-import { hierarchicalToXy } from '@/lib/coordinateUtils'
+import { formatCoordinate, calculateDistance, parseCoordinate, resolveCoordinateToXY } from '@/lib/coordinates'
 import { Coordinate } from '@/types/game.types'
 import { toast } from 'sonner'
 import { VisualCoordinateSelector } from './VisualCoordinateSelector'
@@ -94,31 +92,22 @@ export function FleetCommandPanel({ planetId, destinationPlanet, orderType: init
       return
     }
 
-    // Convert coordinate to legacy format for API compatibility
-    const legacyCoord = convertToLegacyCoordinate(selectedDestination)
-    if (!legacyCoord) {
+    // Resolve target coordinate to region/system + X/Y
+    const resolvedDestination = resolveCoordinateToXY(selectedDestination)
+    if (!resolvedDestination) {
       toast.error('Invalid destination coordinate format')
       return
     }
-
-    // Convert hierarchical coordinates to X/Y coordinates
-    const destinationXY = hierarchicalToXy(
-      legacyCoord.quadrant,
-      legacyCoord.sector,
-      legacyCoord.galaxy,
-      legacyCoord.planet
-    )
 
     try {
       await createFleet({
         ships: selectedShips,
         origin_planet_id: selectedOriginPlanet,
-        destination_quadrant: legacyCoord.quadrant,
-        destination_sector: legacyCoord.sector,
-        destination_galaxy: legacyCoord.galaxy,
-        destination_planet: legacyCoord.planet,
-        destination_x: destinationXY.x,
-        destination_y: destinationXY.y,
+        destination_region: resolvedDestination.region,
+        destination_system: resolvedDestination.system,
+        destination_planet: resolvedDestination.planet,
+        destination_x: resolvedDestination.x,
+        destination_y: resolvedDestination.y,
         order_type: orderType,
         auto_return_on_failure: autoReturn,
         resources: orderType === 'transport' ? resources : undefined,

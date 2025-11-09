@@ -238,7 +238,7 @@ export function SupportPage() {
               </div>
             ) : (
               announcementsToDisplay.map((announcement) => {
-                const publishedLabel = renderPublishedAt(announcement.published_at)
+                const publishedLabel = renderPublishedAt(announcement.published_at ?? undefined)
                 return (
                   <div
                     key={announcement.id}

@@ -64,7 +64,15 @@ export function SignalsPage({ initialTarget }: SignalsPageProps = {}) {
     return matchesSearch && matchesType
   })
 
-  const handleLaunchSignal = async (data: { origin_planet_id: number; target_quadrant: number; target_sector: number; target_galaxy: number; target_system: number; target_planet: number; target_x: number; target_y: number; type: string }) => {
+  const handleLaunchSignal = async (data: {
+    origin_planet_id: number
+    target_region: number
+    target_system: number
+    target_planet: number
+    target_x: number
+    target_y: number
+    type: string
+  }) => {
     try {
       await launchSignal({
         ...data,
