@@ -1,34 +1,59 @@
 import { apiSlice } from '../apiSlice'
-import { AnnouncementListResponse } from '@/types/api.types'
+import { Announcement, AnnouncementListResponse, AnnouncementResponse } from '@/types/api.types'
+
+const transformAnnouncementList = (response: Announcement[] | AnnouncementListResponse | undefined): Announcement[] => {
+  if (!response) {
+    return []
+  }
+
+  if (Array.isArray(response)) {
+    return response
+  }
+
+  if ('announcements' in response && Array.isArray(response.announcements)) {
+    return response.announcements
+  }
+
+  return []
+}
+
+const transformAnnouncement = (response: Announcement | AnnouncementResponse | undefined): Announcement | null => {
+  if (!response) {
+    return null
+  }
+
+  if ('announcement' in response) {
+    return response.announcement ?? null
+  }
+
+  return response
+}
 
 export const announcementsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    // Public endpoint for players to fetch active announcements
-    getAnnouncements: builder.query<AnnouncementListResponse, void>({
-      query: () => '/announcements',
-      providesTags: ['Announcement'],
-      transformResponse: (response: any) => {
-        console.log('[announcementsApi] Raw API response:', response)
-        // Handle different possible response structures
-        if (response.announcements) {
-          console.log('[announcementsApi] Response has announcements array:', response.announcements)
-          return response
-        } else if (response.data && Array.isArray(response.data)) {
-          console.log('[announcementsApi] Response has data array, wrapping in announcements:', response.data)
-          return { announcements: response.data }
-        } else if (Array.isArray(response)) {
-          console.log('[announcementsApi] Response is array directly, wrapping in announcements:', response)
-          return { announcements: response }
-        } else {
-          console.warn('[announcementsApi] Unexpected response structure:', response)
-          return { announcements: [] }
-        }
-      },
+    getAnnouncements: builder.query<Announcement[], void>({
+      query: () => ({
+        url: '/announcements',
+      }),
+      transformResponse: transformAnnouncementList,
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((announcement) => ({ type: 'Announcement' as const, id: announcement.id })),
+              { type: 'Announcement' as const, id: 'LIST' },
+            ]
+          : [{ type: 'Announcement' as const, id: 'LIST' }],
+    }),
+    getAnnouncement: builder.query<Announcement | null, number>({
+      query: (id) => `/announcements/${id}`,
+      transformResponse: transformAnnouncement,
+      providesTags: (_result, _error, id) => [{ type: 'Announcement' as const, id }],
     }),
   }),
 })
 
-export const {
-  useGetAnnouncementsQuery,
-} = announcementsApi
+export const { useGetAnnouncementsQuery, useGetAnnouncementQuery } = announcementsApi
+
+import { apiSlice } from '../apiSlice'
+import { AnnouncementListResponse } from '@/types/api.types'
 

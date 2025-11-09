@@ -1,6 +1,5 @@
 import { useMemo, memo, useCallback } from 'react'
 import { SystemData } from '@/lib/galaxyUtils'
-import { getRegionSystemColor } from '@/lib/regionColors'
 import { VisibilityResponse, ResourceRarity } from '@/types/api.types'
 import { isSystemVisible, getVisibleSystems } from '@/lib/visibilityUtils'
 import { ResourceMetadata } from '@/config/resources'
@@ -195,7 +194,8 @@ function SystemMarkersLayerComponent({
       }
       
       // Glow radius
-      const glowRadius = markerSize * 2.5
+      const geometryGlowRadius = system.radius ? system.radius * 0.15 : 0
+      const glowRadius = Math.max(markerSize * 2.5, geometryGlowRadius)
       
       // System name - always show for home system, otherwise only after zooming into region
       // Don't show label on hover - we use the new glass tooltip instead

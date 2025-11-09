@@ -1,544 +1,257 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowRight, BookOpen, Shield, Users, Rocket, Zap, Globe, Swords, Search, Clock, Target, Layers, TrendingUp, Factory } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { BRAND } from '@/lib/brandImages'
-// Import background images
-import splashImage1 from '../../../assets/images/backgrounds/splash_image_1.jpg'
-import splashImage2 from '../../../assets/images/backgrounds/splash_image_2.jpg'
-import splashImage3 from '../../../assets/images/backgrounds/splash_image_3.jpg'
-import splashImage4 from '../../../assets/images/backgrounds/splash_image_4.jpg'
-import consoleImage from '../../../assets/images/backgrounds/console.jpg'
+import { Rocket, Globe, Users, Shield, Clock, AlertTriangle, Layers, Sparkles, ArrowRight, BookOpen } from 'lucide-react'
+import heroVista from '../../../assets/images/landing/fantasy-scene-with-surreal-landscape.jpg'
+import bridgeShot from '../../../assets/images/landing/control-table-spacecraft-from-inside.jpg'
+import fleetShot from '../../../assets/images/sections/planet/fleet.jpg'
+import planetVista from '../../../assets/images/sections/planet/planet_home_panel.jpg'
+
+const pillarFeatures = [
+  {
+    icon: Rocket,
+    title: 'Command Legendary Fleets',
+    description:
+      'Assemble fighters, carriers, and dreadnoughts. Coordinate movements across twenty regions with tick-perfect precision.',
+  },
+  {
+    icon: Globe,
+    title: 'Shape the Frontier',
+    description:
+      'Colonise more than 8,000 planets across 25 archetypes. Each world fuels Tellerium, Krypton, and rare secondary resources vital to your empire.',
+  },
+  {
+    icon: Users,
+    title: 'Forge Alliances',
+    description:
+      'Share intel, coordinate incidents, and wage synchronized campaigns. Diplomacy is as lethal as plasma torpedoes.',
+  },
+  {
+    icon: Shield,
+    title: 'Fortify the Void',
+    description:
+      'Build ion cannons, quantum disruptors, and orbital shields to protect your star systems from rival incursions.',
+  },
+]
+
+const gameplayBeats = [
+  {
+    icon: Clock,
+    title: 'Meaningful Ticks',
+    detail:
+      'Every thirty minutes the universe advances - production, research, fleet arrivals, and incident fallout resolve deterministically.',
+  },
+  {
+    icon: AlertTriangle,
+    title: 'Live Incidents',
+    detail:
+      'Galaxy-wide crises, derelict recoveries, and seasonal events demand quick reactions. Rally allies and exploit each tick-driven window.',
+  },
+  {
+    icon: Layers,
+    title: 'Empire in Balance',
+    detail:
+      'Up to five worlds, infinite potential. Balance Tellerium, Krypton, Dark Matter, and secondary resource chains to climb the galactic rankings.',
+  },
+]
+
+const statHighlights = [
+  { label: 'Regions', value: '20' },
+  { label: 'Colonisable Planets', value: '8,000+' },
+  { label: 'Planet Archetypes', value: '25' },
+  { label: 'Tech Eras', value: '5' },
+]
 
 export function LandingPage() {
   const navigate = useNavigate()
-  
-  // Randomly select background on mount
-  const [backgroundUrl] = useState(() => {
-    const backgrounds = [splashImage1, splashImage2, splashImage3, splashImage4, consoleImage]
-    return backgrounds[Math.floor(Math.random() * backgrounds.length)]
-  })
-
-  const coreFeatures = [
-    {
-      icon: Rocket,
-      title: 'Fleet Command',
-      description: 'Design and command fleets of fighters, cruisers, carriers, and motherships. Expand your reach across 20 regions and 8,000+ planets.',
-      stat: '7 Ship Classes',
-      color: 'cyan',
-    },
-    {
-      icon: Globe,
-      title: 'Planetary Colonization',
-      description: 'Explore the universe and colonize 25 distinct planet types. Manage Tellerium and Krypton production across your empire.',
-      stat: '8,000+ Planets',
-      color: 'blue',
-    },
-    {
-      icon: Users,
-      title: 'Alliance Warfare',
-      description: 'Forge diplomatic bonds, share resources through alliance funds, and coordinate synchronized attacks on common enemies.',
-      stat: 'Strategic Depth',
-      color: 'purple',
-    },
-    {
-      icon: Zap,
-      title: 'Research & Technology',
-      description: 'Unlock 5 eras of technology. Research cutting-edge facilities, ships, and defences to gain strategic advantages.',
-      stat: '5 Technology Eras',
-      color: 'yellow',
-    },
-    {
-      icon: Shield,
-      title: 'Orbital Defences',
-      description: 'Fortify your planets with Ion Cannons, Quantum Disruptors, and Dark Matter Shields. Protect what you\'ve built.',
-      stat: 'Multi-Tier Defence',
-      color: 'green',
-    },
-    {
-      icon: Search,
-      title: 'Fog of War',
-      description: 'Navigate a universe hidden in darkness. Expand visibility through research and signal scanning. Discover before you conquer.',
-      stat: 'Dynamic Visibility',
-      color: 'orange',
-    },
-  ]
-
-  const gameplayFeatures = [
-    {
-      icon: Clock,
-      title: 'Tick-Based Strategy',
-      description: 'Every 30 minutes, the universe advances. Resources are produced, fleets move, battles are resolved. Plan carefully—every decision echoes.',
-      detail: 'Server-driven ticks ensure fair, deterministic gameplay',
-    },
-    {
-      icon: Target,
-      title: 'Deterministic Combat',
-      description: 'Turn-based fleet combat with detailed ship statistics. Initiative, accuracy, and special abilities determine victory.',
-      detail: 'Same inputs always produce the same results',
-    },
-    {
-      icon: Layers,
-      title: 'Empire Management',
-      description: 'Build infrastructure, manage resources, and expand to 5 planets maximum. Balance production, research, and military might.',
-      detail: 'Maximum 5 planets per empire (1 homeworld + 4 colonies)',
-    },
-    {
-      icon: TrendingUp,
-      title: 'Competitive Rankings',
-      description: 'Climb the leaderboards by building a powerful empire. Compete for dominance in galaxy, alliance, and global rankings.',
-      detail: 'Score calculated from ships, defences, planets, and facilities',
-    },
-  ]
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-background">
-      {/* Fixed background layer with enhanced darkness */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{ 
-          backgroundImage: `url(${backgroundUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'brightness(0.3) contrast(1.1)',
-        }}
-      />
-      
-      {/* Enhanced gradient overlays - EVE/Endless Space style */}
-      <div className="fixed inset-0 -z-10 pointer-events-none">
-        {/* Deep space gradient */}
-        <div 
-          className="absolute inset-0 opacity-40"
-          style={{
-            background: 'radial-gradient(ellipse 100% 60% at 50% 0%, rgba(6, 182, 212, 0.15) 0%, transparent 60%)',
-          }}
-        />
-        {/* Nebula effect */}
-        <div 
-          className="absolute inset-0 opacity-30"
-          style={{
-            background: 'radial-gradient(ellipse 80% 50% at 20% 50%, rgba(139, 92, 246, 0.12) 0%, transparent 70%)',
-          }}
-        />
-        {/* Dark space vignette */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/30 to-background/95" />
-        {/* Side vignettes for cinematic effect */}
-        <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-background/40" />
-      </div>
-      
-      {/* Animated stars overlay - more subtle */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        {[...Array(150)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-white"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              width: `${Math.random() * 1.5 + 0.5}px`,
-              height: `${Math.random() * 1.5 + 0.5}px`,
-              opacity: Math.random() * 0.4 + 0.2,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${Math.random() * 3 + 2}s`,
-              boxShadow: '0 0 2px rgba(255, 255, 255, 0.6)',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Floating energy particles - more sophisticated */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              width: `${Math.random() * 400 + 150}px`,
-              height: `${Math.random() * 400 + 150}px`,
-              background: `radial-gradient(circle, rgba(6, 182, 212, ${Math.random() * 0.08 + 0.02}) 0%, transparent 70%)`,
-              filter: 'blur(40px)',
-              animation: `float ${Math.random() * 20 + 20}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 10}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Main content */}
-      <div className="relative z-10 min-h-screen">
-        {/* Hero Section - More dramatic */}
-        <div className="container mx-auto px-4 py-16 lg:py-32">
-          <div className="max-w-5xl mx-auto text-center space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            {/* Logo with enhanced glow */}
-            <div className="flex justify-center mb-12">
-              <div className="relative">
-                <div className="absolute inset-0 blur-3xl bg-cyan-500/30 rounded-full animate-pulse" />
-                <img 
-                  src={BRAND.logo} 
-                  alt="Astralus" 
-                  className="relative h-40 lg:h-56 w-auto object-contain filter drop-shadow-[0_0_40px_rgba(6,182,212,0.8)]"
-                />
-              </div>
-            </div>
-            
-            {/* Main Title - More dramatic */}
-            <div className="space-y-6">
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-4 tracking-tight">
-                <span className="glow-cyan block mb-2">ASTRALUS</span>
-                <span className="text-3xl md:text-5xl lg:text-6xl font-light text-muted-foreground block mt-2">
-                  The Fractured Stars Await
-                </span>
-              </h1>
-              
-              {/* Tagline */}
-              <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-light">
-                A tick-based grand strategy MMO where empires rise and fall among the stars
-              </p>
-            </div>
-            
-            {/* CTA Buttons - More prominent */}
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center pt-4">
+    <div className="relative">
+      <section className="container mx-auto px-6 py-24 lg:py-32">
+        <div className="grid gap-16 lg:grid-cols-[1.1fr_0.9fr] items-center">
+          <div className="text-white">
+            <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/80">Play for free</p>
+            <h1 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight">
+              Command the fractured stars in a living sci-fi grand strategy MMO.
+            </h1>
+            <p className="mt-6 text-lg text-white/75 leading-relaxed">
+              Astralus runs even while you sleep. Coordinate fleets, fortify colonies, and navigate alliance intrigue in a
+              deterministic universe inspired by classic space operas.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-4">
               <Button
+                size="lg"
+                className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold"
                 onClick={() => navigate('/register')}
-                size="lg"
-                className={cn(
-                  'text-xl px-12 py-8 h-auto font-semibold',
-                  'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700',
-                  'text-white border-2 border-cyan-400/50',
-                  'shadow-2xl shadow-cyan-500/40',
-                  'transition-all duration-300 group',
-                  'hover:scale-105 hover:shadow-cyan-500/60',
-                  'relative overflow-hidden'
-                )}
               >
-                <span className="relative z-10 flex items-center">
-                  <Rocket className="w-6 h-6 mr-3 group-hover:rotate-12 transition-transform" />
-                  Awaken Your Empire
-                  <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-2 transition-transform" />
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                Play for free
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              
               <Button
-                onClick={() => navigate('/login')}
+                size="lg"
                 variant="outline"
-                size="lg"
-                className={cn(
-                  'text-xl px-12 py-8 h-auto font-semibold',
-                  'border-2 border-cyan-500/50 hover:border-cyan-500/80',
-                  'bg-background/40 hover:bg-background/60',
-                  'backdrop-blur-md transition-all duration-300',
-                  'hover:scale-105 shadow-xl shadow-cyan-500/20',
-                  'panel-glass'
-                )}
+                className="border-white/40 text-white hover:bg-white/10"
+                onClick={() => navigate('/login')}
               >
-                Access Command Center
+                Command Center Login
               </Button>
             </div>
+            <div className="mt-10 grid gap-4 sm:grid-cols-4 text-sm text-white/70">
+              {statHighlights.map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/40 p-4 text-center backdrop-blur-lg">
+                  <div className="text-2xl font-semibold text-white">{stat.value}</div>
+                  <div className="mt-2 uppercase tracking-[0.2em] text-white/60 text-xs">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/30 to-purple-500/20 blur-3xl" aria-hidden="true" />
+            <img
+              src={heroVista}
+              alt="Astralus nebula vista"
+              className="relative rounded-3xl border border-white/10 shadow-[0_24px_80px_rgba(8,145,178,0.4)]"
+            />
+          </div>
+        </div>
+        <div className="mt-10">
+          <Button
+            variant="ghost"
+            className="text-white/70 hover:text-white"
+            onClick={() => navigate('/manual')}
+          >
+            <BookOpen className="mr-2 h-5 w-5" />
+            Read the Player Manual
+          </Button>
+        </div>
+      </section>
 
-            {/* Manual Link */}
-            <div className="pt-6">
-              <Button
-                onClick={() => navigate('/manual')}
-                variant="ghost"
-                className="text-muted-foreground hover:text-foreground text-lg"
+      <section className="container mx-auto px-6 py-24">
+        <div className="max-w-4xl mx-auto text-center text-white">
+          <Sparkles className="mx-auto h-10 w-10 text-cyan-300" />
+          <h2 className="mt-6 text-3xl md:text-4xl font-semibold">Why commanders choose Astralus</h2>
+          <p className="mt-4 text-white/70 leading-relaxed">
+            Built to evoke the cinematic tension of classic space epics - minus the grind. Every system is server-authored and fair.
+          </p>
+        </div>
+        <div className="mt-16 grid gap-8 md:grid-cols-2">
+          {pillarFeatures.map((feature) => {
+            const Icon = feature.icon
+            return (
+              <div
+                key={feature.title}
+                className="rounded-3xl border border-white/10 bg-black/60 p-8 shadow-[0_20px_60px_rgba(8,145,178,0.35)] backdrop-blur-xl"
               >
-                <BookOpen className="w-5 h-5 mr-2" />
-                Read Player Manual
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Prologue Section - Enhanced with manual content */}
-        <div className="container mx-auto px-4 pt-8 pb-16">
-          <div className="max-w-5xl mx-auto">
-            <Card className={cn(
-              'panel-glass surface-gradient card-glow vignette',
-              'border-cyan-500/50 shadow-2xl shadow-cyan-500/30',
-              'relative overflow-hidden',
-              'backdrop-blur-md bg-background/60'
-            )}>
-              <CardHeader className="flex-shrink-0 p-6 border-b border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-transparent">
-                <CardTitle className="text-2xl font-bold">
-                  <span className="glow-cyan">Prologue: The Fractured Stars</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6 p-8 text-lg leading-relaxed">
-                <p className="text-xl text-foreground font-medium italic">
-                  <span className="text-cyan-400">The Great Silence came without warning.</span>
-                </p>
-                <p className="text-muted-foreground">
-                  For millennia, the <strong className="text-foreground">Galactic Consortium</strong> maintained peace across the known universe. The <span className="text-cyan-400 font-semibold">Tellerium-Krypton Accord</span> bound a thousand worlds together, sharing resources and protecting the weak. But greed knows no bounds, and when the Consortium's central authority collapsed under the weight of corruption and ambition, the accord shattered like glass.
-                </p>
-                <p className="text-foreground font-semibold text-xl pt-2">
-                  Now, you are alone in the void.
-                </p>
-                <p className="text-muted-foreground">
-                  The remnants of the Consortium scattered across <strong className="text-foreground">twenty regions</strong>, each containing countless star systems teeming with planets—some barren, some rich with resources, all waiting to be claimed. The old rules are gone. The strong prey upon the weak. Alliances form and break like tides.
-                </p>
-                <p className="text-muted-foreground">
-                  You are a <span className="text-cyan-400 font-semibold">Commander</span>, awakened from cryogenic stasis to find your homeworld isolated and vulnerable. Your people look to you for salvation, for conquest, for survival. But you are not the only one who has awakened.
-                </p>
-                <p className="text-foreground font-bold text-2xl pt-6 border-t border-cyan-500/30">
-                  <span className="glow-cyan">This is your moment, Commander. The stars await your command.</span>
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Core Features Section - Enhanced grid */}
-        <div className="container mx-auto px-4 py-20 lg:py-32">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                <span className="glow-cyan">Master the Universe</span>
-              </h2>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                Strategic depth meets galactic conquest in a tick-based grand strategy experience
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {coreFeatures.map((feature, index) => {
-                const Icon = feature.icon
-                const colorClasses = {
-                  cyan: 'border-cyan-500/50 text-cyan-400 bg-cyan-500/10',
-                  blue: 'border-blue-500/50 text-blue-400 bg-blue-500/10',
-                  purple: 'border-purple-500/50 text-purple-400 bg-purple-500/10',
-                  yellow: 'border-yellow-500/50 text-yellow-400 bg-yellow-500/10',
-                  green: 'border-green-500/50 text-green-400 bg-green-500/10',
-                  orange: 'border-orange-500/50 text-orange-400 bg-orange-500/10',
-                }
-                const colorClass = colorClasses[feature.color as keyof typeof colorClasses] || colorClasses.cyan
-                
-                return (
-                  <Card
-                    key={index}
-                    className={cn(
-                      'panel-glass surface-gradient card-glow vignette',
-                      'border-cyan-500/40 shadow-xl shadow-cyan-500/10',
-                      'hover:shadow-2xl hover:shadow-cyan-500/30 transition-all duration-500',
-                      'relative overflow-hidden group',
-                      'hover:scale-[1.02] hover:-translate-y-1',
-                      'backdrop-blur-md bg-background/50'
-                    )}
-                  >
-                    <CardHeader className="flex-shrink-0 p-4 border-b border-border/50 bg-muted/20">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={cn('w-10 h-10 rounded flex items-center justify-center border-2', colorClass)}>
-                            <Icon className="w-5 h-5" />
-                          </div>
-                          <CardTitle className="text-lg font-semibold">
-                            {feature.title}
-                          </CardTitle>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-4">
-                      <CardDescription className="text-base leading-relaxed text-muted-foreground">
-                        {feature.description}
-                      </CardDescription>
-                      <div className="pt-2 border-t border-border/30">
-                        <span className="text-sm font-semibold text-cyan-400">
-                          {feature.stat}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Gameplay Highlights - Enhanced */}
-        <div className="container mx-auto px-4 py-20 lg:py-32">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                <span className="glow-cyan">Strategic Gameplay</span>
-              </h2>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                Every decision matters in this deterministic, tick-based universe
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {gameplayFeatures.map((feature, index) => {
-                const Icon = feature.icon
-                return (
-                  <Card 
-                    key={index}
-                    className={cn(
-                      'panel-glass surface-gradient card-glow vignette',
-                      'border-cyan-500/40 shadow-xl shadow-cyan-500/10',
-                      'relative overflow-hidden',
-                      'backdrop-blur-md bg-background/50',
-                      'hover:shadow-2xl hover:shadow-cyan-500/20 transition-all duration-300'
-                    )}
-                  >
-                    <CardHeader className="flex-shrink-0 p-6 border-b border-border/50 bg-muted/20">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-cyan-500/20 border-2 border-cyan-500/50">
-                          <Icon className="w-6 h-6 text-cyan-400" />
-                        </div>
-                        <CardTitle className="text-xl font-semibold glow-cyan">
-                          {feature.title}
-                        </CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-4">
-                      <p className="text-muted-foreground text-lg leading-relaxed">
-                        {feature.description}
-                      </p>
-                      <div className="pt-3 border-t border-border/30">
-                        <p className="text-sm text-cyan-400/80 font-medium">
-                          {feature.detail}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Key Stats Section */}
-        <div className="container mx-auto px-4 py-20 lg:py-32">
-          <div className="max-w-6xl mx-auto">
-            <Card className={cn(
-              'panel-glass surface-gradient card-glow vignette',
-              'border-cyan-500/50 shadow-2xl shadow-cyan-500/30',
-              'backdrop-blur-md bg-background/60'
-            )}>
-              <CardHeader className="p-6 border-b border-cyan-500/30">
-                <CardTitle className="text-2xl font-bold text-center">
-                  <span className="glow-cyan">The Universe Awaits</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-8">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                  <div>
-                    <div className="text-4xl md:text-5xl font-bold text-cyan-400 mb-2">20</div>
-                    <div className="text-sm text-muted-foreground uppercase tracking-wider">Regions</div>
-                  </div>
-                  <div>
-                    <div className="text-4xl md:text-5xl font-bold text-cyan-400 mb-2">8,000+</div>
-                    <div className="text-sm text-muted-foreground uppercase tracking-wider">Planets</div>
-                  </div>
-                  <div>
-                    <div className="text-4xl md:text-5xl font-bold text-cyan-400 mb-2">7</div>
-                    <div className="text-sm text-muted-foreground uppercase tracking-wider">Ship Classes</div>
-                  </div>
-                  <div>
-                    <div className="text-4xl md:text-5xl font-bold text-cyan-400 mb-2">5</div>
-                    <div className="text-sm text-muted-foreground uppercase tracking-wider">Technology Eras</div>
-                  </div>
+                <div className="flex items-center gap-4 text-white">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-300">
+                    <Icon className="h-6 w-6" />
+                  </span>
+                  <h3 className="text-xl font-semibold">{feature.title}</h3>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <p className="mt-6 text-sm leading-relaxed text-white/70">{feature.description}</p>
+              </div>
+            )
+          })}
         </div>
+      </section>
 
-        {/* Final CTA Section - More dramatic */}
-        <div className="container mx-auto px-4 py-24 lg:py-40">
-          <div className="max-w-5xl mx-auto text-center">
-            <Card className={cn(
-              'panel-glass surface-gradient card-glow vignette',
-              'border-cyan-500/50 shadow-2xl shadow-cyan-500/40',
-              'relative overflow-hidden',
-              'backdrop-blur-md bg-background/60'
-            )}>
-              <CardHeader className="p-8 border-b border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-transparent">
-                <CardTitle className="text-3xl md:text-4xl font-bold">
-                  <span className="glow-cyan">Begin Your Journey</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-10 space-y-8">
-                <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed">
-                  Join thousands of commanders in the ultimate space strategy experience. 
-                  <br />
-                  <span className="text-foreground font-semibold">What kind of legacy will you leave among the fractured stars?</span>
-                </p>
-                <div className="flex flex-col sm:flex-row gap-6 justify-center pt-4">
-                  <Button
-                    onClick={() => navigate('/register')}
-                    size="lg"
-                    className={cn(
-                      'text-xl px-12 py-8 h-auto font-semibold',
-                      'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700',
-                      'text-white border-2 border-cyan-400/50',
-                      'shadow-2xl shadow-cyan-500/40',
-                      'transition-all duration-300 group',
-                      'hover:scale-105 hover:shadow-cyan-500/60',
-                      'relative overflow-hidden'
-                    )}
-                  >
-                    <span className="relative z-10 flex items-center">
-                      <Rocket className="w-6 h-6 mr-3 group-hover:rotate-12 transition-transform" />
-                      Create Your Empire
-                      <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-2 transition-transform" />
-                    </span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                  </Button>
-                  
-                  <Button
-                    onClick={() => navigate('/login')}
-                    variant="outline"
-                    size="lg"
-                    className={cn(
-                      'text-xl px-12 py-8 h-auto font-semibold',
-                      'border-2 border-cyan-500/50 hover:border-cyan-500/80',
-                      'bg-background/40 hover:bg-background/60',
-                      'backdrop-blur-md transition-all duration-300',
-                      'hover:scale-105 shadow-xl shadow-cyan-500/20',
-                      'panel-glass'
-                    )}
-                  >
-                    Access Command Center
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 -z-10">
+          <img src={bridgeShot} alt="Astralus command bridge" className="h-full w-full object-cover opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/75 to-black" aria-hidden="true" />
         </div>
-
-        {/* Copyright Footer */}
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-6xl mx-auto text-center">
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} iammarkyb studios. All rights reserved.
+        <div className="container mx-auto px-6 py-24">
+          <div className="max-w-3xl text-white">
+            <p className="text-sm uppercase tracking-[0.3em] text-cyan-200/80">The fractured stars</p>
+            <h2 className="mt-4 text-3xl md:text-4xl font-semibold">Your saga continues between sessions</h2>
+            <p className="mt-6 text-white/70 leading-relaxed">
+              Astralus processes the galaxy on a relentless cadence. Wake up to intercepted fleets, conclude diplomatic gambits, and
+              launch counter-strikes before the next tick hits. The universe never pauses.
             </p>
           </div>
+          <div className="mt-16 grid gap-8 md:grid-cols-3">
+            {gameplayBeats.map((beat) => {
+              const Icon = beat.icon
+              return (
+                <div key={beat.title} className="rounded-3xl border border-white/10 bg-black/60 p-6 backdrop-blur-xl text-white">
+                  <div className="flex items-center gap-4">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <h3 className="text-lg font-semibold">{beat.title}</h3>
+                  </div>
+                  <p className="mt-4 text-sm leading-relaxed text-white/70">{beat.detail}</p>
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Custom animations */}
-      <style>{`
-        @keyframes float {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-            opacity: 0.1;
-          }
-          33% {
-            transform: translate(60px, -60px) scale(1.2);
-            opacity: 0.2;
-          }
-          66% {
-            transform: translate(-40px, 40px) scale(0.9);
-            opacity: 0.15;
-          }
-        }
-      `}</style>
+      <section className="container mx-auto px-6 py-24">
+        <div className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr] items-center">
+          <div className="text-white">
+            <p className="text-sm uppercase tracking-[0.3em] text-cyan-200/80">Eyes on the galaxy</p>
+            <h2 className="mt-4 text-3xl md:text-4xl font-semibold">Scan. Colonise. Dominate.</h2>
+            <p className="mt-6 text-white/70 leading-relaxed">
+              Multi-layer intel keeps commanders sharp. Deploy probes, trace signals, and use the holopad to monitor construction,
+              market swings, and alliance assignments from one glass dashboard.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 text-sm text-white/70">
+              <div className="rounded-2xl border border-white/10 bg-black/50 p-4 backdrop-blur-md">
+                <span className="text-white font-semibold">Sensor Intel Matrix</span>
+                <p className="mt-2">Live signal sweeps and recon overlays reveal approaching fleets, incidents, and rank shifts.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/50 p-4 backdrop-blur-md">
+                <span className="text-white font-semibold">Alliance Coordination</span>
+                <p className="mt-2">Share resources, announcements, and combat pings in real time.</p>
+              </div>
+            </div>
+          </div>
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/30 to-cyan-500/20 blur-3xl" aria-hidden="true" />
+            <div className="relative space-y-6">
+              <img
+                src={fleetShot}
+                alt="Alliance fleets assemble"
+                className="w-full rounded-3xl border border-white/10 shadow-[0_24px_80px_rgba(8,145,178,0.4)]"
+              />
+              <img
+                src={planetVista}
+                alt="Planet-side operations"
+                className="w-3/4 rounded-3xl border border-white/10 shadow-[0_20px_60px_rgba(139,92,246,0.35)] ml-auto"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="container mx-auto px-6 pb-24">
+        <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-cyan-500/10 via-black/75 to-purple-500/10 p-12 text-center backdrop-blur-2xl text-white">
+          <p className="text-sm uppercase tracking-[0.3em] text-white/60">Begin your legend</p>
+          <h2 className="mt-4 text-3xl md:text-4xl font-semibold">The next tick is approaching. Are you ready?</h2>
+          <p className="mt-6 text-white/70 leading-relaxed max-w-2xl mx-auto">
+            Take command for free, master the onboarding cinematic, and secure your first colonies before rival empires awaken.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <Button
+              size="lg"
+              className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold"
+              onClick={() => navigate('/register')}
+            >
+              Play for free
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/40 text-white hover:bg-white/10"
+              onClick={() => navigate('/support')}
+            >
+              Need Help?
+            </Button>
+          </div>
+          <p className="mt-6 text-xs text-white/50">Premium currency is optional. Skill, coordination, and strategy win the war.</p>
+        </div>
+      </section>
     </div>
   )
 }
-

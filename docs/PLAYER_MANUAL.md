@@ -1,59 +1,60 @@
-# Astralus Player Manual
+# Astralus Player Manual — Command the Fractured Stars
 
-Complete guide to gameplay, strategy, and tactics for Astralus.
+This edition of the manual matches the refreshed Astralus portal: luminous gradients, cinematic staging, and a focus on helping new commanders orient quickly. Keep the manual open on a second monitor or holopad while you play; each chapter mirrors the layout of the in-game interface and the landing portal cards.
 
 ## Table of Contents
 
 1. [Welcome, Commander](#welcome-commander)
-2. [Getting Started](#getting-started)
-3. [Core Gameplay](#core-gameplay)
-4. [Resources & Production](#resources--production)
-5. [Ships & Combat](#ships--combat)
-6. [Defences & Facilities](#defences--facilities)
-7. [Research & Technology](#research--technology)
-8. [Fleet Movement & Travel](#fleet-movement--travel)
-9. [Colonization & Exploration](#colonization--exploration)
-10. [Visibility & Fog of War](#visibility--fog-of-war)
-11. [Alliances](#alliances)
-12. [Galaxy Incidents](#galaxy-incidents)
-13. [NPC Empires](#npc-empires)
-14. [Market System](#market-system)
-15. [Quantum Credits & Boosters](#quantum-credits--boosters)
-16. [Construction & Manufacturing](#construction--manufacturing)
-17. [Missions & Interactions](#missions--interactions)
-18. [Events & Notifications](#events--notifications)
-19. [User Interface Expectations](#user-interface-expectations)
-20. [Strategy Guide](#strategy-guide)
-21. [Advanced Tactics](#advanced-tactics)
-22. [Reference Tables](#reference-tables)
-23. [Tips & Best Practices](#tips--best-practices)
+2. [Portal & Support Channels](#portal--support-channels)
+3. [Getting Started](#getting-started)
+4. [Core Gameplay](#core-gameplay)
+5. [Resources & Production](#resources--production)
+6. [Ships & Combat](#ships--combat)
+7. [Defences & Facilities](#defences--facilities)
+8. [Research & Technology](#research--technology)
+9. [Fleet Movement & Travel](#fleet-movement--travel)
+10. [Colonization & Exploration](#colonization--exploration)
+11. [Visibility & Fog of War](#visibility--fog-of-war)
+12. [Alliances](#alliances)
+13. [Galaxy Incidents](#galaxy-incidents)
+14. [NPC Empires](#npc-empires)
+15. [Market System](#market-system)
+16. [Quantum Credits & Boosters](#quantum-credits--boosters)
+17. [Construction & Manufacturing](#construction--manufacturing)
+18. [Missions & Interactions](#missions--interactions)
+19. [Events & Notifications](#events--notifications)
+20. [User Interface Expectations](#user-interface-expectations)
+21. [Strategy Guide](#strategy-guide)
+22. [Advanced Tactics](#advanced-tactics)
+23. [Reference Tables](#reference-tables)
+24. [Tips & Best Practices](#tips--best-practices)
 
 ---
 
 ## Welcome, Commander
 
+> **Cinematic Briefing:** The landing portal now mirrors an immersive control deck. Every section there—from “Command the fractured stars” to the Operational Briefings module—links directly back to the reference chapters below.
+
 ### Prologue: The Fractured Stars
 
-The Great Silence came without warning. For millennia, the Galactic Consortium maintained peace across the known universe. The **Tellerium-Krypton Accord** bound a thousand worlds together, sharing resources and protecting the weak. But greed knows no bounds, and when the Consortium's central authority collapsed under the weight of corruption and ambition, the accord shattered like glass.
+The Great Silence came without warning. For millennia the Galactic Consortium enforced balance, its Tellerium–Krypton Accord nourishing a thousand worlds. Then the fracturing began—corruption, sabotage, rogue admirals. Now spiral arms crackle with abandoned relays, redacted dossiers, and unclaimed vaults of dark matter.
 
-Now, you are alone in the void. The remnants of the Consortium scattered across twenty regions, each containing countless star systems teeming with planets—some barren, some rich with resources, all waiting to be claimed. The old rules are gone. The strong prey upon the weak. Alliances form and break like tides.
+You awaken aboard a refitted cryoship. Outside the viewport, twenty mapped regions shimmer with new geometry overlays transmitted by Astralus Control. Channels that once showed static now pulse with “Operational Briefings” banners. Your people expect salvation—or conquest. Rival commanders are already mobilising.
 
-You are a **Commander**, awakened from cryogenic stasis to find your homeworld isolated and vulnerable. Your people look to you for salvation, for conquest, for survival. But you are not the only one who has awakened.
-
-This is your moment, Commander. The stars await your command.
+This is your moment. Sync with the portal, absorb the briefings, and command the fractured stars.
 
 ### What is Astralus?
 
-Astralus is a tick-based grand strategy browser game where you:
+A tick-driven grand strategy MMO that never sleeps. Through the landing portal and holopad you will:
 
 - Build and command fleets of starships
-- Colonize planets across a vast galaxy
-- Research advanced technologies
-- Construct facilities and defences
-- Form alliances or fight alone
-- Compete for dominance in a living universe
+- Colonise planets across a spiral galaxy of 8,000+ worlds
+- Research advanced technologies and unlock specialisations
+- Construct facilities and orbital defences tailored to each planet
+- Coordinate alliances, orchestrate incidents, and push back fog of war
+- Respond to real-time **Operational Briefings** piped to the support center
 
-The game runs on **server-driven ticks** (default: 30 minutes - testing: 5 minutes). Every tick, resource production, construction, fleet movement, and combat are processed automatically.
+Game logic advances on **server-driven ticks** (default: 30 minutes; test clusters may run 5-minute ticks). Each tick executes production, construction progress, fleet movement, combat, colonisation, market matching, and score recalculation. Strategic planning between ticks is crucial—let the manual guide your cadence.
 
 ### Key Concepts
 
@@ -61,13 +62,51 @@ The game runs on **server-driven ticks** (default: 30 minutes - testing: 5 minut
 
 **Tick System**: The game progresses in discrete time steps called "ticks". Every action takes time measured in ticks.
 
-**Universe Structure**: The galaxy is organized into 20 Regions, each containing 125 Systems, with ~8,000 planets total distributed in a spiral galaxy pattern.
+**Universe Structure**: 20 regions, 2,500 systems, and ~8,000 planets—now all surfaced with backend-provided geometry (centers, radii, and bounds) to align your tactical overlays with the galaxy map refresh.
 
 **Resources**: Three main resources - Tellerium (manufacturing), Krypton (fuel), and Dark Matter (advanced/exotic).
 
 **Combat**: Deterministic, turn-based fleet combat with detailed ship statistics and abilities.
 
-**Visibility**: Fog of war system - you only see what you've discovered or unlocked via research.
+**Visibility**: A multi-tier fog-of-war system. Operational Briefings highlight new reveal radii, adjacency buffers, and discoverable systems matching the latest galaxy map update.
+
+---
+
+## Portal & Support Channels
+
+The landing portal is your pre-login mission deck. Use it to prime yourself before diving into the holopad.
+
+### Home (Command the Fractured Stars)
+
+- Cinematic hero panel with primary CTAs: **Play for free**, **Command Center Login**.
+- Quick statistic tiles (Regions, Colonisable Planets, Archetypes, Tech Eras) mirror in-game data.
+- Scroll to digest feature pillars, curated imagery, and empire storytelling that matches manual chapters.
+
+### Learn, About, and Support Navigation
+
+- **About Astralus** — lore capsules, production notes, and campaign teasers.
+- **Learn to Play** — curated links into this manual and onboarding videos.
+- **Support** — the new communications hub embracing Operational Briefings.
+
+### Operational Briefings & Support
+
+The Support page now surfaces live announcements via the `/announcements` endpoint:
+
+- Pinned or critical items rise to the top.
+- Published timestamps render relative (“Published 12 minutes ago”).
+- Buttons hand off to full-length briefings when a link is provided.
+- When announcements are loading, shimmering skeletons keep the panel responsive.
+
+Within the same page you’ll find:
+
+- **Discord Deployment**: join link for rapid escalation or community tactics.
+- **Secure Ticket Mailer**: pre-populated email generator for sensitive issues.
+- **Self-Service Block**: direct portal to this manual and the UI Field Guide.
+- **Operations Escalation**: guidance on incident reporting and expected response times.
+
+> **Tip:** Treat Operational Briefings as canonical truth—if an announcement tweaks fog-of-war radii, adjacency buffers, or maintenance windows, the galaxy map and this manual reflect those values immediately.
+
+---
 
 ---
 

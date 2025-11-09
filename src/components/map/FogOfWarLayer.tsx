@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { useGetVisibilityQuery } from '@/api/endpoints/universeApi'
 import { Planet } from '@/types/api.types'
-import { SystemData } from '@/lib/galaxyUtils'
+import { SystemData, getPlanetRegionAndSystem, calculateRegionBounds } from '@/lib/galaxyUtils'
 import { getPlanetXY } from '@/lib/coordinates'
-import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
+import { getVisibleRegionGeometries, getVisibleSystemGeometries } from '@/lib/visibilityUtils'
+import { getRegionAdjacencyBuffer, getSystemRadiusDefault } from '@/lib/geometryDefaults'
 
 interface FogOfWarLayerProps {
   gridWidth: number
@@ -72,12 +73,18 @@ export function FogOfWarLayer({
     return false
   }, [visibilityData, visibilityLevel])
 
+  const regionAdjacencyBuffer = getRegionAdjacencyBuffer() ?? 0
+  const systemRadiusFallback = getSystemRadiusDefault() ?? 120
+
   // Group planets by visibility tier for three-tier reveal system
   const revealAreas = useMemo(() => {
     // If full visibility, return empty array (no fog will be rendered anyway)
     if (hasFullVisibility) {
       return { regionLevel: [], systemLevel: [], planetLevel: [] }
     }
+
+    const regionGeometryMap = getVisibleRegionGeometries(visibilityData)
+    const systemGeometryMap = getVisibleSystemGeometries(visibilityData)
 
     // Filter planets that have fog_of_war data and are in viewport
     // Backend already filters hidden planets, so we only get visible/fogged planets
@@ -103,16 +110,66 @@ export function FogOfWarLayer({
     // Also use systems if we have very few planets with fog data (might be incomplete)
     const useSystemFallback = (planetsWithFog.length === 0 || planetsWithFog.length < systems.length / 2) && systems.length > 0
 
+    const regionRevealMap = new Map<number, { centerX: number; centerY: number; width: number; height: number; region: number }>()
+    const systemRevealMap = new Map<string, { centerX: number; centerY: number; width: number; height: number; key: string }>()
+
+    const viewportPadding = Math.max(regionAdjacencyBuffer * 2, 200)
+    const isInViewport = (x: number, y: number) => (
+      x >= viewportBounds.minX - viewportPadding &&
+      x <= viewportBounds.maxX + viewportPadding &&
+      y >= viewportBounds.minY - viewportPadding &&
+      y <= viewportBounds.maxY + viewportPadding
+    )
+
     // 1. REGION-LEVEL REVEALS (Largest)
-    let regionReveals: Array<{ centerX: number; centerY: number; width: number; height: number; region: number }> = []
-    
+    regionGeometryMap.forEach((geometry, region) => {
+      if (!isInViewport(geometry.center.x, geometry.center.y)) {
+        return
+      }
+      const widthBase = geometry.bounds ? geometry.bounds.max_x - geometry.bounds.min_x : geometry.radius * 2
+      const heightBase = geometry.bounds ? geometry.bounds.max_y - geometry.bounds.min_y : geometry.radius * 2
+      const width = Math.max(widthBase, geometry.radius * 2, 80) + regionAdjacencyBuffer * 2
+      const height = Math.max(heightBase, geometry.radius * 2, 80) + regionAdjacencyBuffer * 2
+      regionRevealMap.set(region, {
+        region,
+        centerX: geometry.center.x,
+        centerY: geometry.center.y,
+        width,
+        height
+      })
+    })
+
+    if (systems.length > 0) {
+      const systemsByRegion = new Map<number, SystemData[]>()
+      systems.forEach(system => {
+        if (!isInViewport(system.center.x, system.center.y)) {
+          return
+        }
+        if (!systemsByRegion.has(system.region)) {
+          systemsByRegion.set(system.region, [])
+        }
+        systemsByRegion.get(system.region)!.push(system)
+      })
+
+      systemsByRegion.forEach((regionSystems, region) => {
+        if (regionRevealMap.has(region)) return
+        const bounds = calculateRegionBounds(regionSystems)
+        if (!bounds) return
+        regionRevealMap.set(region, {
+          region,
+          centerX: bounds.centerX,
+          centerY: bounds.centerY,
+          width: (bounds.maxX - bounds.minX) + regionAdjacencyBuffer * 2,
+          height: (bounds.maxY - bounds.minY) + regionAdjacencyBuffer * 2
+        })
+      })
+    }
+
     if (!useSystemFallback) {
-      // Filter planets where region_visible = true
       const regionVisiblePlanets = planetsWithFog.filter(
         p => p.fog_of_war?.region_visible === true
       )
-      
-      // Group by region
+
       const planetsByRegion = new Map<number, Planet[]>()
       regionVisiblePlanets.forEach(planet => {
         const { region } = getPlanetRegionAndSystem(planet)
@@ -124,13 +181,13 @@ export function FogOfWarLayer({
         }
       })
 
-      // Calculate bounding boxes for each region
-      regionReveals = Array.from(planetsByRegion.entries()).map(([region, regionPlanets]) => {
+      planetsByRegion.forEach((regionPlanets, region) => {
+        if (regionRevealMap.has(region)) return
         const positions = regionPlanets
           .map(p => getPlanetXY(p))
           .filter((xy): xy is { x: number; y: number } => xy !== null)
-        
-        if (positions.length === 0) return null
+
+        if (positions.length === 0) return
 
         const xs = positions.map(p => p.x)
         const ys = positions.map(p => p.y)
@@ -138,36 +195,74 @@ export function FogOfWarLayer({
         const maxX = Math.max(...xs)
         const minY = Math.min(...ys)
         const maxY = Math.max(...ys)
-
-        // Large padding for region-level reveals
-        const padding = 100
+        const padding = Math.max(100, regionAdjacencyBuffer)
         const centerX = (minX + maxX) / 2
         const centerY = (minY + maxY) / 2
-        const width = maxX - minX + padding * 2
-        const height = maxY - minY + padding * 2
+        const width = (maxX - minX) + padding * 2
+        const height = (maxY - minY) + padding * 2
 
-        return {
+        regionRevealMap.set(region, {
+          region,
           centerX,
           centerY,
           width,
-          height,
-          region
-        }
-      }).filter((r): r is NonNullable<typeof r> => r !== null)
+          height
+        })
+      })
     }
 
     // 2. SYSTEM-LEVEL REVEALS (Medium)
-    // First, try to get reveals from planets with fog_of_war data
-    const systemRevealsFromPlanets: Array<{ centerX: number; centerY: number; width: number; height: number; key: string }> = []
-    
+    systemGeometryMap.forEach((geometry, key) => {
+      const [regionStr, systemStr] = key.split(':')
+      const region = Number(regionStr)
+      const systemNumber = Number(systemStr)
+      if (Number.isNaN(region) || Number.isNaN(systemNumber)) return
+      if (!isInViewport(geometry.center.x, geometry.center.y)) {
+        return
+      }
+      const radius = geometry.radius ?? systemRadiusFallback
+      const widthBase = geometry.bounds ? geometry.bounds.max_x - geometry.bounds.min_x : radius * 2
+      const heightBase = geometry.bounds ? geometry.bounds.max_y - geometry.bounds.min_y : radius * 2
+      const padding = Math.max(60, radius * 0.35) + regionAdjacencyBuffer / 2
+      systemRevealMap.set(key, {
+        key,
+        centerX: geometry.center.x,
+        centerY: geometry.center.y,
+        width: Math.max(widthBase, radius * 2, 40) + padding * 2,
+        height: Math.max(heightBase, radius * 2, 40) + padding * 2
+      })
+    })
+
+    systems.forEach(system => {
+      const key = `${system.region}:${system.system}`
+      if (systemRevealMap.has(key)) return
+      if (!isInViewport(system.center.x, system.center.y)) {
+        return
+      }
+      const geometry = system.geometry
+      const radius = geometry?.radius ?? system.radius ?? systemRadiusFallback
+      const widthBase = geometry?.bounds
+        ? geometry.bounds.max_x - geometry.bounds.min_x
+        : system.bounds.maxX - system.bounds.minX
+      const heightBase = geometry?.bounds
+        ? geometry.bounds.max_y - geometry.bounds.min_y
+        : system.bounds.maxY - system.bounds.minY
+      const padding = Math.max(60, radius * 0.35) + regionAdjacencyBuffer / 2
+      systemRevealMap.set(key, {
+        key,
+        centerX: geometry?.center.x ?? system.center.x,
+        centerY: geometry?.center.y ?? system.center.y,
+        width: Math.max(widthBase, radius * 2, 40) + padding * 2,
+        height: Math.max(heightBase, radius * 2, 40) + padding * 2
+      })
+    })
+
     if (!useSystemFallback) {
-      // Filter planets where system_visible = true AND region_visible = false
       const systemVisiblePlanets = planetsWithFog.filter(
-        p => p.fog_of_war?.system_visible === true && 
+        p => p.fog_of_war?.system_visible === true &&
              p.fog_of_war?.region_visible === false
       )
 
-      // Group by region:system key
       const planetsBySystem = new Map<string, Planet[]>()
       systemVisiblePlanets.forEach(planet => {
         const { region, system } = getPlanetRegionAndSystem(planet)
@@ -180,12 +275,12 @@ export function FogOfWarLayer({
         }
       })
 
-      // Calculate bounding boxes for each system
       planetsBySystem.forEach((systemPlanets, key) => {
+        if (systemRevealMap.has(key)) return
         const positions = systemPlanets
           .map(p => getPlanetXY(p))
           .filter((xy): xy is { x: number; y: number } => xy !== null)
-        
+
         if (positions.length === 0) return
 
         const xs = positions.map(p => p.x)
@@ -194,67 +289,21 @@ export function FogOfWarLayer({
         const maxX = Math.max(...xs)
         const minY = Math.min(...ys)
         const maxY = Math.max(...ys)
-
-        // Medium padding for system-level reveals
-        const padding = 60
-        // Calculate center from planet positions (more accurate than bounds)
+        const padding = Math.max(60, regionAdjacencyBuffer / 2)
         const centerX = (minX + maxX) / 2
         const centerY = (minY + maxY) / 2
-        // Ensure minimum size for reveals
         const width = Math.max(maxX - minX, 40) + padding * 2
         const height = Math.max(maxY - minY, 40) + padding * 2
 
-        systemRevealsFromPlanets.push({
+        systemRevealMap.set(key, {
+          key,
           centerX,
           centerY,
           width,
-          height,
-          key
+          height
         })
       })
     }
-
-    // Also add reveals from systems directly (ensures all visible systems get reveals)
-    // This is important when planets don't have fog_of_war data
-    const systemRevealsFromSystems: Array<{ centerX: number; centerY: number; width: number; height: number; key: string }> = []
-    const systemsWithReveals = new Set(systemRevealsFromPlanets.map(r => r.key))
-    
-    systems.forEach(system => {
-      // Skip if we already have a reveal for this system from planets
-      const key = `${system.region}:${system.system}`
-      if (systemsWithReveals.has(key)) return
-      
-      // Check if system is in viewport
-      const { center, bounds } = system
-      const padding = 200
-      const inViewport = (
-        center.x >= viewportBounds.minX - padding &&
-        center.x <= viewportBounds.maxX + padding &&
-        center.y >= viewportBounds.minY - padding &&
-        center.y <= viewportBounds.maxY + padding
-      )
-      
-      if (!inViewport) return
-      
-      // Use system center directly (this is the actual system position)
-      // Calculate reveal size from bounds with padding
-      const revealPadding = 60
-      const centerX = center.x  // Use actual system center
-      const centerY = center.y  // Use actual system center
-      const width = Math.max(bounds.maxX - bounds.minX, 40) + revealPadding * 2  // Ensure minimum size
-      const height = Math.max(bounds.maxY - bounds.minY, 40) + revealPadding * 2  // Ensure minimum size
-
-      systemRevealsFromSystems.push({
-        centerX,
-        centerY,
-        width,
-        height,
-        key
-      })
-    })
-
-    // Combine reveals from planets and systems
-    const systemReveals = [...systemRevealsFromPlanets, ...systemRevealsFromSystems]
 
     // 3. PLANET-LEVEL REVEALS (Smallest)
     // Filter planets where planet_discovered = true AND system_visible = false AND region_visible = false
@@ -278,11 +327,15 @@ export function FogOfWarLayer({
       .filter((r): r is NonNullable<typeof r> => r !== null)
 
     return {
-      regionLevel: regionReveals,
-      systemLevel: systemReveals,
+      regionLevel: Array.from(regionRevealMap.values()),
+      systemLevel: Array.from(systemRevealMap.values()),
       planetLevel: planetReveals
     }
-  }, [planets, systems, viewportBounds, hasFullVisibility])
+  }, [planets, systems, viewportBounds, hasFullVisibility, visibilityData, regionAdjacencyBuffer, systemRadiusFallback])
+
+  // Generate unique IDs for gradients and mask to avoid conflicts (must execute every render to maintain hook order)
+  const uniqueId = useMemo(() => Math.random().toString(36).substr(2, 9), [])
+  const maskId = `fogMask-${uniqueId}`
 
   // Calculate fog bounds - cover entire viewport with generous padding
   // This ensures the fog always covers the full screen, even when panning/zooming
@@ -342,10 +395,6 @@ export function FogOfWarLayer({
       />
     )
   }
-
-  // Generate unique IDs for gradients and mask to avoid conflicts
-  const uniqueId = useMemo(() => Math.random().toString(36).substr(2, 9), [])
-  const maskId = `fogMask-${uniqueId}`
 
   return (
     <>
@@ -492,12 +541,21 @@ export function FogOfWarLayer({
           
           {/* Home system reveal (always visible) with gradient */}
           {homeSystem && (() => {
-            const bounds = homeSystem.bounds
-            const centerX = (bounds.minX + bounds.maxX) / 2
-            const centerY = (bounds.minY + bounds.maxY) / 2
-            const width = bounds.maxX - bounds.minX + 50
-            const height = bounds.maxY - bounds.minY + 50
             const gradientId = `homeSystemGradient-${uniqueId}`
+            const geometry = homeSystem.geometry
+            const bounds = homeSystem.bounds
+            const centerX = geometry?.center.x ?? (bounds.minX + bounds.maxX) / 2
+            const centerY = geometry?.center.y ?? (bounds.minY + bounds.maxY) / 2
+            const radius = geometry?.radius ?? homeSystem.radius ?? systemRadiusFallback
+            const boundsWidth = geometry?.bounds
+              ? geometry.bounds.max_x - geometry.bounds.min_x
+              : bounds.maxX - bounds.minX
+            const boundsHeight = geometry?.bounds
+              ? geometry.bounds.max_y - geometry.bounds.min_y
+              : bounds.maxY - bounds.minY
+            const padding = Math.max(50, radius * 0.4)
+            const width = Math.max(boundsWidth, radius * 2) + padding * 2
+            const height = Math.max(boundsHeight, radius * 2) + padding * 2
             
             return (
               <ellipse

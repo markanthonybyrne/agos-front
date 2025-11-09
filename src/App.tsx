@@ -12,7 +12,13 @@ import { useGlobalTickData } from '@/hooks/useGlobalTickData'
 import { useMapDataRefresh } from '@/hooks/useMapDataRefresh'
 import { AdminGuard } from '@/features/admin/components/AdminGuard'
 import { LandingGuard } from '@/components/common/LandingGuard'
+import { LandingLayout } from '@/features/landing/LandingLayout'
 import { LandingPage } from '@/features/landing/LandingPage'
+import { AboutAstralusPage } from '@/features/landing/pages/AboutAstralusPage'
+import { LearnToPlayPage } from '@/features/landing/pages/LearnToPlayPage'
+import { SupportPage } from '@/features/landing/pages/SupportPage'
+import { TermsPage } from '@/features/landing/pages/TermsPage'
+import { PrivacyPage } from '@/features/landing/pages/PrivacyPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { SocialAuthCallbackPage } from '@/features/auth/SocialAuthCallbackPage'
 import { PlayerManual } from '@/features/manual/PlayerManual'
@@ -73,18 +79,25 @@ function AppContent() {
   return (
     <>
       <Routes>
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             <LandingGuard>
-              <LandingPage />
+              <LandingLayout />
             </LandingGuard>
-          } 
-        />
+          }
+        >
+          <Route index element={<LandingPage />} />
+          <Route path="about" element={<AboutAstralusPage />} />
+          <Route path="learn" element={<LearnToPlayPage />} />
+          <Route path="support" element={<SupportPage />} />
+          <Route path="manual" element={<PlayerManual variant="landing" />} />
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="privacy" element={<PrivacyPage />} />
+        </Route>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
         <Route path="/auth/callback" element={<SocialAuthCallbackPage />} />
-        <Route path="/manual" element={<PlayerManual />} />
         <Route
           path="/*"
           element={

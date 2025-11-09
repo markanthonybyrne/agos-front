@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,8 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { formatCoordinate } from '@/lib/coordinates'
-import { getSystemXyRange } from '@/lib/coordinateUtils'
+import { getSystemXyRange, hierarchicalToXy, xyToHierarchical } from '@/lib/coordinateUtils'
 import { useAuth } from '@/hooks/useAuth'
 import { 
   Send, 
@@ -35,6 +34,8 @@ type SignalType = 'fleet' | 'orbital_defence' | 'planetary' | 'all_frequency' | 
 
 interface InitialTarget {
   coordinate?: string
+  x?: number
+  y?: number
   quadrant?: number
   sector?: number
   galaxy?: number
@@ -87,10 +88,25 @@ const signalTypes = [
   }
 ]
 
+type ParsedCoordinate = {
+  x: number
+  y: number
+  quadrant: number
+  sector: number
+  galaxy: number
+  system: number
+  planet: number
+}
+
 export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormProps) {
   const { empire } = useAuth()
-  const [coordinateInput, setCoordinateInput] = useState(initialTarget?.coordinate ?? '')
-  const [parsedCoordinate, setParsedCoordinate] = useState<{quadrant: number, sector: number, galaxy: number, system: number, planet: number} | null>(null)
+  const [coordinateInput, setCoordinateInput] = useState(() => {
+    if (typeof initialTarget?.x === 'number' && typeof initialTarget?.y === 'number') {
+      return `X:${initialTarget.x}:${initialTarget.y}`
+    }
+    return initialTarget?.coordinate ?? ''
+  })
+  const [parsedCoordinate, setParsedCoordinate] = useState<ParsedCoordinate | null>(null)
 
   const {
     register,
@@ -113,36 +129,89 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
   const selectedType = watch('type')
   const selectedSignalType = signalTypes.find(t => t.value === selectedType)
 
-  const parseCoordinate = (input: string) => {
-    // Parse coordinate format: Q:S:G:SY:P (e.g., "1:1:1:1:1") - 5-level system
-    const parts = input.split(':').map(p => parseInt(p.trim()))
-    if (parts.length === 5 && parts.every(p => !isNaN(p) && p > 0)) {
-      return {
-        quadrant: parts[0],
-        sector: parts[1],
-        galaxy: parts[2],
-        system: parts[3],
-        planet: parts[4]
-      }
+  const parseCoordinate = useCallback((input: string): ParsedCoordinate | null => {
+    const trimmed = input.trim()
+    if (!trimmed) {
+      return null
     }
-    // Fallback for 4-level format (legacy) - assume system 1
-    if (parts.length === 4 && parts.every(p => !isNaN(p) && p > 0)) {
-      return {
-        quadrant: parts[0],
-        sector: parts[1],
-        galaxy: parts[2],
-        system: 1, // Default to system 1 for legacy format
-        planet: parts[3]
-      }
-    }
-    return null
-  }
 
-  const handleCoordinateChange = (value: string) => {
+    const xyWithPrefix = trimmed.match(/^X\s*:\s*(\d{1,4})\s*:\s*(\d{1,4})$/i)
+    if (xyWithPrefix) {
+      const x = Number(xyWithPrefix[1])
+      const y = Number(xyWithPrefix[2])
+      if (Number.isNaN(x) || Number.isNaN(y)) return null
+      if (x < 0 || x > 1999 || y < 0 || y > 999) return null
+      const hier = xyToHierarchical(x, y)
+      return {
+        x,
+        y,
+        quadrant: hier.quadrant,
+        sector: hier.sector,
+        galaxy: hier.galaxy,
+        system: hier.system ?? 1,
+        planet: hier.planet,
+      }
+    }
+
+    const xySimple = trimmed.match(/^(\d{1,4})\s*:\s*(\d{1,4})$/)
+    if (xySimple) {
+      const x = Number(xySimple[1])
+      const y = Number(xySimple[2])
+      if (Number.isNaN(x) || Number.isNaN(y)) return null
+      if (x < 0 || x > 1999 || y < 0 || y > 999) return null
+      const hier = xyToHierarchical(x, y)
+      return {
+        x,
+        y,
+        quadrant: hier.quadrant,
+        sector: hier.sector,
+        galaxy: hier.galaxy,
+        system: hier.system ?? 1,
+        planet: hier.planet,
+      }
+    }
+
+    const parts = trimmed.split(':').map((segment) => parseInt(segment.trim(), 10))
+
+    if (parts.length === 5 && parts.every((part) => !Number.isNaN(part) && part > 0)) {
+      const [quadrant, sector, galaxy, system, planet] = parts
+      const range = getSystemXyRange(quadrant, sector, galaxy, system)
+      const x = Math.floor((range.x_min + range.x_max) / 2)
+      const y = Math.floor((range.y_min + range.y_max) / 2)
+      return {
+        x,
+        y,
+        quadrant,
+        sector,
+        galaxy,
+        system,
+        planet,
+      }
+    }
+
+    if (parts.length === 4 && parts.every((part) => !Number.isNaN(part) && part > 0)) {
+      const [quadrant, sector, galaxy, planet] = parts
+      const xy = hierarchicalToXy(quadrant, sector, galaxy, planet)
+      const hier = xyToHierarchical(xy.x, xy.y)
+      return {
+        x: Math.round(xy.x),
+        y: Math.round(xy.y),
+        quadrant,
+        sector,
+        galaxy,
+        system: hier.system ?? 1,
+        planet,
+      }
+    }
+
+    return null
+  }, [])
+
+  const handleCoordinateChange = useCallback((value: string) => {
     setCoordinateInput(value)
     const parsed = parseCoordinate(value)
     setParsedCoordinate(parsed)
-    
+
     if (parsed) {
       setValue('target_quadrant', parsed.quadrant)
       setValue('target_sector', parsed.sector)
@@ -150,39 +219,27 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
       setValue('target_system', parsed.system)
       setValue('target_planet', parsed.planet)
     }
-  }
+  }, [parseCoordinate, setValue])
 
   const onSubmit = (data: SignalFormData) => {
     if (!parsedCoordinate) {
-      toast.error('Invalid coordinate format. Use Q:S:G:SY:P (e.g., 1:1:1:1:1)')
+      toast.error('Invalid coordinate format. Use X:123:456')
       return
     }
     if (!empire?.homeworld_planet_id) {
       toast.error('Unable to determine origin planet. Please ensure you are logged in.')
       return
     }
-    
-    // Get system X/Y range and use center point for target coordinates
-    const systemRange = getSystemXyRange(
-      data.target_quadrant,
-      data.target_sector,
-      data.target_galaxy,
-      data.target_system
-    )
-    
-    // Use center of system range as target coordinates
-    const target_x = Math.floor((systemRange.x_min + systemRange.x_max) / 2)
-    const target_y = Math.floor((systemRange.y_min + systemRange.y_max) / 2)
-    
+
     onLaunch({
       origin_planet_id: empire.homeworld_planet_id,
-      target_quadrant: data.target_quadrant,
-      target_sector: data.target_sector,
-      target_galaxy: data.target_galaxy,
-      target_system: data.target_system,
-      target_planet: data.target_planet,
-      target_x: target_x,
-      target_y: target_y,
+      target_quadrant: parsedCoordinate.quadrant,
+      target_sector: parsedCoordinate.sector,
+      target_galaxy: parsedCoordinate.galaxy,
+      target_system: parsedCoordinate.system,
+      target_planet: parsedCoordinate.planet,
+      target_x: parsedCoordinate.x,
+      target_y: parsedCoordinate.y,
       type: data.type
     })
   }
@@ -194,31 +251,29 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
       setValue('type', initialTarget.type)
     }
 
+    if (typeof initialTarget.x === 'number' && typeof initialTarget.y === 'number') {
+      const formatted = `X:${initialTarget.x}:${initialTarget.y}`
+      handleCoordinateChange(formatted)
+      return
+    }
+
     if (initialTarget.coordinate) {
       handleCoordinateChange(initialTarget.coordinate)
-    } else {
-      if (initialTarget.quadrant) setValue('target_quadrant', initialTarget.quadrant)
-      if (initialTarget.sector) setValue('target_sector', initialTarget.sector)
-      if (initialTarget.galaxy) setValue('target_galaxy', initialTarget.galaxy)
-      if (initialTarget.system) setValue('target_system', initialTarget.system)
-      if (initialTarget.planet) setValue('target_planet', initialTarget.planet)
-      if (
-        initialTarget.quadrant &&
-        initialTarget.sector &&
-        initialTarget.galaxy &&
-        initialTarget.system &&
-        initialTarget.planet
-      ) {
-        setParsedCoordinate({
-          quadrant: initialTarget.quadrant,
-          sector: initialTarget.sector,
-          galaxy: initialTarget.galaxy,
-          system: initialTarget.system,
-          planet: initialTarget.planet,
-        })
-      }
+      return
     }
-  }, [initialTarget, setValue])
+
+    if (
+      initialTarget.quadrant &&
+      initialTarget.sector &&
+      initialTarget.galaxy &&
+      initialTarget.planet
+    ) {
+      const legacyCoordinate = initialTarget.system
+        ? `${initialTarget.quadrant}:${initialTarget.sector}:${initialTarget.galaxy}:${initialTarget.system}:${initialTarget.planet}`
+        : `${initialTarget.quadrant}:${initialTarget.sector}:${initialTarget.galaxy}:${initialTarget.planet}`
+      handleCoordinateChange(legacyCoordinate)
+    }
+  }, [handleCoordinateChange, initialTarget, setValue])
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -228,20 +283,20 @@ export function SignalForm({ onLaunch, isLoading, initialTarget }: SignalFormPro
         <div className="space-y-2">
           <Input
             id="coordinate_input"
-            placeholder="Enter coordinate (e.g., 1:1:1:1:1)"
+            placeholder="Enter coordinate (e.g., X:250:375)"
             value={coordinateInput}
             onChange={(e) => handleCoordinateChange(e.target.value)}
           />
           {parsedCoordinate && (
             <div className="flex items-center gap-2 text-sm text-green-400">
               <MapPin className="w-4 h-4" />
-              <span>Valid coordinate: {parsedCoordinate.quadrant}:{parsedCoordinate.sector}:{parsedCoordinate.galaxy}:{parsedCoordinate.system}:{parsedCoordinate.planet}</span>
+              <span>Valid coordinate: X:{parsedCoordinate.x}:{parsedCoordinate.y}</span>
             </div>
           )}
           {coordinateInput && !parsedCoordinate && (
             <div className="flex items-center gap-2 text-sm text-destructive">
               <AlertCircle className="w-4 h-4" />
-              <span>Invalid format. Use Q:S:G:SY:P (e.g., 1:1:1:1:1)</span>
+              <span>Invalid format. Use X:123:456</span>
             </div>
           )}
         </div>

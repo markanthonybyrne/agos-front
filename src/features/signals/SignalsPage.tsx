@@ -6,8 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useGetSignalsQuery, useLaunchSignalMutation, useGetSignalStatisticsQuery } from '@/api/endpoints/signalsApi'
 import { formatDate, formatDateTime } from '@/lib/formatters'
-import { formatCoordinate } from '@/lib/coordinates'
-import { xyToHierarchical } from '@/lib/coordinateUtils'
 import { 
   Scan, 
   Send, 
@@ -24,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SignalForm } from './components/SignalForm'
 import { SignalHistory } from './components/SignalHistory'
 import { SignalResults } from './components/SignalResults'
+import { formatSignalCoordinate } from './utils'
 
 type SignalType = 'fleet' | 'orbital_defence' | 'planetary' | 'all_frequency' | 'events'
 
@@ -56,18 +55,11 @@ export function SignalsPage({ initialTarget }: SignalsPageProps = {}) {
   console.log('SignalsPage - signalsData:', signalsData)
   console.log('SignalsPage - signals:', signals)
   
-  const filteredSignals = signals.filter(signal => {
-    // Format coordinate - prefer target_x and target_y if available (source of truth)
-    let coordinateString = ''
-    if (signal.target_x !== undefined && signal.target_y !== undefined) {
-      const coord = xyToHierarchical(signal.target_x, signal.target_y)
-      coordinateString = `${coord.quadrant}:${coord.sector}:${coord.galaxy}:${coord.system}:${coord.planet}`
-    } else if (signal.target_system && signal.target_system > 0) {
-      coordinateString = `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_system}:${signal.target_planet}`
-    } else {
-      coordinateString = `${signal.target_quadrant}:${signal.target_sector}:${signal.target_galaxy}:${signal.target_planet}`
-    }
-    const matchesSearch = coordinateString.includes(searchTerm)
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const filteredSignals = signals.filter((signal) => {
+    const coordinateString = formatSignalCoordinate(signal)
+    const matchesSearch =
+      normalizedSearch === '' || coordinateString.toLowerCase().includes(normalizedSearch)
     const matchesType = signalTypeFilter === 'all' || signal.type === signalTypeFilter
     return matchesSearch && matchesType
   })
@@ -313,7 +305,7 @@ export function SignalsPage({ initialTarget }: SignalsPageProps = {}) {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                       <Input
-                        placeholder="Search by coordinate..."
+                        placeholder="Search by X coordinate (e.g., X:250:375)"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10"

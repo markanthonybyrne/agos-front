@@ -1,5 +1,4 @@
-import { Planet } from '@/types/api.types'
-import { VisibilityResponse } from '@/types/api.types'
+import { Planet, VisibilityResponse, GeometryDescriptor } from '@/types/api.types'
 import { getPlanetRegionAndSystem } from './galaxyUtils'
 
 /**
@@ -114,5 +113,78 @@ export function getVisibleSystems(visibilityData: VisibilityResponse | undefined
   
   return systems
 }
+/**
+ * Build geometry descriptor from legacy x/y ranges if geometry is missing
+ */
+function buildGeometryFromRanges(
+  xRange?: { min: number; max: number },
+  yRange?: { min: number; max: number }
+): GeometryDescriptor | null {
+  if (
+    !xRange ||
+    !yRange ||
+    typeof xRange.min !== 'number' ||
+    typeof xRange.max !== 'number' ||
+    typeof yRange.min !== 'number' ||
+    typeof yRange.max !== 'number'
+  ) {
+    return null
+  }
 
+  const minX = xRange.min
+  const maxX = xRange.max
+  const minY = yRange.min
+  const maxY = yRange.max
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const radius = Math.max(maxX - minX, maxY - minY) / 2
 
+  return {
+    center: { x: centerX, y: centerY },
+    radius,
+    bounds: {
+      min_x: minX,
+      max_x: maxX,
+      min_y: minY,
+      max_y: maxY,
+    },
+  }
+}
+
+export function getVisibleRegionGeometries(
+  visibilityData: VisibilityResponse | undefined
+): Map<number, GeometryDescriptor> {
+  const geometries = new Map<number, GeometryDescriptor>()
+  if (!visibilityData?.visible_regions) return geometries
+
+  visibilityData.visible_regions.forEach((region) => {
+    let geometry = region.geometry
+    if (!geometry) {
+      geometry = buildGeometryFromRanges(region.x_range, region.y_range) ?? undefined
+    }
+    if (geometry) {
+      geometries.set(region.region, geometry)
+    }
+  })
+
+  return geometries
+}
+
+export function getVisibleSystemGeometries(
+  visibilityData: VisibilityResponse | undefined
+): Map<string, GeometryDescriptor> {
+  const geometries = new Map<string, GeometryDescriptor>()
+  if (!visibilityData?.visible_systems) return geometries
+
+  visibilityData.visible_systems.forEach((system) => {
+    let geometry = system.geometry
+    if (!geometry) {
+      geometry = buildGeometryFromRanges(system.x_range, system.y_range) ?? undefined
+    }
+    if (geometry) {
+      geometries.set(`${system.region}:${system.system}`, geometry)
+    }
+  })
+
+  return geometries
+}

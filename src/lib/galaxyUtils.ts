@@ -1,4 +1,4 @@
-import { Planet } from '@/types/api.types'
+import { Planet, GeometryDescriptor, Region as ApiRegion, System as ApiSystem, GeometryDefaultsConfig } from '@/types/api.types'
 
 /**
  * Galaxy Utilities
@@ -8,18 +8,26 @@ import { Planet } from '@/types/api.types'
  * Region:System:Planet hierarchy.
  */
 
+export interface RectBounds {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+export interface RegionBounds extends RectBounds {
+  centerX: number
+  centerY: number
+}
+
 export interface RegionData {
   region: number
   name: string | null
   systems: SystemData[]
-  bounds: {
-    minX: number
-    maxX: number
-    minY: number
-    maxY: number
-    centerX: number
-    centerY: number
-  }
+  bounds: RegionBounds
+  center: { x: number; y: number }
+  radius: number
+  geometry?: GeometryDescriptor
 }
 
 export interface SystemData {
@@ -27,13 +35,116 @@ export interface SystemData {
   system: number
   name: string | null
   center: { x: number; y: number }
-  bounds: {
-    minX: number
-    maxX: number
-    minY: number
-    maxY: number
-  }
+  bounds: RectBounds
+  radius: number
+  geometry?: GeometryDescriptor
   planets: Planet[]
+}
+
+const FALLBACK_SYSTEM_RADIUS = 120
+const FALLBACK_REGION_RADIUS = 400
+
+function geometryToRectBounds(geometry: GeometryDescriptor): RectBounds {
+  if (geometry.bounds) {
+    return {
+      minX: geometry.bounds.min_x,
+      maxX: geometry.bounds.max_x,
+      minY: geometry.bounds.min_y,
+      maxY: geometry.bounds.max_y,
+    }
+  }
+
+  const { center, radius } = geometry
+  const safeRadius = Math.max(0, radius ?? 0)
+
+  return {
+    minX: center.x - safeRadius,
+    maxX: center.x + safeRadius,
+    minY: center.y - safeRadius,
+    maxY: center.y + safeRadius,
+  }
+}
+
+function rectToRegionBounds(bounds: RectBounds, center?: { x: number; y: number }): RegionBounds {
+  if (center) {
+    return {
+      ...bounds,
+      centerX: center.x,
+      centerY: center.y,
+    }
+  }
+
+  return {
+    ...bounds,
+    centerX: (bounds.minX + bounds.maxX) / 2,
+    centerY: (bounds.minY + bounds.maxY) / 2,
+  }
+}
+
+function geometryToRegionBounds(geometry: GeometryDescriptor): RegionBounds {
+  const rect = geometryToRectBounds(geometry)
+  return rectToRegionBounds(rect, geometry.center)
+}
+
+function radiusFromBounds(bounds: RectBounds): number {
+  const width = Math.max(0, bounds.maxX - bounds.minX)
+  const height = Math.max(0, bounds.maxY - bounds.minY)
+  return Math.max(width, height) / 2
+}
+
+function resolveSystemRadius(
+  geometry: GeometryDescriptor | undefined,
+  bounds: RectBounds | null,
+  geometryDefaults?: Partial<GeometryDefaultsConfig>
+): number {
+  if (geometry?.radius && geometry.radius > 0) {
+    return geometry.radius
+  }
+
+  const derived = bounds ? radiusFromBounds(bounds) : undefined
+  const fallback = geometryDefaults?.system_radius_default ?? FALLBACK_SYSTEM_RADIUS
+
+  if (derived === undefined || derived <= 0) {
+    return fallback
+  }
+
+  return Math.max(derived, fallback)
+}
+
+function resolveRegionRadius(
+  geometry: GeometryDescriptor | undefined,
+  bounds: RegionBounds | null,
+  geometryDefaults?: Partial<GeometryDefaultsConfig>
+): number {
+  if (geometry?.radius && geometry.radius > 0) {
+    return geometry.radius
+  }
+
+  const derived = bounds ? radiusFromBounds(bounds) : undefined
+  const minRadius = geometryDefaults?.region_radius_min ?? FALLBACK_REGION_RADIUS
+
+  if (derived === undefined || derived <= 0) {
+    return minRadius
+  }
+
+  return Math.max(derived, minRadius)
+}
+
+export interface BuildGalaxyDataOptions {
+  mapRegions?: ApiRegion[]
+  mapSystems?: ApiSystem[]
+  geometryDefaults?: Partial<GeometryDefaultsConfig>
+}
+
+interface CreateSystemDataOptions {
+  systemNames?: Record<string, string>
+  geometry?: GeometryDescriptor
+  geometryDefaults?: Partial<GeometryDefaultsConfig>
+}
+
+interface CreateRegionDataOptions {
+  geometry?: GeometryDescriptor
+  geometryDefaults?: Partial<GeometryDefaultsConfig>
 }
 
 /**
@@ -159,7 +270,7 @@ export function calculateSystemCenter(planets: Planet[]): { x: number; y: number
 /**
  * Calculate system bounds from planet positions
  */
-export function calculateSystemBounds(planets: Planet[]): { minX: number; maxX: number; minY: number; maxY: number } | null {
+export function calculateSystemBounds(planets: Planet[]): RectBounds | null {
   if (planets.length === 0) return null
   
   const validPositions: { x: number; y: number }[] = []
@@ -197,7 +308,7 @@ export function calculateSystemBounds(planets: Planet[]): { minX: number; maxX: 
 /**
  * Calculate region bounds from systems
  */
-export function calculateRegionBounds(systems: SystemData[]): { minX: number; maxX: number; minY: number; maxY: number; centerX: number; centerY: number } | null {
+export function calculateRegionBounds(systems: SystemData[]): RegionBounds | null {
   if (systems.length === 0) return null
   
   const xs: number[] = []
@@ -230,17 +341,29 @@ export function createSystemData(
   region: number,
   system: number,
   planets: Planet[],
-  systemNames?: Record<string, string>
+  options: CreateSystemDataOptions = {}
 ): SystemData | null {
-  const center = calculateSystemCenter(planets)
-  const bounds = calculateSystemBounds(planets)
-  
+  const { systemNames, geometry, geometryDefaults } = options
+
+  const geometryBounds = geometry ? geometryToRectBounds(geometry) : null
+  const fallbackBounds = calculateSystemBounds(planets)
+  const bounds = geometryBounds ?? fallbackBounds
+
+  const fallbackCenter = calculateSystemCenter(planets)
+  let center = geometry?.center ?? fallbackCenter
+
+  if (!center && bounds) {
+    center = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    }
+  }
+
   if (!center || !bounds) return null
-  
+
   // Get system name - prefer from systemNames map, then from planet
   let systemName: string | null = null
-  
-  // Try systemNames map first (from API response, format: "region:system")
+
   if (systemNames) {
     const key = `${region}:${system}`
     systemName = systemNames[key] || null
@@ -248,19 +371,22 @@ export function createSystemData(
       systemName = systemName.trim() || null
     }
   }
-  
-  // Fallback to first planet's system_name
+
   if (!systemName) {
     const firstPlanet = planets[0]
     systemName = firstPlanet?.system_name?.trim() ?? null
   }
-  
+
+  const radius = resolveSystemRadius(geometry, bounds, geometryDefaults)
+
   return {
     region,
     system,
     name: systemName,
     center,
     bounds,
+    radius,
+    geometry,
     planets
   }
 }
@@ -271,17 +397,30 @@ export function createSystemData(
 export function createRegionData(
   region: number,
   systems: SystemData[],
-  regionName?: string | null
+  regionName?: string | null,
+  options: CreateRegionDataOptions = {}
 ): RegionData | null {
-  const bounds = calculateRegionBounds(systems)
-  
+  const { geometry, geometryDefaults } = options
+
+  let bounds: RegionBounds | null = geometry ? geometryToRegionBounds(geometry) : null
+
+  if (!bounds) {
+    bounds = calculateRegionBounds(systems)
+  }
+
   if (!bounds) return null
-  
+
+  const center = geometry?.center ?? { x: bounds.centerX, y: bounds.centerY }
+  const radius = resolveRegionRadius(geometry, bounds, geometryDefaults)
+
   return {
     region,
     name: regionName ?? null,
     systems,
-    bounds
+    bounds,
+    center,
+    radius,
+    geometry
   }
 }
 
@@ -291,12 +430,49 @@ export function createRegionData(
 export function buildGalaxyData(
   planets: Planet[], 
   regionNames?: Record<string, string>,
-  systemNames?: Record<string, string>
+  systemNames?: Record<string, string>,
+  options: BuildGalaxyDataOptions = {}
 ): {
   regions: Map<number, RegionData>
   systems: Map<string, SystemData>
   systemMap: SystemData[]
 } {
+  const { mapRegions = [], mapSystems = [], geometryDefaults } = options
+
+  const systemGeometryLookup = new Map<string, GeometryDescriptor>()
+  mapSystems?.forEach((systemEntry) => {
+    if (systemEntry?.geometry) {
+      const key = `${systemEntry.region}:${systemEntry.system}`
+      systemGeometryLookup.set(key, systemEntry.geometry)
+    }
+  })
+
+  planets.forEach((planet) => {
+    const { region, system } = getPlanetRegionAndSystem(planet)
+    if (region === null || system === null) return
+    const key = `${region}:${system}`
+    if (systemGeometryLookup.has(key)) return
+    const planetGeometry = planet.geometry?.system
+    if (planetGeometry) {
+      systemGeometryLookup.set(key, planetGeometry)
+    }
+  })
+
+  const regionGeometryLookup = new Map<number, GeometryDescriptor>()
+  const regionNameLookup = new Map<number, string>()
+
+  mapRegions?.forEach((regionEntry) => {
+    if (regionEntry.geometry) {
+      regionGeometryLookup.set(regionEntry.region, regionEntry.geometry)
+    }
+    if (typeof regionEntry.name === 'string') {
+      const trimmed = regionEntry.name.trim()
+      if (trimmed.length > 0) {
+        regionNameLookup.set(regionEntry.region, trimmed)
+      }
+    }
+  })
+
   // Group by system
   const systemGroups = groupPlanetsBySystem(planets)
   const systems = new Map<string, SystemData>()
@@ -305,7 +481,11 @@ export function buildGalaxyData(
   // Create system data
   systemGroups.forEach((systemPlanets, key) => {
     const [region, system] = key.split(':').map(Number)
-    const systemData = createSystemData(region, system, systemPlanets, systemNames)
+    const systemData = createSystemData(region, system, systemPlanets, {
+      systemNames,
+      geometry: systemGeometryLookup.get(key),
+      geometryDefaults
+    })
     if (systemData) {
       systems.set(key, systemData)
       systemMap.push(systemData)
@@ -337,6 +517,10 @@ export function buildGalaxyData(
       }
     }
     
+    if (!regionName) {
+      regionName = regionNameLookup.get(region) ?? null
+    }
+    
     // Fallback to first planet's region_name
     if (!regionName) {
       const firstSystem = regionSystems[0]
@@ -344,7 +528,10 @@ export function buildGalaxyData(
       regionName = firstPlanet?.region_name?.trim() || null
     }
     
-    const regionData = createRegionData(region, regionSystems, regionName)
+    const regionData = createRegionData(region, regionSystems, regionName, {
+      geometry: regionGeometryLookup.get(region),
+      geometryDefaults
+    })
     if (regionData) {
       regions.set(region, regionData)
     }

@@ -223,6 +223,47 @@ export interface FogOfWar {
 // Region and System Types
 export type RegionTheme = 'frozen' | 'molten' | 'desert' | 'oceanic' | 'forest' | 'urban' | 'void' | 'habitable' | 'industrial' | string
 
+export interface GeometryCenter {
+  x: number
+  y: number
+}
+
+export interface GeometryBounds {
+  min_x: number
+  max_x: number
+  min_y: number
+  max_y: number
+}
+
+export interface GeometryDescriptor {
+  center: GeometryCenter
+  radius: number
+  bounds?: GeometryBounds
+}
+
+export interface Announcement {
+  id: number
+  title: string
+  summary?: string | null
+  body?: string | null
+  content?: string | null
+  slug?: string | null
+  priority?: 'info' | 'warning' | 'critical' | string | null
+  is_pinned?: boolean
+  published_at?: string
+  updated_at?: string
+  link_url?: string | null
+  metadata?: Record<string, any>
+}
+
+export interface AnnouncementListResponse {
+  announcements: Announcement[]
+}
+
+export interface AnnouncementResponse {
+  announcement: Announcement
+}
+
 export interface Region {
   region: number
   name: string
@@ -234,6 +275,7 @@ export interface Region {
   discovery_status?: DiscoveryStatus
   x_range: { min: number; max: number }
   y_range: { min: number; max: number }
+  geometry?: GeometryDescriptor
 }
 
 export interface System {
@@ -247,6 +289,7 @@ export interface System {
   discovery_status?: DiscoveryStatus
   x_range: { min: number; max: number }
   y_range: { min: number; max: number }
+  geometry?: GeometryDescriptor
 }
 
 export interface Planet {
@@ -290,6 +333,9 @@ export interface Planet {
   region_name?: string | null
   is_habitable?: boolean // For colonization checks
   secondary_reserves?: SecondaryReserve[]
+  geometry?: {
+    system?: GeometryDescriptor
+  }
 }
 
 export interface Fleet {
@@ -796,6 +842,7 @@ export interface VisibilityResponse {
     discovery_status: DiscoveryStatus
     x_range: { min: number; max: number }
     y_range: { min: number; max: number }
+    geometry?: GeometryDescriptor
   }>
   visible_systems?: Array<{
     region: number
@@ -805,6 +852,7 @@ export interface VisibilityResponse {
     discovery_status: DiscoveryStatus
     x_range: { min: number; max: number }
     y_range: { min: number; max: number }
+    geometry?: GeometryDescriptor
   }>
   visible_galaxies?: Array<{
     quadrant: number
@@ -834,6 +882,30 @@ export interface VisibilityResponse {
       warp_technology: boolean
     }
   }
+}
+
+export interface GeometryDefaultsConfig {
+  system_radius_default: number
+  region_radius_min: number
+  region_adjacency_buffer: number
+}
+
+export interface UniverseConfigResponse {
+  grid_size?: number | { width: number; height: number }
+  grid_width?: number
+  grid_height?: number
+  universe_structure: {
+    quadrant_count: number
+    sectors_per_quadrant: number
+    galaxies_per_sector: number
+    systems_per_galaxy: number
+    planets_per_system: number
+  }
+  capacities: {
+    total_systems: number
+    max_planets: number
+  }
+  geometry_defaults?: GeometryDefaultsConfig
 }
 
 export interface FleetRangeValidation {

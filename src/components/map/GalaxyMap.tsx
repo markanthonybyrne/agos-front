@@ -27,6 +27,7 @@ import { Incident } from '@/types/api.types'
 import { GALACTIC_CORE } from '@/lib/spiralUtils'
 import { getPlanetXY, formatCoordinate } from '@/lib/coordinates'
 import { isPlanetVisible } from '@/lib/visibilityUtils'
+import { setGeometryDefaults } from '@/lib/geometryDefaults'
 import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useResourcesCatalog } from '@/hooks/useResourcesCatalog'
@@ -77,6 +78,10 @@ export function GalaxyMap() {
   const gridHeight = configData?.grid_height || 
     (typeof configData?.grid_size === 'object' && configData.grid_size !== null ? configData.grid_size.height : null) || 
     (typeof configData?.grid_size === 'number' ? configData.grid_size : DEFAULT_GRID_HEIGHT)
+
+  useEffect(() => {
+    setGeometryDefaults(configData?.geometry_defaults ?? null)
+  }, [configData?.geometry_defaults])
   
   // Fetch all planets for galaxy map - use planets from Redux store (already loaded by InitialDataLoader)
   // Only use map query to get region/system names and structure, not planets
@@ -139,30 +144,39 @@ export function GalaxyMap() {
     const systemNames = mapData?.system_names || {}
     
     // If no visible planets, still create empty regions with names for the legend
+    const defaultRegionRadius = configData?.geometry_defaults?.region_radius_min ?? Math.max(gridWidth, gridHeight) / 2
+
     if (!visiblePlanets || visiblePlanets.length === 0) {
       const regions = new Map<number, RegionData>()
       // Create all 20 regions with names (for legend display)
       for (let i = 1; i <= 20; i++) {
         const regionName = regionNames[i.toString()] || regionNames[i] || null
         const trimmedName = regionName && typeof regionName === 'string' ? regionName.trim() : null
+        const bounds = {
+          minX: 0,
+          maxX: gridWidth,
+          minY: 0,
+          maxY: gridHeight,
+          centerX: gridWidth / 2,
+          centerY: gridHeight / 2,
+        }
         regions.set(i, {
           region: i,
           name: trimmedName,
           systems: [],
-          bounds: {
-            minX: 0,
-            maxX: gridWidth,
-            minY: 0,
-            maxY: gridHeight,
-            centerX: gridWidth / 2,
-            centerY: gridHeight / 2,
-          }
+          bounds,
+          center: { x: bounds.centerX, y: bounds.centerY },
+          radius: defaultRegionRadius,
         })
       }
       return { regions, systems: new Map(), systemMap: [] }
     }
     
-    const built = buildGalaxyData(visiblePlanets, regionNames, systemNames)
+    const built = buildGalaxyData(visiblePlanets, regionNames, systemNames, {
+      mapRegions: mapData?.regions,
+      mapSystems: mapData?.systems,
+      geometryDefaults: configData?.geometry_defaults,
+    })
     
     // Ensure all 20 regions exist in the map (even if empty) for legend display
     // This preserves region names even when regions have no visible planets
@@ -197,24 +211,27 @@ export function GalaxyMap() {
         }
       } else {
         // Create missing region
+        const bounds = {
+          minX: 0,
+          maxX: gridWidth,
+          minY: 0,
+          maxY: gridHeight,
+          centerX: gridWidth / 2,
+          centerY: gridHeight / 2,
+        }
         built.regions.set(i, {
           region: i,
           name: finalName,
           systems: [],
-          bounds: {
-            minX: 0,
-            maxX: gridWidth,
-            minY: 0,
-            maxY: gridHeight,
-            centerX: gridWidth / 2,
-            centerY: gridHeight / 2,
-          }
+          bounds,
+          center: { x: bounds.centerX, y: bounds.centerY },
+          radius: defaultRegionRadius,
         })
       }
     }
     
     return built
-  }, [visiblePlanets, mapData?.region_names, mapData?.system_names, planetsToUse, gridWidth, gridHeight])
+  }, [visiblePlanets, mapData?.region_names, mapData?.system_names, mapData?.regions, mapData?.systems, planetsToUse, gridWidth, gridHeight, configData?.geometry_defaults])
   
   // Find the user's home system (always visible, even if not in visible planets)
   const homeSystem = useMemo(() => {
@@ -234,6 +251,8 @@ export function GalaxyMap() {
       return null
     }
     
+    const fallbackSystemRadius = configData?.geometry_defaults?.system_radius_default ?? 10
+    
     // Find the system containing this homeworld (check visible systems first, then all)
     let homeSystem = galaxyData.systemMap.find(system => 
       system.planets.some(p => p.id === empire.homeworld_planet_id)
@@ -246,17 +265,19 @@ export function GalaxyMap() {
         // Build a minimal system data for home system
         const xy = getPlanetXY(homeworldPlanet)
         if (xy) {
+          const bounds = {
+            minX: xy.x - 10,
+            maxX: xy.x + 10,
+            minY: xy.y - 10,
+            maxY: xy.y + 10,
+          }
           homeSystem = {
             region,
             system,
             name: homeworldPlanet.system_name || null,
             center: xy,
-            bounds: {
-              minX: xy.x - 10,
-              maxX: xy.x + 10,
-              minY: xy.y - 10,
-              maxY: xy.y + 10,
-            },
+            bounds,
+            radius: fallbackSystemRadius,
             planets: [homeworldPlanet],
           }
         }
@@ -264,7 +285,7 @@ export function GalaxyMap() {
     }
     
     return homeSystem || null
-  }, [empire?.homeworld_planet_id, visiblePlanets, planetsToUse, galaxyData.systemMap])
+  }, [empire?.homeworld_planet_id, visiblePlanets, planetsToUse, galaxyData.systemMap, configData?.geometry_defaults?.system_radius_default])
   
   // Initialize zoom/pan - start with scale to fit entire galaxy
   // Use actual window/viewport dimensions for responsive sizing
@@ -560,32 +581,8 @@ export function GalaxyMap() {
     event.stopPropagation()
     const targetScale = initialScale * 2.5 // Zoom to 2.5x to show region clearly
     
-    // Calculate center from actual planet positions (spiral-aware)
-    // Use planet distribution center instead of rectangular bounds center
-    const planetPoints: { x: number; y: number }[] = []
-    region.systems.forEach(system => {
-      system.planets.forEach(planet => {
-        const xy = getPlanetXY(planet)
-        if (xy) {
-          planetPoints.push(xy)
-        }
-      })
-    })
-    
-    let centerX: number
-    let centerY: number
-    
-    if (planetPoints.length > 0) {
-      // Use actual planet distribution center
-      const sumX = planetPoints.reduce((sum, p) => sum + p.x, 0)
-      const sumY = planetPoints.reduce((sum, p) => sum + p.y, 0)
-      centerX = sumX / planetPoints.length
-      centerY = sumY / planetPoints.length
-    } else {
-      // Fallback to bounds center
-      centerX = region.bounds.centerX
-      centerY = region.bounds.centerY
-    }
+    const centerX = region.center?.x ?? region.bounds.centerX
+    const centerY = region.center?.y ?? region.bounds.centerY
     
     // Calculate pan to center the region
     const targetPanX = (gridWidth / 2 - centerX) * targetScale

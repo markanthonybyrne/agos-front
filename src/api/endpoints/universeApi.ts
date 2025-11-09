@@ -1,5 +1,5 @@
 import { apiSlice } from '../apiSlice'
-import { ApiResponse, UniverseMap, Ranking, ExplorationStatus, FleetRangeValidation, VisibilityResponse } from '@/types/api.types'
+import { UniverseMap, Ranking, ExplorationStatus, FleetRangeValidation, VisibilityResponse, UniverseConfigResponse } from '@/types/api.types'
 
 export const universeApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -70,22 +70,7 @@ export const universeApi = apiSlice.injectEndpoints({
       query: () => '/universe/discoverable',
       providesTags: ['Universe'],
     }),
-    getUniverseConfig: builder.query<{
-      grid_size?: number | { width: number; height: number }
-      grid_width?: number
-      grid_height?: number
-      universe_structure: {
-        quadrant_count: number
-        sectors_per_quadrant: number
-        galaxies_per_sector: number
-        systems_per_galaxy: number
-        planets_per_system: number
-      }
-      capacities: {
-        total_systems: number
-        max_planets: number
-      }
-    }, void>({
+    getUniverseConfig: builder.query<UniverseConfigResponse, void>({
       query: () => '/universe/config',
       providesTags: ['Universe'],
     }),

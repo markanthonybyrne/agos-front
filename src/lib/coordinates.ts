@@ -89,6 +89,11 @@ export function getPlanetXY(planet: Planet): { x: number; y: number } | null {
     }
   }
 
+  if (planet.geometry?.system?.center) {
+    const { x, y } = planet.geometry.system.center
+    return { x, y }
+  }
+
   // Try parsing string coordinate
   const parsed = parseCoordinate(planet.coordinate)
   if (parsed && parsed.quadrant && parsed.sector && parsed.galaxy && parsed.planet) {

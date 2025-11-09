@@ -20,9 +20,9 @@ interface GalaxyRegionLayerProps {
 /**
  * GalaxyRegionLayer - Renders colored territory overlays for regions
  * 
- * Displays semi-transparent colored regions using convex hull boundaries
- * based on actual planet positions, following the spiral galaxy layout.
- * Falls back to rectangular bounds if insufficient planets for hull calculation.
+ * Prefers backend-provided geometry metadata for region footprints.
+ * Falls back to convex hulls of planet positions (or rectangular bounds)
+ * when geometry is unavailable for legacy datasets.
  */
 function GalaxyRegionLayerComponent({ 
   regions, 
@@ -70,49 +70,105 @@ function GalaxyRegionLayerComponent({
   
   const regionPaths = useMemo(() => {
     return visibleRegions.map(region => {
-      const { bounds } = region
       const isHovered = hoveredRegion?.region === region.region
       const color = getRegionColor(region.region)
       const borderColor = getRegionBorderColor(region.region)
-      
-      // Collect all planet positions from all systems in this region
-      const planetPoints: Point[] = []
-      region.systems.forEach(system => {
-        system.planets.forEach(planet => {
-          const xy = getPlanetXY(planet)
-          if (xy) {
-            planetPoints.push([xy.x, xy.y])
-          }
-        })
-      })
-      
-      // Calculate convex hull if we have enough points, otherwise use rectangular bounds
-      const useConvexHull = planetPoints.length >= 3
-      let pathData: string
-      let centerX: number
-      let centerY: number
-      
-      if (useConvexHull) {
-        const hull = convexHull(planetPoints)
-        pathData = hullToPath(hull)
-        // Calculate center from hull points
-        const sumX = hull.reduce((sum, p) => sum + p[0], 0)
-        const sumY = hull.reduce((sum, p) => sum + p[1], 0)
-        centerX = sumX / hull.length
-        centerY = sumY / hull.length
+
+      let centerX = region.center?.x ?? region.bounds.centerX
+      let centerY = region.center?.y ?? region.bounds.centerY
+      let overlayElement: JSX.Element
+
+      if (region.geometry) {
+        const { center, bounds } = region.geometry
+        const radiusX = bounds
+          ? Math.max((bounds.max_x - bounds.min_x) / 2, region.radius)
+          : region.radius
+        const radiusY = bounds
+          ? Math.max((bounds.max_y - bounds.min_y) / 2, region.radius)
+          : region.radius
+
+        centerX = center.x
+        centerY = center.y
+
+        overlayElement = (
+          <ellipse
+            cx={center.x}
+            cy={center.y}
+            rx={Math.max(radiusX, 1)}
+            ry={Math.max(radiusY, 1)}
+            fill={color}
+            stroke={isHovered ? borderColor : 'none'}
+            strokeWidth={isHovered ? 2 : 0}
+            className="region-overlay"
+            style={{
+              opacity: isHovered ? 0.75 : 0.15,
+              transition: 'opacity 0.2s ease-in-out'
+            }}
+          />
+        )
       } else {
-        // Fallback to rectangular bounds
-        pathData = `M ${bounds.minX} ${bounds.minY} L ${bounds.maxX} ${bounds.minY} L ${bounds.maxX} ${bounds.maxY} L ${bounds.minX} ${bounds.maxY} Z`
-        centerX = bounds.centerX
-        centerY = bounds.centerY
+        const planetPoints: Point[] = []
+        region.systems.forEach(system => {
+          system.planets.forEach(planet => {
+            const xy = getPlanetXY(planet)
+            if (xy) {
+              planetPoints.push([xy.x, xy.y])
+            }
+          })
+        })
+
+        const useConvexHull = planetPoints.length >= 3
+
+        if (useConvexHull) {
+          const hull = convexHull(planetPoints)
+          const pathData = hullToPath(hull)
+          const sumX = hull.reduce((sum, p) => sum + p[0], 0)
+          const sumY = hull.reduce((sum, p) => sum + p[1], 0)
+          centerX = sumX / hull.length
+          centerY = sumY / hull.length
+
+          overlayElement = (
+            <path
+              d={pathData}
+              fill={color}
+              stroke={isHovered ? borderColor : 'none'}
+              strokeWidth={isHovered ? 2 : 0}
+              className="region-overlay"
+              style={{
+                opacity: isHovered ? 0.75 : 0.15,
+                transition: 'opacity 0.2s ease-in-out'
+              }}
+            />
+          )
+        } else {
+          const { minX, maxX, minY, maxY } = region.bounds
+          centerX = region.bounds.centerX
+          centerY = region.bounds.centerY
+
+          overlayElement = (
+            <rect
+              x={minX}
+              y={minY}
+              width={Math.max(maxX - minX, 1)}
+              height={Math.max(maxY - minY, 1)}
+              fill={color}
+              stroke={isHovered ? borderColor : 'none'}
+              strokeWidth={isHovered ? 2 : 0}
+              className="region-overlay"
+              style={{
+                opacity: isHovered ? 0.75 : 0.15,
+                transition: 'opacity 0.2s ease-in-out'
+              }}
+            />
+          )
+        }
       }
-      
+
       return (
         <g 
           key={`region-${region.region}`}
           className={cn('region-group', isHovered && 'region-hovered')}
           onClick={(e) => {
-            // Block clicks on hidden regions
             if (!isRegionVisibleForInteraction(region)) {
               e.stopPropagation()
               return
@@ -120,7 +176,6 @@ function GalaxyRegionLayerComponent({
             onRegionClick?.(region, e)
           }}
           onMouseEnter={() => {
-            // Only trigger hover for visible regions
             if (isRegionVisibleForInteraction(region)) {
               onRegionHover?.(region)
             }
@@ -132,17 +187,7 @@ function GalaxyRegionLayerComponent({
             pointerEvents: isRegionVisibleForInteraction(region) ? 'auto' : 'none'
           }}
         >
-          {/* Region fill - very subtle colored overlay (no borders) */}
-          <path
-            d={pathData}
-            fill={color}
-            className="region-overlay"
-            style={{
-              opacity: isHovered ? 0.75 : 0.15,
-              transition: 'opacity 0.2s ease-in-out'
-            }}
-          />
-          {/* Region name label */}
+          {overlayElement}
           {region.name && (
             <text
               x={centerX}
