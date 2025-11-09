@@ -126,9 +126,9 @@ export function SlidingPanel({
           }}
           onClick={(e) => {
             if (!isAnimating) return
-            // Check if tutorial is active - if so, don't close panel on backdrop click
-            const tutorialActive = document.querySelector('[data-tutorial-active="true"]')
-            if (tutorialActive) {
+            // Prevent closing if onboarding overlay is active
+            const onboardingActive = document.querySelector('[data-onboarding-active="true"]')
+            if (onboardingActive) {
               e.stopPropagation()
               return
             }

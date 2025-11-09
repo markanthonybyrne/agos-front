@@ -10,6 +10,7 @@ import {
   SocialAuthResponseMeta,
 } from '@/types/api.types'
 import { updateUser, setSocialProviders, clearSocialProviders } from '@/app/slices/authSlice'
+import type { RootState } from '@/app/store'
 
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -122,6 +123,37 @@ export const authApi = apiSlice.injectEndpoints({
         ...(result?.empire?.id ? [{ type: 'Empire' as const, id: result.empire.id }] : []),
         ...(result?.planets?.map((p: Planet) => ({ type: 'Planet' as const, id: p.id })) || []),
       ],
+    }),
+    updateOnboardingStatus: builder.mutation<
+      { onboarding_completed: boolean },
+      { completed: boolean }
+    >({
+      query: ({ completed }) => ({
+        url: '/me/onboarding',
+        method: 'PATCH',
+        body: { completed },
+      }),
+      transformResponse: (response: { status?: string; data?: { onboarding_completed: boolean }; onboarding_completed?: boolean }) => {
+        if (response.status === 'ok' && typeof response.data?.onboarding_completed === 'boolean') {
+          return { onboarding_completed: response.data.onboarding_completed }
+        }
+        if (typeof response.onboarding_completed === 'boolean') {
+          return { onboarding_completed: response.onboarding_completed }
+        }
+        return { onboarding_completed: true }
+      },
+      async onQueryStarted({ completed }, { dispatch, queryFulfilled, getState }) {
+        try {
+          const { data } = await queryFulfilled
+          const state = getState() as RootState
+          const currentUser = state.auth.user
+          if (currentUser) {
+            dispatch(updateUser({ ...currentUser, onboarding_completed: data.onboarding_completed }))
+          }
+        } catch {
+          // Silently ignore; UI will retry on next session
+        }
+      },
     }),
     updateProfile: builder.mutation<
       { user: User; empire: Empire },
@@ -455,6 +487,7 @@ export const {
   useLoginMutation,
   useLogoutMutation,
   useGetMeQuery,
+  useUpdateOnboardingStatusMutation,
   useUpdateProfileMutation,
   useChangePasswordMutation,
   useUploadAvatarMutation,

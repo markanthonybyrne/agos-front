@@ -16,24 +16,16 @@ import {
   Save,
   RefreshCw,
   Eye,
-  EyeOff,
-  GraduationCap,
-  Play,
-  RotateCcw
+  EyeOff
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { startTutorial, resetTutorial } from '@/app/slices/tutorialSlice'
 import { ProfileSettings } from './components/ProfileSettings'
 import { NotificationSettings } from './components/NotificationSettings'
 import { AccountSettings } from './components/AccountSettings'
 
 export function SettingsPage() {
-  const dispatch = useAppDispatch()
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'account' | 'tutorial'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'account'>('profile')
   const [showApiToken, setShowApiToken] = useState(false)
-  const isTutorialCompleted = useAppSelector((state) => state.tutorial.isTutorialCompleted)
-  const isTutorialActive = useAppSelector((state) => state.tutorial.isActive)
 
   const { data: meData, isLoading } = useGetMeQuery()
   const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation()
@@ -69,21 +61,6 @@ export function SettingsPage() {
       navigator.clipboard.writeText(user.api_token)
       toast.success('API token copied to clipboard')
     }
-  }
-
-  const handleStartTutorial = () => {
-    // Reset tutorial first, then start
-    dispatch(resetTutorial())
-    // Small delay to ensure state is reset
-    setTimeout(() => {
-      dispatch(startTutorial())
-      toast.success('Tutorial started!')
-    }, 100)
-  }
-
-  const handleResetTutorial = () => {
-    dispatch(resetTutorial())
-    toast.success('Tutorial reset. It will start automatically on next page load.')
   }
 
   return (
@@ -208,7 +185,7 @@ export function SettingsPage() {
 
       {/* Main Settings */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-        <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Profile
@@ -216,10 +193,6 @@ export function SettingsPage() {
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
             Notifications
-          </TabsTrigger>
-          <TabsTrigger value="tutorial" className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4" />
-            Tutorial
           </TabsTrigger>
           <TabsTrigger value="account" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
@@ -239,63 +212,6 @@ export function SettingsPage() {
         <TabsContent value="notifications" className="mt-6">
           <NotificationSettings />
         </TabsContent>
-
-        <TabsContent value="tutorial" className="mt-6">
-          <Card className="panel-glass">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-cyan-400" />
-                Tutorial System
-              </CardTitle>
-              <CardDescription>
-                Start or reset the interactive tutorial to learn about the game
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
-                <p className="text-sm text-muted-foreground mb-4">
-                  The tutorial will guide you through the basics of building your empire, managing resources, 
-                  exploring the galaxy, and engaging in strategic combat.
-                </p>
-                
-                <div className="flex items-center gap-2 mb-4">
-                  <Badge variant={isTutorialActive ? "default" : "outline"} className={isTutorialActive ? "bg-cyan-600" : ""}>
-                    {isTutorialActive ? 'Tutorial Active' : isTutorialCompleted ? 'Tutorial Completed' : 'Tutorial Available'}
-                  </Badge>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    onClick={handleStartTutorial}
-                    disabled={isTutorialActive}
-                    className="flex-1 bg-cyan-600 hover:bg-cyan-700"
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    {isTutorialActive ? 'Tutorial Running...' : 'Start Tutorial'}
-                  </Button>
-                  
-                  <Button
-                    onClick={handleResetTutorial}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Reset Tutorial
-                  </Button>
-                </div>
-
-                {isTutorialActive && (
-                  <div className="mt-4 p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-                    <p className="text-sm text-cyan-400">
-                      ⚡ Tutorial is currently active. Follow the prompts on screen to complete it.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="account" className="mt-6">
           <AccountSettings
             onLogout={handleLogout}

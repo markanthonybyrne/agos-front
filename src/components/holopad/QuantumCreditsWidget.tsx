@@ -58,7 +58,6 @@ export function QuantumCreditsWidget({
       onClose={onClose}
       isMinimized={isMinimized}
       className="border-cyan/20"
-      data-tutorial="quantum-credits-widget"
     >
       {isLoading ? (
         <div className="space-y-4">

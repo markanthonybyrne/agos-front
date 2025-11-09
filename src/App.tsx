@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -9,9 +9,7 @@ import { AuthTransitionOverlay } from '@/components/common/AuthTransitionOverlay
 import { InitialDataLoader } from '@/components/common/InitialDataLoader'
 import { useAchievementNotifications } from '@/hooks/useAchievementNotifications'
 import { useGlobalTickData } from '@/hooks/useGlobalTickData'
-import { useTutorialDetection } from '@/hooks/useTutorialDetection'
 import { useMapDataRefresh } from '@/hooks/useMapDataRefresh'
-import { TutorialManager } from '@/components/tutorial/TutorialManager'
 import { AdminGuard } from '@/features/admin/components/AdminGuard'
 import { LandingGuard } from '@/components/common/LandingGuard'
 import { LandingPage } from '@/features/landing/LandingPage'
@@ -54,6 +52,10 @@ import { AdminPanelWrapper } from '@/features/admin/components/AdminPanelWrapper
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { UiGuidePage } from '@/features/guides/UiGuidePage'
 import { useSocialAuthProviders } from '@/hooks/useSocialAuthProviders'
+import { useAppSelector } from '@/app/hooks'
+import { OnboardingExperience } from '@/features/onboarding/OnboardingExperience'
+import { ASTRALUS_CINEMATIC, ASTRALUS_TOUR } from '@/features/onboarding/config'
+import { useUpdateOnboardingStatusMutation } from '@/api/endpoints/authApi'
 
 function AppContent() {
   // Initialize achievement notifications
@@ -61,9 +63,6 @@ function AppContent() {
   
   // Fetch tick data globally for all authenticated pages
   useGlobalTickData()
-  
-  // Detect and trigger tutorial for first-time users
-  useTutorialDetection()
   
   // Refresh map data on tick events
   useMapDataRefresh()
@@ -73,7 +72,6 @@ function AppContent() {
 
   return (
     <>
-      <TutorialManager />
       <Routes>
         <Route 
           path="/" 
@@ -166,13 +164,50 @@ function SignalsPanelRoute() {
 
 function App() {
   const [dataLoadingComplete, setDataLoadingComplete] = useState(false)
+  const user = useAppSelector((state) => state.auth.user)
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false)
+  const [updateOnboardingStatus] = useUpdateOnboardingStatusMutation()
+
+  const shouldShowOnboarding = Boolean(
+    isAuthenticated && user && user.onboarding_completed === false && !onboardingDismissed
+  )
+
+  const handleOnboardingClose = useCallback(
+    async (options?: { markComplete?: boolean }) => {
+      setOnboardingDismissed(true)
+      if (options?.markComplete === false) {
+        return
+      }
+      try {
+        await updateOnboardingStatus({ completed: true }).unwrap()
+      } catch (error) {
+        console.warn('[Onboarding] Failed to update onboarding status', error)
+      }
+    },
+    [updateOnboardingStatus],
+  )
 
   return (
     <ErrorBoundary>
+      {shouldShowOnboarding && (
+        <OnboardingExperience
+          isOpen
+          onClose={async (options) => {
+            await handleOnboardingClose(options)
+          }}
+          cinematic={ASTRALUS_CINEMATIC}
+          tour={ASTRALUS_TOUR}
+          autoStart
+        />
+      )}
       {/* Only render app content after data loading is complete */}
       {/* InitialDataLoader handles showing its own loading screen */}
       {dataLoadingComplete && <AppContent />}
-      <InitialDataLoader onComplete={() => setDataLoadingComplete(true)} />
+      <InitialDataLoader
+        onComplete={() => setDataLoadingComplete(true)}
+        mode={shouldShowOnboarding ? 'headless' : 'default'}
+      />
       <TickCountdownTimer />
       <AuthTransitionOverlay />
       <Toaster 

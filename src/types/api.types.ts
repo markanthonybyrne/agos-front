@@ -160,6 +160,7 @@ export interface User {
   email: string
   last_login?: string
   created_at: string
+  onboarding_completed?: boolean
   // Optional fields used in settings UI
   api_token?: string
   role?: string // Legacy field, use roles array instead

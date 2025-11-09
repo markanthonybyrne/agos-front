@@ -278,12 +278,14 @@ export function QuantumCreditsPanel() {
 
   const formatPrice = (pkg: QuantumCreditPackage) => {
     try {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat('en-GB', {
         style: 'currency',
-        currency: pkg.currency || 'USD',
-      }).format((pkg.price || 0) / 100)
+        currency: pkg.currency || 'GBP',
+        currencyDisplay: 'symbol',
+      }).format((pkg.price ?? 0) / 100)
     } catch {
-      return `${(pkg.price || 0) / 100} ${pkg.currency ?? ''}`.trim()
+      const amount = ((pkg.price ?? 0) / 100).toFixed(2)
+      return `£${amount}`
     }
   }
 

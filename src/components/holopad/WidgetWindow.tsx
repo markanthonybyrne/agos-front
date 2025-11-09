@@ -11,7 +11,6 @@ interface WidgetWindowProps {
   onClose?: () => void
   isMinimized?: boolean
   className?: string
-  'data-tutorial'?: string
 }
 
 export function WidgetWindow({ 
@@ -21,12 +20,10 @@ export function WidgetWindow({
   onClose, 
   isMinimized = false,
   className,
-  'data-tutorial': dataTutorial
 }: WidgetWindowProps) {
   return (
     <Card 
       className={cn("h-full flex flex-col overflow-hidden", className)}
-      data-tutorial={dataTutorial}
     >
       {/* Window-style header with controls */}
       <CardHeader className="flex-shrink-0 p-2 border-b border-border/50 bg-muted/20 widget-drag-handle cursor-move">

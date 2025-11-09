@@ -253,15 +253,16 @@ export function PersistentHUD({ className, showClose = false }: PersistentHUDPro
           </div>
 
       {hudVisible && (
-            <div 
+        <div 
           className={cn(
             'fixed z-40 max-w-full pointer-events-none',
             className
           )}
-              style={{
+          style={{
             top: limitedPosition.top,
             left: limitedPosition.left,
           }}
+          data-onboarding-target="hud"
         >
           <div
                 className="pointer-events-auto w-[min(92vw,440px)] rounded-xl panel-glass surface-gradient card-glow p-4"

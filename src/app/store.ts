@@ -5,7 +5,6 @@ import gameReducer from './slices/gameSlice'
 import uiReducer from './slices/uiSlice'
 import notificationReducer from './slices/notificationSlice'
 import panelReducer from './slices/panelSlice'
-import tutorialReducer from './slices/tutorialSlice'
 import chatReducer from './slices/chatSlice'
 import planetsReducer from './slices/planetsSlice'
 import cameraReducer from './slices/cameraSlice'
@@ -20,7 +19,6 @@ export const store = configureStore({
     notifications: notificationReducer,
     panel: panelReducer,
     techTree: techTreeReducer,
-    tutorial: tutorialReducer,
     chat: chatReducer,
     planets: planetsReducer,
     camera: cameraReducer,

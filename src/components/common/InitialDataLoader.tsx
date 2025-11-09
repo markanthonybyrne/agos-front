@@ -13,11 +13,12 @@ import { universeApi } from '@/api/endpoints/universeApi'
 
 interface InitialDataLoaderProps {
   onComplete: () => void
+  mode?: 'default' | 'headless'
 }
 
 const SESSION_LOADED_KEY = 'planets_session_loaded' // Track if loaded this session
 
-export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
+export function InitialDataLoader({ onComplete, mode = 'default' }: InitialDataLoaderProps) {
   const dispatch = useAppDispatch()
   const { allPlanets, isLoading, loadingProgress, loadingPhase, isLoaded, lastLoadedAt } = useAppSelector(
     (state) => state.planets
@@ -442,7 +443,7 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
     return null
   }
   
-  if ((!showLoader && !isLoading) || hasCompleted) {
+  if ((!showLoader && !isLoading) || hasCompleted || mode === 'headless') {
     return null
   }
 
@@ -474,66 +475,60 @@ export function InitialDataLoader({ onComplete }: InitialDataLoaderProps) {
 
   return (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center">
-      {/* Glassy blur overlay */}
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
-      
-      {/* Loading content */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_-10%,rgba(46,121,141,0.18),transparent),radial-gradient(circle_at_80%_-10%,rgba(50,142,119,0.14),transparent)] bg-[#050c13e6] backdrop-blur-xl" />
+
       <div className="relative z-10 flex flex-col items-center justify-center space-y-8">
-        {/* Timer circle (similar to tick countdown) */}
-        <div className="relative w-32 h-32 flex items-center justify-center">
-          {/* Pulsing glow effect */}
-          <div className="absolute inset-0 rounded-full bg-cyan-400/20 animate-ping" />
-          <div className="absolute inset-0 rounded-full bg-cyan-400/10 animate-pulse" />
-          
-          {/* SVG Circle */}
-          <svg
-            className="absolute inset-0 w-full h-full transform -rotate-90"
-            viewBox="0 0 100 100"
-          >
-            {/* Background circle */}
+        <div className="relative flex h-36 w-36 items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-500/25 via-sky-400/20 to-emerald-500/25 blur-xl" />
+          <div className="absolute inset-[14%] rounded-full bg-[#06121c] border border-cyan-500/20 shadow-[0_0_30px_rgba(46,121,141,0.35)]" />
+
+          <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100">
+            <defs>
+              <linearGradient id="astralus-loader" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="rgba(46, 121, 141, 1)" />
+                <stop offset="50%" stopColor="rgba(50, 142, 119, 1)" />
+                <stop offset="100%" stopColor="rgba(103, 232, 249, 0.9)" />
+              </linearGradient>
+            </defs>
+
             <circle
               cx="50"
               cy="50"
               r="45"
               fill="none"
-              stroke="currentColor"
+              stroke="rgba(8, 39, 54, 0.65)"
               strokeWidth="4"
-              className="text-border/30"
             />
-            
-            {/* Progress circle */}
             <circle
               cx="50"
               cy="50"
               r="45"
               fill="none"
-              stroke="currentColor"
+              stroke="url(#astralus-loader)"
               strokeWidth="4"
               strokeLinecap="round"
-              className="text-cyan-400 transition-all duration-300"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
-              style={{
-                filter: 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.6))',
-              }}
+              style={{ filter: 'drop-shadow(0 0 14px rgba(46, 121, 141, 0.55))' }}
             />
           </svg>
-          
-          {/* Progress display */}
+
           <div className="relative z-10 flex flex-col items-center justify-center">
-            <span className="font-mono font-bold text-cyan-400 glow-cyan text-2xl">
+            <span className="text-3xl font-semibold tracking-[0.25em] text-cyan-300 drop-shadow-[0_0_12px_rgba(46,121,141,0.45)]">
               {Math.round(loadingProgress)}%
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.6em] text-cyan-200/70">
+              Syncing
             </span>
           </div>
         </div>
-        
-        {/* Phase label */}
-        <div className="text-center space-y-2">
-          <h3 className="text-xl font-semibold text-foreground glow-cyan">
+
+        <div className="text-center space-y-3">
+          <h3 className="text-xl font-semibold uppercase tracking-[0.45em] text-cyan-100">
             {getPhaseLabel()}
           </h3>
           {getPhaseDescription() && (
-            <p className="text-sm text-muted-foreground font-mono">
+            <p className="text-sm font-mono text-cyan-200/70">
               {getPhaseDescription()}
             </p>
           )}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Bell,
   Mail,
@@ -42,6 +42,19 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
     refetchOnMountOrArgChange: true,
   })
 
+  useEffect(() => {
+    const handleOnboardingStep = (event: Event) => {
+      const custom = event as CustomEvent<{ stepId?: string }>
+      if (custom.detail?.stepId === 'quick-dock') {
+        setIsCollapsed(false)
+      }
+    }
+    window.addEventListener('astralus:onboarding-tour-step', handleOnboardingStep)
+    return () => {
+      window.removeEventListener('astralus:onboarding-tour-step', handleOnboardingStep)
+    }
+  }, [])
+
   const handleLogout = () => {
     dispatch(logout())
     navigate('/login')
@@ -56,6 +69,7 @@ export function QuickAccessSidebar({ constructionCount = 0 }: QuickAccessSidebar
           isCollapsed ? '-translate-x-full' : 'translate-x-0'
         )}
         style={{ width: '64px' }}
+        data-onboarding-target="quick-dock"
       >
       {/* EVE-style vertical icon bar with glass effect */}
       <div className="w-full h-full flex flex-col items-center pt-4 pb-4 gap-2 panel-glass surface-gradient card-glow vignette border-r border-border/50 pointer-events-auto">

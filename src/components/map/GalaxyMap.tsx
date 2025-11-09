@@ -738,6 +738,7 @@ export function GalaxyMap() {
     <div 
       ref={zoomPan.containerRef}
       className="fixed inset-0 overflow-hidden z-0"
+      data-onboarding-target="galaxy-map"
       style={{ 
         backgroundColor: 'transparent',
       }}

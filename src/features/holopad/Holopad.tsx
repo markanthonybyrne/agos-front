@@ -390,7 +390,7 @@ export function Holopad() {
   }
 
   return (
-    <div className="px-6 py-8 holopad-enter pb-24">
+    <div className="px-6 py-8 holopad-enter pb-24" data-onboarding-target="holopad">
       <GridLayout
         className="layout"
         layout={visibleLayout}

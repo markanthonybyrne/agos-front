@@ -96,7 +96,7 @@ const DialogContent = React.forwardRef<
           visibility: 'visible',
         }}
         onClick={(e) => {
-          // Prevent clicks inside tutorial modal from closing panels
+          // Prevent clicks inside the dialog from bubbling and closing surrounding panels
           e.stopPropagation()
         }}
         {...props}

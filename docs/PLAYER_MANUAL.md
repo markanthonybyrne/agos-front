@@ -86,6 +86,7 @@ The game runs on **server-driven ticks** (default: 30 minutes - testing: 5 minut
    - View planet coordinates and type
    - Check initial resource balances
    - Review available construction options
+   - Let the in-game onboarding briefing finish streaming; the guided tour that follows will walk you through the HUD, quick dock, and holopad layout.
 
 2. **Build Infrastructure**:
    - Purchase Mines (for Tellerium production)
