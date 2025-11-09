@@ -22,6 +22,8 @@ interface SystemViewProps {
   className?: string
   systemName?: string | null
   visibilityData?: VisibilityResponse // Visibility data for fog of war
+  playerEmpireId?: number | null
+  playerAvatarUrl?: string | null
 }
 
 /**
@@ -43,7 +45,9 @@ function SystemView({
   hoveredPlanet,
   className = '',
   systemName,
-  visibilityData
+  visibilityData,
+  playerEmpireId,
+  playerAvatarUrl,
 }: SystemViewProps) {
   // Use normalized zoom if provided, otherwise calculate from scale
   const effectiveNormalizedZoom = normalizedZoom ?? (() => {
@@ -241,6 +245,13 @@ function SystemView({
       {/* Performance optimization: render different detail levels based on zoom */}
       {planetOrbits.map(({ planet, planetXY, radius, angle }) => {
         const isHovered = hoveredPlanet?.id === planet.id
+        const ownedByPlayer = Boolean(playerEmpireId) && (
+          planet.owner_empire_id === playerEmpireId ||
+          (planet.owner_empire_id === undefined && (planet.state === 'homeworld' || planet.state === 'colony'))
+        )
+        const avatarBadgeSize = Math.max(basePlanetSize * 0.55, 12)
+        const avatarOffset = basePlanetSize * 0.68
+        const avatarClipId = `planet-owner-avatar-${system.key}-${planet.id}`
         // Check if planet is visible for interaction
         const isPlanetVisibleForInteraction = isPlanetVisible(planet, visibilityData)
         
@@ -322,6 +333,61 @@ function SystemView({
               filter: isPlanetVisibleForInteraction ? 'none' : 'brightness(0.3)'
             }}
           >
+            {ownedByPlayer && (
+              <>
+                <circle
+                  cx={currentPlanetX}
+                  cy={currentPlanetY}
+                  r={planetSize * 0.65}
+                  stroke="rgba(126, 220, 255, 0.85)"
+                  strokeWidth={Math.max(planetSize * 0.12, 1.8)}
+                  fill="none"
+                  className="planet-owned-ring"
+                  style={{
+                    filter: 'drop-shadow(0 0 8px rgba(126, 220, 255, 0.75))',
+                    opacity: 0.95,
+                  }}
+                />
+                {playerAvatarUrl ? (
+                  <>
+                    <defs>
+                      <clipPath id={avatarClipId}>
+                        <circle
+                          cx={currentPlanetX + avatarOffset}
+                          cy={currentPlanetY - avatarOffset}
+                          r={avatarBadgeSize / 2}
+                        />
+                      </clipPath>
+                    </defs>
+                    <circle
+                      cx={currentPlanetX + avatarOffset}
+                      cy={currentPlanetY - avatarOffset}
+                      r={(avatarBadgeSize / 2) + 2}
+                      fill="rgba(6, 18, 36, 0.85)"
+                      stroke="rgba(126, 220, 255, 0.65)"
+                      strokeWidth={1.5}
+                      style={{ filter: 'drop-shadow(0 0 4px rgba(126, 220, 255, 0.55))' }}
+                    />
+                    <image
+                      href={playerAvatarUrl}
+                      x={currentPlanetX + avatarOffset - avatarBadgeSize / 2}
+                      y={currentPlanetY - avatarOffset - avatarBadgeSize / 2}
+                      width={avatarBadgeSize}
+                      height={avatarBadgeSize}
+                      clipPath={`url(#${avatarClipId})`}
+                    />
+                  </>
+                ) : (
+                  <circle
+                    cx={currentPlanetX}
+                    cy={currentPlanetY}
+                    r={planetSize * 0.35}
+                    fill="rgba(126, 220, 255, 0.18)"
+                    style={{ filter: 'blur(0.5px)' }}
+                  />
+                )}
+              </>
+            )}
             {planetImage && (
               <>
                 {/* Planet glow on hover */}
@@ -436,6 +502,9 @@ export const SystemViewMemo = memo(SystemView, (prevProps, nextProps) => {
     nextProps.normalizedZoom !== undefined &&
     Math.abs(prevProps.normalizedZoom - nextProps.normalizedZoom) >= 0.05
   
+  const playerEmpireChanged = prevProps.playerEmpireId !== nextProps.playerEmpireId
+  const avatarChanged = prevProps.playerAvatarUrl !== nextProps.playerAvatarUrl
+  
   return (
     prevProps.system.key === nextProps.system.key &&
     !scaleChanged &&
@@ -444,7 +513,9 @@ export const SystemViewMemo = memo(SystemView, (prevProps, nextProps) => {
     prevProps.system.planets.length === nextProps.system.planets.length && // Check if planets changed
     prevProps.systemName === nextProps.systemName && // Check if system name changed
     (prevProps.detailLevel ?? 'full') === (nextProps.detailLevel ?? 'full') && // Check if detail level changed
-    prevProps.visibilityData === nextProps.visibilityData // Check if visibility data changed
+    prevProps.visibilityData === nextProps.visibilityData && // Check if visibility data changed
+    !playerEmpireChanged &&
+    !avatarChanged
   )
 })
 

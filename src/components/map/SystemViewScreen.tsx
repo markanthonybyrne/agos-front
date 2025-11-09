@@ -15,6 +15,7 @@ import { WarpTransition } from './WarpTransition'
 import { PlanetZoomView } from './PlanetZoomView'
 import { PlanetHexGridView } from './PlanetHexGridView'
 import { useAuth } from '@/hooks/useAuth'
+import { getAvatarUrl } from '@/lib/avatar'
 
 /**
  * SystemViewScreen - Detailed system view screen
@@ -41,6 +42,7 @@ export function SystemViewScreen() {
   
   // Fetch visibility data for fog of war
   const { data: visibilityData } = useGetVisibilityQuery()
+  const playerAvatarUrl = useMemo(() => getAvatarUrl(empire?.avatar_url || empire?.avatar_path), [empire?.avatar_url, empire?.avatar_path])
   
   const regionNum = region ? parseInt(region, 10) : null
   const systemNum = system ? parseInt(system, 10) : null
@@ -373,6 +375,8 @@ export function SystemViewScreen() {
               hoveredPlanet={hoveredPlanet}
               systemName={systemViewData.system_name}
               visibilityData={visibilityData}
+              playerEmpireId={empire?.id}
+              playerAvatarUrl={playerAvatarUrl ?? undefined}
             />
           </g>
         </svg>
