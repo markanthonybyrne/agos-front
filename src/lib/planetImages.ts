@@ -122,20 +122,30 @@ const MAX_ASTEROID_TYPES = asteroidImages.length
  * This ensures the same system always gets the same sol image
  */
 export function getRandomSolImageForSystem(systemKey: string): string {
-  // Parse the system key (format: "Q:S:G:SY")
-  const parts = systemKey.split(':').map(Number)
-  if (parts.length < 4) {
-    return solImg // Default if invalid
+  if (!systemKey) {
+    return solImg
   }
-  
-  const [quadrant, sector, galaxy, system] = parts
-  
-  // Create a deterministic hash from coordinates
-  const hash = quadrant * 10000 + sector * 1000 + galaxy * 100 + system
-  
-  // Map hash to 0-6 range (7 sol images)
+
+  const parts = systemKey.split(':').map((value) => Number(value))
+
+  let hash = 0
+
+  if (parts.length >= 4 && parts.every((value) => Number.isFinite(value))) {
+    const [quadrant, sector, galaxy, system] = parts
+    hash = quadrant * 10000 + sector * 1000 + galaxy * 100 + system
+  } else if (parts.length >= 2 && parts.every((value) => Number.isFinite(value))) {
+    const [region, system] = parts
+    hash = region * 1000 + system
+  } else {
+    for (let index = 0; index < systemKey.length; index += 1) {
+      hash = (hash << 5) - hash + systemKey.charCodeAt(index)
+      hash |= 0
+    }
+    hash = Math.abs(hash)
+  }
+
   const index = hash % MAX_SOL_TYPES
-  
+
   return solImages[index]
 }
 

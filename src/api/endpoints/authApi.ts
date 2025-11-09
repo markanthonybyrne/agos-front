@@ -5,8 +5,11 @@ import {
   RegisterRequest,
   LoginRequest,
   Planet,
+  SocialAuthCallbackRequest,
+  SocialAuthResponse,
+  SocialAuthResponseMeta,
 } from '@/types/api.types'
-import { updateUser } from '@/app/slices/authSlice'
+import { updateUser, setSocialProviders, clearSocialProviders } from '@/app/slices/authSlice'
 
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -358,6 +361,92 @@ export const authApi = apiSlice.injectEndpoints({
       },
       invalidatesTags: ['Empire'],
     }),
+    getSocialProviders: builder.query<string[], void>({
+      query: () => '/auth/social/providers',
+      transformResponse: (response: { status?: string; data?: string[] } | string[]) => {
+        if (Array.isArray(response)) {
+          return response
+        }
+        if (response && typeof response === 'object') {
+          if (Array.isArray((response as any).providers)) {
+            return (response as any).providers
+          }
+          if (Array.isArray(response.data)) {
+            return response.data
+          }
+          if (Array.isArray((response as any).data?.providers)) {
+            return (response as any).data.providers
+          }
+        }
+        return []
+      },
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled
+          dispatch(setSocialProviders(data))
+        } catch (error: any) {
+          // If provider endpoint disabled (404), clear providers
+          dispatch(clearSocialProviders())
+        }
+      },
+    }),
+    getSocialRedirect: builder.mutation<
+      { authorization_url: string },
+      { provider: string; redirectUri?: string; stateless?: 0 | 1 }
+    >({
+      query: ({ provider, redirectUri, stateless }) => {
+        const params: Record<string, string | number> = {}
+        if (redirectUri) params.redirect_uri = redirectUri
+        if (typeof stateless === 'number') params.stateless = stateless
+        return {
+          url: `/auth/social/${provider}/redirect`,
+          method: 'GET',
+          params,
+        }
+      },
+      transformResponse: (response: { status?: string; data?: { authorization_url: string }; authorization_url?: string }) => {
+        if (response?.authorization_url) {
+          return { authorization_url: response.authorization_url }
+        }
+        if (response?.data?.authorization_url) {
+          return { authorization_url: response.data.authorization_url }
+        }
+        return response as unknown as { authorization_url: string }
+      },
+    }),
+    socialCallback: builder.mutation<
+      SocialAuthResponse,
+      { provider: string; payload: SocialAuthCallbackRequest }
+    >({
+      query: ({ provider, payload }) => ({
+        url: `/auth/social/${provider}/callback`,
+        method: 'POST',
+        body: payload,
+      }),
+      transformResponse: (
+        response:
+          | SocialAuthResponse
+          | {
+              status?: string
+              data?: SocialAuthResponse
+              meta?: SocialAuthResponseMeta
+            },
+      ) => {
+        if (response && typeof response === 'object' && 'token' in response && response.token) {
+          return response as SocialAuthResponse
+        }
+
+        if (response && typeof response === 'object' && 'data' in response && response.data) {
+          const envelope = response as { data: SocialAuthResponse; meta?: SocialAuthResponseMeta }
+          return {
+            ...envelope.data,
+            meta: envelope.data.meta ?? envelope.meta,
+          }
+        }
+
+        return response as SocialAuthResponse
+      },
+    }),
   }),
 })
 
@@ -374,5 +463,8 @@ export const {
   useUpdatePreferencesMutation,
   useDeleteAccountMutation,
   useUpdateEmpireDescriptionMutation,
+  useGetSocialProvidersQuery,
+  useGetSocialRedirectMutation,
+  useSocialCallbackMutation,
 } = authApi
 

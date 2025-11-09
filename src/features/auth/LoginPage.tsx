@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useEffect, useState } from 'react'
-import { useLoginMutation, useRegisterMutation } from '@/api/endpoints/authApi'
+import { useLoginMutation, useRegisterMutation, useGetSocialRedirectMutation } from '@/api/endpoints/authApi'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setCredentials } from '@/app/slices/authSlice'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowRight, BookOpen, UserPlus, Mail, Lock, User, Crown, Globe, ArrowBigRightDash } from 'lucide-react'
+import { ArrowRight, BookOpen, UserPlus, Mail, Lock, User, Crown, Globe, ArrowBigRightDash, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/brandImages'
 // Import background images so Vite bundles them
@@ -37,17 +37,43 @@ const registerSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>
 type RegisterFormData = z.infer<typeof registerSchema>
 
+const SOCIAL_PROVIDER_CONFIG = {
+  google: {
+    loginLabel: 'Continue with Google',
+    registerLabel: 'Sign up with Google',
+    className: 'bg-white/95 text-gray-900 border border-white/30 hover:bg-white focus-visible:ring-[#4285F4]',
+    icon: <GoogleLogo className="h-4 w-4" />,
+  },
+  discord: {
+    loginLabel: 'Continue with Discord',
+    registerLabel: 'Sign up with Discord',
+    className: 'bg-[#5865F2]/90 text-white border border-[#5865F2]/40 hover:bg-[#5865F2] focus-visible:ring-[#5865F2]',
+    icon: <DiscordLogo className="h-4 w-4" />,
+  },
+} as const
+
+type SocialProviderKey = keyof typeof SOCIAL_PROVIDER_CONFIG
+
+const SUPPORTED_SOCIAL_PROVIDERS = Object.keys(SOCIAL_PROVIDER_CONFIG) as SocialProviderKey[]
+
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const dispatch = useAppDispatch()
   const [login, { isLoading: isLoggingIn }] = useLoginMutation()
   const [register, { isLoading: isRegistering }] = useRegisterMutation()
+  const [getSocialRedirect] = useGetSocialRedirectMutation()
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [activeSocialProvider, setActiveSocialProvider] = useState<SocialProviderKey | null>(null)
   
   // Check if user is already authenticated
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
   const token = useAppSelector((state) => state.auth.token)
+  const socialProviders = useAppSelector((state) => state.auth.socialProviders)
+  const availableSocialProviders = socialProviders.filter((provider): provider is SocialProviderKey =>
+    SUPPORTED_SOCIAL_PROVIDERS.includes(provider as SocialProviderKey)
+  )
+  const hasSocialProviders = availableSocialProviders.length > 0
 
   // Randomly select background on mount
   const [backgroundUrl] = useState(() => {
@@ -62,6 +88,88 @@ export function LoginPage() {
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   })
+
+  const handleSocialAuth = async (provider: SocialProviderKey) => {
+    const redirectUri = `${window.location.origin}/auth/callback?provider=${provider}`
+    try {
+      setActiveSocialProvider(provider)
+      const result = await getSocialRedirect({
+        provider,
+        redirectUri,
+      }).unwrap()
+
+      if (result?.authorization_url) {
+        window.location.href = result.authorization_url
+      } else {
+        throw new Error('Missing authorization URL')
+      }
+    } catch (error: any) {
+      const status = error?.status
+      if (status === 404) {
+        toast.error('This sign-in method is currently unavailable.')
+      } else if (status === 422) {
+        toast.error('The provider denied access. Please grant the requested permissions and try again.')
+      } else {
+        toast.error('Unable to start social sign-in. Please try again.')
+      }
+      console.error('[Auth] Social redirect failed', error)
+    } finally {
+      setActiveSocialProvider((current) => (current === provider ? null : current))
+    }
+  }
+
+  const renderDivider = (label: string) => (
+    <div className="relative pt-4">
+      <div className="absolute inset-0 flex items-center">
+        <span className="w-full border-t border-border/50" />
+      </div>
+      <div className="relative flex justify-center text-[10px] uppercase tracking-[0.45em]">
+        <span className="bg-card px-3 py-1 text-muted-foreground font-semibold">
+          {label}
+        </span>
+      </div>
+    </div>
+  )
+
+  const renderSocialButtons = (mode: 'login' | 'register') => {
+    if (!hasSocialProviders) return null
+    return (
+      <div className="space-y-3">
+        {availableSocialProviders.map((provider) => {
+          const config = SOCIAL_PROVIDER_CONFIG[provider]
+          const isActive = activeSocialProvider === provider
+          return (
+            <Button
+              key={provider}
+              type="button"
+              variant="outline"
+              disabled={isActive}
+              onClick={() => handleSocialAuth(provider)}
+              className={cn(
+                'w-full h-11 justify-center gap-3 text-sm font-semibold transition-all duration-200',
+                'bg-gray-900/80 border border-white/10 text-white hover:bg-gray-800/80',
+                'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                config.className,
+                isActive && 'opacity-70 pointer-events-none'
+              )}
+            >
+              {isActive ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Redirecting...
+                </span>
+              ) : (
+                <>
+                  {config.icon}
+                  <span>{mode === 'login' ? config.loginLabel : config.registerLabel}</span>
+                </>
+              )}
+            </Button>
+          )
+        })}
+      </div>
+    )
+  }
 
   // Set register mode if coming from /register route
   useEffect(() => {
@@ -277,6 +385,12 @@ export function LoginPage() {
                     className="absolute inset-0 animate-in fade-in slide-in-from-right-5 duration-500 ease-out"
                   >
                     <div className="space-y-6 p-6">
+                      {hasSocialProviders && (
+                        <div className="space-y-3">
+                          {renderSocialButtons('login')}
+                          {renderDivider('Or continue with email')}
+                        </div>
+                      )}
                       <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-5">
                         <div className="space-y-2">
                           <Label htmlFor="email" className="text-sm font-semibold flex items-center gap-2 text-foreground">
@@ -353,14 +467,7 @@ export function LoginPage() {
                         </Button>
                       </form>
                       
-                      <div className="relative pt-4">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t border-border/50" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">Or</span>
-                        </div>
-                      </div>
+                      {renderDivider('More options')}
 
                       <div className="space-y-3 pt-2">
                         <Button 
@@ -395,6 +502,12 @@ export function LoginPage() {
                     className="absolute inset-0 animate-in fade-in slide-in-from-left-5 duration-500 ease-out"
                   >
                     <div className="space-y-6 p-6">
+                      {hasSocialProviders && (
+                        <div className="space-y-3">
+                          {renderSocialButtons('register')}
+                          {renderDivider('Or enlist with email')}
+                        </div>
+                      )}
                       <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-5">
                         <div className="space-y-2">
                           <Label htmlFor="username" className="text-sm font-semibold flex items-center gap-2 text-foreground">
@@ -519,14 +632,7 @@ export function LoginPage() {
                         </Button>
                       </form>
                       
-                      <div className="relative pt-4">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t border-border/50" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">Or</span>
-                        </div>
-                      </div>
+                      {renderDivider('Already enlisted?')}
 
                       <div className="space-y-3 pt-2">
                         <Button
@@ -593,5 +699,53 @@ export function LoginPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+interface SocialLogoProps {
+  className?: string
+}
+
+function GoogleLogo({ className }: SocialLogoProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="#4285F4"
+        d="M23.489 12.272c0-.85-.075-1.472-.239-2.118H12v4.016h6.54c-.132 1.047-.844 2.626-2.422 3.676l-.022.145 3.518 2.726.244.024c2.243-2.068 3.631-5.108 3.631-8.469Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.295 0 6.067-1.093 8.09-2.982l-3.855-2.987c-1.035.703-2.425 1.194-4.235 1.194-3.237 0-5.981-2.13-6.964-5.076l-.144.012-3.77 2.915-.049.135C2.975 21.626 7.125 24 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.036 13.149a7.214 7.214 0 0 1-.377-2.307c0-.804.139-1.582.365-2.307l-.006-.155-3.828-2.964-.125.059A11.955 11.955 0 0 0 0 10.842c0 1.928.466 3.749 1.265 5.366l3.771-2.915Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.74c2.292 0 3.833.96 4.713 1.763l3.439-3.362C18.052 1.229 15.295 0 12 0 7.125 0 2.975 2.374 1.265 6.134l3.758 2.97C6.986 6.159 9.73 4.74 12 4.74Z"
+      />
+    </svg>
+  )
+}
+
+function DiscordLogo({ className }: SocialLogoProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M20.317 4.369A19.791 19.791 0 0 0 16.557 3l-.183.203c2.176.67 3.28 1.63 3.28 1.63-1.364-.75-2.593-1.125-3.781-1.276a14.537 14.537 0 0 0-6.531.25c-.123.029-.237.062-.356.093l-.024.006c-.07.018-.109.03-.109.03s1.087-.974 3.44-1.652L12.065 3c-.453.003-2.879.059-5.433 1.718 0 0-2.816 5.141-2.816 11.444 0 0 1.645 2.834 5.98 2.973 0 0 .726-.873 1.314-1.623-2.493-.741-3.436-2.289-3.436-2.289s.194.135.542.327l.019.011c.045.026.09.05.136.075.391.209.781.372 1.143.506.64.246 1.4.492 2.291.663a13.03 13.03 0 0 0 5.217-.048c.433-.082.873-.199 1.332-.35.228-.072.468-.159.72-.273l.046-.02s-.964 1.573-3.514 2.301c.588.748 1.3 1.601 1.3 1.601 4.335-.139 5.98-2.973 5.98-2.973 0-6.303-2.816-11.444-2.816-11.444ZM9.548 13.737c-.978 0-1.777-.893-1.777-1.99 0-1.098.782-2.005 1.777-2.005s1.79.907 1.777 2.004c0 1.098-.782 1.991-1.777 1.991Zm4.895 0c-.978 0-1.777-.893-1.777-1.99 0-1.098.781-2.005 1.777-2.005 1.004 0 1.79.907 1.777 2.004 0 1.098-.773 1.991-1.777 1.991Z"
+      />
+    </svg>
   )
 }

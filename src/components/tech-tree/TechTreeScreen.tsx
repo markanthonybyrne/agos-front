@@ -22,6 +22,7 @@ import {
   removePlan,
   setActivePlan,
   setAdvisorState,
+  addPlan,
 } from '@/app/slices/techTreeSlice'
 import type { TechTreePlan, TechTreeState, TechAdvisorState } from '@/app/slices/techTreeSlice'
 import { TechNodeData, TechNodeType, SpecializationType } from '@/types/tech-tree.types'

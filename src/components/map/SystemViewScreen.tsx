@@ -3,7 +3,7 @@ import { useGetMapQuery, useGetVisibilityQuery } from '@/api/endpoints/universeA
 import { usePanel } from '@/components/common/PanelManager'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
 import { getPlanetRegionAndSystem } from '@/lib/galaxyUtils'
-import { SystemViewMemo } from './SystemView'
+import { SystemViewMemo, BASE_ORBIT_RADIUS, ORBIT_SPACING } from './SystemView'
 import { SystemData } from '@/lib/systemUtils'
 import { getPlanetXY, parseCoordinate } from '@/lib/coordinates'
 import { Planet } from '@/types/api.types'
@@ -148,6 +148,8 @@ export function SystemViewScreen() {
       x: (Math.min(...xs) + Math.max(...xs)) / 2,
       y: (Math.min(...ys) + Math.max(...ys)) / 2
     }
+    const maxRadius = BASE_ORBIT_RADIUS + Math.max(systemPlanets.length - 1, 0) * ORBIT_SPACING
+    const orbitMargin = maxRadius + 220
     
     // Create SystemData for SystemView component
     // We need to adapt to the old format for compatibility
@@ -164,10 +166,10 @@ export function SystemViewScreen() {
       system: systemNum,
       center,
       bounds: {
-        x_min: Math.min(...xs),
-        x_max: Math.max(...xs),
-        y_min: Math.min(...ys),
-        y_max: Math.max(...ys)
+        x_min: center.x - orbitMargin,
+        x_max: center.x + orbitMargin,
+        y_min: center.y - orbitMargin,
+        y_max: center.y + orbitMargin
       },
       planets: systemPlanets,
       galaxy_name: firstPlanet.region_name || null,
@@ -328,32 +330,6 @@ export function SystemViewScreen() {
           />
         )}
         
-        {/* Back button */}
-        <div className="absolute top-4 left-4 z-10">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/map')}
-            className="bg-black/70 backdrop-blur-sm border-white/20 hover:bg-black/90"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Galaxy Map
-          </Button>
-        </div>
-        
-        {/* System name header */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-          <div className="bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2">
-            <h2 className="text-white text-lg font-semibold">
-              {systemViewData.system_name || `System ${regionNum}:${systemNum}`}
-            </h2>
-            {systemViewData.galaxy_name && (
-              <p className="text-white/70 text-sm">
-                {systemViewData.galaxy_name}
-              </p>
-            )}
-          </div>
-        </div>
-        
         {/* SVG system view */}
         <svg
           className="absolute inset-0 w-full h-full"
@@ -380,6 +356,29 @@ export function SystemViewScreen() {
             />
           </g>
         </svg>
+      </div>
+      <div className="fixed bottom-6 right-6 z-10 max-w-xs sm:max-w-md">
+        <div className="panel-glass surface-gradient border border-cyan-500/40 card-glow p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-right sm:text-left">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.35em] text-white/50 mb-1">
+              Sector Intel
+            </p>
+            <h2 className="text-lg font-semibold text-white">
+              {systemViewData.system_name || `System ${regionNum}:${systemNum}`}
+            </h2>
+            <p className="text-xs text-white/60 font-mono">
+              {systemViewData.galaxy_name || `Region ${regionNum}`}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/map')}
+            className="self-end sm:self-start border-cyan-500/40 text-cyan-100 hover:bg-cyan-500/15"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Galaxy
+          </Button>
+        </div>
       </div>
       
       {/* Planet view - hex grid for owned planets, zoom view for others */}

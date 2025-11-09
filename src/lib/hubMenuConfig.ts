@@ -239,5 +239,24 @@ export const hubMenuConfig: HubCategory[] = [
       },
     ],
   },
+  {
+    id: 'guides',
+    label: 'Guides & Help',
+    icon: LayoutDashboard,
+    mainMenuItems: [
+      {
+        id: 'ui-guide',
+        label: 'UI Field Guide',
+        icon: LayoutDashboard,
+        navigateTo: '/guides/ui',
+      },
+      {
+        id: 'player-manual',
+        label: 'Player Manual',
+        icon: LayoutDashboard,
+        navigateTo: '/manual',
+      },
+    ],
+  },
 ]
 

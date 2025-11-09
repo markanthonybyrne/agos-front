@@ -6,25 +6,32 @@ interface AuthState {
   empire: Empire | null
   token: string | null
   isAuthenticated: boolean
+  socialProviders: string[]
+  socialProvidersLoaded: boolean
 }
 
 const getInitialState = (): AuthState => {
   const token = localStorage.getItem('token')
   const userStr = localStorage.getItem('user')
   const empireStr = localStorage.getItem('empire')
+  const providersStr = localStorage.getItem('social_providers')
   
   let user = null
   let empire = null
+  let socialProviders: string[] = []
   
   try {
     if (userStr) user = JSON.parse(userStr)
     if (empireStr) empire = JSON.parse(empireStr)
+    if (providersStr) socialProviders = JSON.parse(providersStr)
   } catch (error) {
     console.error('Error parsing stored auth data:', error)
     // Clear invalid data
     localStorage.removeItem('user')
     localStorage.removeItem('empire')
     localStorage.removeItem('token')
+    localStorage.removeItem('social_providers')
+    socialProviders = []
   }
   
   return {
@@ -32,6 +39,8 @@ const getInitialState = (): AuthState => {
     empire,
     token,
     isAuthenticated: !!(token && user),
+    socialProviders,
+    socialProvidersLoaded: socialProviders.length > 0,
   }
 }
 
@@ -57,9 +66,12 @@ const authSlice = createSlice({
       state.empire = null
       state.token = null
       state.isAuthenticated = false
+      state.socialProviders = []
+      state.socialProvidersLoaded = false
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('empire')
+      localStorage.removeItem('social_providers')
       // Clear universe map cache on logout
       localStorage.removeItem('universe_map_planets')
       localStorage.removeItem('universe_map_planets_timestamp')
@@ -77,9 +89,26 @@ const authSlice = createSlice({
       state.user = action.payload
       localStorage.setItem('user', JSON.stringify(action.payload))
     },
+    setSocialProviders: (state, action: PayloadAction<string[]>) => {
+      state.socialProviders = action.payload
+      state.socialProvidersLoaded = true
+      localStorage.setItem('social_providers', JSON.stringify(action.payload))
+    },
+    clearSocialProviders: (state) => {
+      state.socialProviders = []
+      state.socialProvidersLoaded = false
+      localStorage.removeItem('social_providers')
+    },
   },
 })
 
-export const { setCredentials, logout, updateEmpire, updateUser } = authSlice.actions
+export const {
+  setCredentials,
+  logout,
+  updateEmpire,
+  updateUser,
+  setSocialProviders,
+  clearSocialProviders,
+} = authSlice.actions
 export default authSlice.reducer
 

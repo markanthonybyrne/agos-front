@@ -27,6 +27,36 @@ export interface QuantumCreditsBalance {
   transactions: QuantumCreditsTransaction[]
 }
 
+export interface QuantumCreditPackage {
+  key: string
+  slug?: string
+  id?: string | number
+  name: string
+  credits: number
+  price: number
+  currency: string
+  description?: string
+  badge?: string | null
+  perks?: string[]
+  icon?: string | null
+  most_popular?: boolean
+}
+
+export interface QuantumCreditPackagesResponse {
+  packages: QuantumCreditPackage[]
+}
+
+export interface QuantumCreditPurchaseIntentRequest {
+  package: string
+}
+
+export interface QuantumCreditPurchaseIntentResponse {
+  client_secret: string
+  payment_intent: string
+  purchase_id: string
+  publishable_key: string
+}
+
 export interface ActiveBooster {
   id: number
   type: 'production' | 'construction' | 'signal' | 'secondary_extraction'
@@ -172,6 +202,8 @@ export interface Empire {
   secondary_capacity_used?: number
   secondary_capacity_bonus_percent?: number
   secondary_resource_delta?: SecondaryResourceDelta
+  avatar_url?: string | null
+  avatar_path?: string | null
 }
 
 // Fog of War Types
@@ -821,6 +853,23 @@ export interface RegisterRequest {
 export interface LoginRequest {
   email: string
   password: string
+}
+
+export interface SocialAuthCallbackRequest {
+  code?: string
+  redirect_uri?: string
+  access_token?: string
+}
+
+export interface SocialAuthResponseMeta {
+  is_new_user?: boolean
+}
+
+export interface SocialAuthResponse {
+  token: string
+  user: User
+  empire: Empire | null
+  meta?: SocialAuthResponseMeta
 }
 
 // Legacy interface - use the one below instead

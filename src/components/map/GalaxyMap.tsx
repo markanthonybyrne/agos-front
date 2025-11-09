@@ -744,7 +744,7 @@ export function GalaxyMap() {
       onWheel={zoomPan.onWheel}
       onContextMenu={handleMapContextMenu}
     >
-      <div className="absolute top-4 left-4 z-[200] w-64 space-y-2">
+      <div className="absolute bottom-6 right-6 z-[200] w-64 space-y-2">
         <div className="rounded-lg border border-cyan-500/20 bg-slate-900/80 backdrop-blur-sm p-3 shadow-lg shadow-cyan-500/10">
           <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200 mb-2">
             Materials Overlay

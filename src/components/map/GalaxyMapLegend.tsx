@@ -23,15 +23,19 @@ export function GalaxyMapLegend({ regions, className = '' }: GalaxyMapLegendProp
     height: 350,
   })
 
-  // Initialize position on mount - bottom-left corner
+  // Initialize position on mount - bottom-right corner
   useEffect(() => {
     if (position === null) {
-      setPosition({ 
-        x: 20, 
-        y: window.innerHeight - dimensions.height - 20 // Position near bottom
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const x = Math.max(20, viewportWidth - dimensions.width - 20)
+      const y = Math.max(20, viewportHeight - dimensions.height - 20)
+      setPosition({
+        x,
+        y,
       })
     }
-  }, [position, dimensions.height])
+  }, [position, dimensions.height, dimensions.width])
 
   // Get regions to display - use provided regions or show all 20
   const regionsToShow = useMemo(() => {
@@ -58,7 +62,7 @@ export function GalaxyMapLegend({ regions, className = '' }: GalaxyMapLegendProp
         onClick={handleRestore}
         className="fixed z-50 px-3 py-2 panel-glass border border-cyan-500/30 rounded-none cut-corners text-xs text-cyan-300 hover:bg-gray-800/50 hover:border-cyan-400/50 transition-all duration-200"
         style={{ 
-          left: `${position.x}px`, 
+          left: `${Math.max(20, Math.min(window.innerWidth - 160, position.x))}px`, 
           bottom: `${Math.max(20, bottomPosition)}px` 
         }}
       >

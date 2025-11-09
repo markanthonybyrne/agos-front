@@ -1,7 +1,6 @@
-import { useMemo, memo, useState, useEffect } from 'react'
+import { useMemo, memo } from 'react'
 import { Planet } from '@/types/api.types'
-import { SystemData, calculateOrbitRadius, calculateOrbitAngle } from '@/lib/systemUtils'
-import { getPlanetXY } from '@/lib/coordinates'
+import { SystemData } from '@/lib/systemUtils'
 import { getPlanetImage, getRandomSolImageForSystem, getRandomAsteroidImageForPlanet } from '@/lib/planetImages'
 import { cn } from '@/lib/utils'
 import { formatCoordinate } from '@/lib/coordinates'
@@ -24,6 +23,21 @@ interface SystemViewProps {
   visibilityData?: VisibilityResponse // Visibility data for fog of war
   playerEmpireId?: number | null
   playerAvatarUrl?: string | null
+}
+
+export const BASE_ORBIT_RADIUS = 260
+export const ORBIT_SPACING = 140
+
+function hashAngle(seed: string, index: number, total: number): number {
+  let hash = 0
+  const combinedSeed = `${seed}-${index}-${total}`
+  for (let position = 0; position < combinedSeed.length; position += 1) {
+    hash = (hash << 5) - hash + combinedSeed.charCodeAt(position)
+    hash |= 0
+  }
+  const baseAngle = (index / Math.max(total, 1)) * Math.PI * 2
+  const offset = ((hash % 360) / 360) * Math.PI * 2
+  return baseAngle + offset
 }
 
 /**
@@ -49,36 +63,33 @@ function SystemView({
   playerEmpireId,
   playerAvatarUrl,
 }: SystemViewProps) {
-  // Use normalized zoom if provided, otherwise calculate from scale
   const effectiveNormalizedZoom = normalizedZoom ?? (() => {
     const minScale = 0.09
     const maxScale = 1.554
     return Math.max(0, Math.min(1, (scale - minScale) / (maxScale - minScale)))
   })()
-  
-  // Disable orbiting animation - planets stay static on orbit rings
-  const shouldAnimateOrbits = false
-  
-  // Animation time for orbital motion (not used anymore)
-  const [animationTime] = useState(0)
-  
-  // Calculate orbit information for each planet
-  const planetOrbits = useMemo(() => {
-    return system.planets.map(planet => {
-      const planetXY = getPlanetXY(planet)
-      if (!planetXY) return null
-      
-      const radius = calculateOrbitRadius(planetXY, system.center)
-      const angle = calculateOrbitAngle(planetXY, system.center)
-      
+ 
+  const planetLayout = useMemo(() => {
+    const total = system.planets.length
+    if (total === 0) return []
+
+    return system.planets.map((planet, index) => {
+      const radius = BASE_ORBIT_RADIUS + index * ORBIT_SPACING
+      const angle = hashAngle(String(planet.id ?? planet.coordinate ?? index), index, total)
+      const planetXY = {
+        x: system.center.x + radius * Math.cos(angle),
+        y: system.center.y + radius * Math.sin(angle),
+      }
+
       return {
         planet,
         planetXY,
         radius,
-        angle
+        angle,
+        index,
       }
-    }).filter((orbit): orbit is NonNullable<typeof orbit> => orbit !== null)
-  }, [system.planets, system.center])
+    })
+  }, [system.center, system.planets])
   
   // Calculate asset sizes based on normalized zoom (0.0-1.0)
   // Smooth scaling: linear interpolation between min and max based on zoom
@@ -112,35 +123,8 @@ function SystemView({
         
         if (orbitOpacity <= 0) return null
         
-        // Render an orbit line for each planet in the system
-        // Use ALL planets from system.planets, not just those in planetOrbits
-        // This ensures every planet gets an orbit line, even if position calculation had issues
-        return system.planets.map(planet => {
-          // Get planet position - use fallback if getPlanetXY fails
-          const planetXY = getPlanetXY(planet) || (() => {
-            // Fallback: use system center as planet position if we can't calculate it
-            // This ensures we still render an orbit line (even if at radius 0)
-            return system.center
-          })()
-          
-          let radius = calculateOrbitRadius(planetXY, system.center)
-          
-          // Skip orbits with invalid radius
-          if (!isFinite(radius) || radius < 0) {
-            return null
-          }
-          
-          // Ensure minimum visible radius for planets at system center
-          // This ensures all planets have visible orbit lines
-          const minRadius = 5 // Minimum 5 units radius for visibility
-          if (radius < minRadius) {
-            radius = minRadius
-          }
-          
-          // Calculate animation speed based on radius - larger orbits move slower
-          // Base speed: 180 seconds for full cycle, scaled by radius for realism
-          const animationDuration = 180 + (radius * 0.15) // Larger orbits take longer
-          
+        return planetLayout.map(({ radius, planet }) => {
+          const animationDuration = 180 + radius * 0.15
           return (
             <circle
               key={`orbit-${system.key}-${planet.id}-${radius}`}
@@ -243,7 +227,11 @@ function SystemView({
       {/* Planets use their actual X/Y coordinates which already place them in orbits around their sol */}
       {/* At high zoom (450%-500%), planets animate along their orbits */}
       {/* Performance optimization: render different detail levels based on zoom */}
-      {planetOrbits.map(({ planet, planetXY, radius, angle }) => {
+      {planetLayout.map(({ planet, planetXY, index }) => {
+        const planetKey =
+          planet.id ??
+          planet.coordinate ??
+          `${system.key}-planet-${index}`
         const isHovered = hoveredPlanet?.id === planet.id
         const ownedByPlayer = Boolean(playerEmpireId) && (
           planet.owner_empire_id === playerEmpireId ||
@@ -263,7 +251,7 @@ function SystemView({
         if (detailLevel === 'minimal') {
           return (
             <circle
-              key={planet.id}
+              key={`planet-min-${planetKey}`}
               cx={currentPlanetX}
               cy={currentPlanetY}
               r={Math.max(2, basePlanetSize * 0.3)}
@@ -310,7 +298,7 @@ function SystemView({
         
         return (
           <g
-            key={planet.id}
+            key={`planet-${planetKey}`}
             className={cn(
               'planet-orbit',
               isHovered && 'planet-hovered',
@@ -418,15 +406,15 @@ function SystemView({
             {detailLevel === 'full' && (
               <>
                 {/* At 0.75-0.85 normalized zoom, show labels normally */}
-                {(effectiveNormalizedZoom >= 0.75 && effectiveNormalizedZoom < 0.85) && (
+                {effectiveNormalizedZoom >= 0.75 && effectiveNormalizedZoom < 0.85 && (
                   <g>
                     <text
                       x={currentPlanetX}
-                      y={currentPlanetY + planetSize / 2 + 12}
+                      y={currentPlanetY + planetSize / 2 + 10}
                       textAnchor="middle"
                       className="fill-white font-mono font-semibold"
                       style={{ 
-                        fontSize: `${Math.max(6, Math.min(8, 6 + effectiveNormalizedZoom * 2))}px`,
+                        fontSize: `${Math.max(4, Math.min(5.5, 4 + effectiveNormalizedZoom * 0.8))}px`,
                         textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                       }}
                     >
@@ -434,11 +422,11 @@ function SystemView({
                     </text>
                     <text
                       x={currentPlanetX}
-                      y={currentPlanetY + planetSize / 2 + 22}
+                      y={currentPlanetY + planetSize / 2 + 18}
                       textAnchor="middle"
                       className="fill-gray-300 font-mono"
                       style={{ 
-                        fontSize: `${Math.max(5, Math.min(7, 5 + effectiveNormalizedZoom * 1.5))}px`,
+                        fontSize: `${Math.max(3.5, Math.min(4.5, 3.5 + effectiveNormalizedZoom * 0.6))}px`,
                         textShadow: '0 0 3px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                       }}
                     >
@@ -455,7 +443,7 @@ function SystemView({
                       textAnchor="middle"
                       className="fill-white font-mono font-semibold"
                       style={{ 
-                        fontSize: '7px',
+                        fontSize: '4.5px',
                         textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                       }}
                     >
@@ -467,7 +455,7 @@ function SystemView({
                       textAnchor="middle"
                       className="fill-gray-300 font-mono"
                       style={{ 
-                        fontSize: '6px',
+                        fontSize: '4px',
                         textShadow: '0 0 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 0.8)'
                       }}
                     >

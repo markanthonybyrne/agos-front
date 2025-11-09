@@ -16,6 +16,7 @@ import { AdminGuard } from '@/features/admin/components/AdminGuard'
 import { LandingGuard } from '@/components/common/LandingGuard'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { SocialAuthCallbackPage } from '@/features/auth/SocialAuthCallbackPage'
 import { PlayerManual } from '@/features/manual/PlayerManual'
 import { Holopad } from '@/features/holopad/Holopad'
 import { PlanetsList } from '@/features/planets/PlanetsList'
@@ -51,6 +52,8 @@ import { QuantumCreditsPage } from '@/features/admin/routes/QuantumCreditsPage'
 import { BoostersPage } from '@/features/admin/routes/BoostersPage'
 import { AdminPanelWrapper } from '@/features/admin/components/AdminPanelWrapper'
 import { PanelType, PanelSize } from '@/app/slices/panelSlice'
+import { UiGuidePage } from '@/features/guides/UiGuidePage'
+import { useSocialAuthProviders } from '@/hooks/useSocialAuthProviders'
 
 function AppContent() {
   // Initialize achievement notifications
@@ -64,6 +67,9 @@ function AppContent() {
   
   // Refresh map data on tick events
   useMapDataRefresh()
+
+  // Discover available social auth providers once per session
+  useSocialAuthProviders()
 
   return (
     <>
@@ -79,6 +85,7 @@ function AppContent() {
         />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
+        <Route path="/auth/callback" element={<SocialAuthCallbackPage />} />
         <Route path="/manual" element={<PlayerManual />} />
         <Route
           path="/*"
@@ -99,6 +106,7 @@ function AppContent() {
                   <Route path="/combat" element={<CombatLogsPage />} />
                   <Route path="/rankings" element={<RankingsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/guides/ui" element={<UiGuidePage />} />
                   <Route path="/tech-tree" element={<TechTreeScreen />} />
                   {/* Admin Routes */}
                   <Route
