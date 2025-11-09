@@ -153,6 +153,15 @@ export function SlidingPanel({
           transition: 'transform 300ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease-out',
           opacity: isAnimating ? 1 : 0,
         }}
+        onWheelCapture={(event) => {
+          event.stopPropagation()
+        }}
+        onMouseDownCapture={(event) => {
+          event.stopPropagation()
+        }}
+        onTouchStartCapture={(event) => {
+          event.stopPropagation()
+        }}
       >
         <Card className="flex h-full min-h-0 flex-col rounded-none border-0 panel-glass" style={{ clipPath: 'none' }}>
           {/* Sleek header with minimize/maximize */}

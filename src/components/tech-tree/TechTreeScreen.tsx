@@ -60,6 +60,7 @@ export function TechTreeScreen() {
   const location = useLocation()
   const { openPanel } = useWindow()
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [advisorNode, setAdvisorNode] = useState<TechNodeData | null>(null)
   const [pendingQueueNode, setPendingQueueNode] = useState<TechNodeData | null>(null)
   const [isPlanetSelectorOpen, setPlanetSelectorOpen] = useState(false)
   
@@ -301,6 +302,7 @@ export function TechTreeScreen() {
       const node = graphData?.nodes.find((n) => n.id === nodeId)
       if (node) {
         dispatch(selectNode(nodeId))
+        setAdvisorNode(node)
         openDetails(node)
       }
     },
@@ -365,20 +367,13 @@ export function TechTreeScreen() {
       (lastBoundsRef.current.width !== nodeBounds.width || lastBoundsRef.current.height !== nodeBounds.height)
     ) {
       const centerX = (nodeBounds.minX + nodeBounds.maxX) / 2
-      const centerY = (nodeBounds.minY + nodeBounds.maxY) / 2
-      
-      // Calculate pan to center the content in the viewport
       const viewportCenterX = window.innerWidth / 2
-      const viewportCenterY = window.innerHeight / 2
-      
-      // Account for top status bar and footer chrome
-      const chromeHeight = 180
-      const adjustedViewportCenterY = (window.innerHeight - chromeHeight) / 2
-      
+      const topInset = 120
+
       const targetPanX = viewportCenterX - centerX * zoomPan.scale
-      const targetPanY = adjustedViewportCenterY - centerY * zoomPan.scale
-      
-      // Set zoom and pan to center the tree
+      const targetPanY = topInset - nodeBounds.minY * zoomPan.scale
+
+      // Set zoom and pan to position the tree
       // Use a small delay to ensure this runs after any reset from useZoomPan
       setTimeout(() => {
         zoomPan.setZoomAndPan(zoomPan.scale, targetPanX, targetPanY)
@@ -563,6 +558,7 @@ export function TechTreeScreen() {
       const node = graphData.nodes.find((n) => n.id === selectedNodeId)
       if (node) {
         openDetails(node)
+        setAdvisorNode(node)
       }
     } else if (!selectedNodeId) {
       closeDetails()
@@ -715,7 +711,7 @@ export function TechTreeScreen() {
       <AdvisorDrawer
         isOpen={overlays.advisorHints}
         onToggle={() => handleToggleOverlay('advisorHints')}
-        selectedNode={selectedNode}
+        selectedNode={advisorNode}
         graphData={graphData}
       />
 

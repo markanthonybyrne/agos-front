@@ -204,10 +204,10 @@ export function calculateHierarchicalLayout(
   const eras = Array.from(eraGroups.keys()).sort((a, b) => a - b)
   
   // Layout configuration
-  const columnSpacing = 240
-  const rowSpacing = 170
-  const eraSpacing = 220
-  const topPadding = 160
+  const columnSpacing = 620
+  const rowSpacing = 520
+  const eraSpacing = 600
+  const topPadding = 300
   const centerX = config.width / 2
   
   eras.forEach((era, eraIndex) => {
@@ -241,9 +241,14 @@ export function calculateHierarchicalLayout(
       })
       
       const baseX = startX + columnOrder * columnSpacing
+      const usedRows = new Set<number>()
       
       columnNodes.forEach((node, index) => {
-        const rowIndex = node.row ?? index
+        let rowIndex = node.row ?? index
+        while (usedRows.has(rowIndex)) {
+          rowIndex += 1
+        }
+        usedRows.add(rowIndex)
         const y = eraBaseY + rowIndex * rowSpacing
         
         node.row = rowIndex
